@@ -3,7 +3,9 @@
 > This document started as the original project brief. It has been cleaned up so
 > it no longer contradicts the shipped bot; obsolete ideas (Docker/Oracle
 > hosting, Telegram Stars, seat counts, 25-watch supporter limits) were removed.
-> [`README.md`](../README.md) remains the authoritative, up-to-date documentation.
+> [`README.md`](../README.md) is the friendly overview and
+> [`TECHNICAL.md`](TECHNICAL.md) holds the implementation notes; together they
+> are the authoritative documentation for the shipped bot.
 
 ## Goal
 
