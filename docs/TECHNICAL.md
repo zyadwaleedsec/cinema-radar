@@ -6,18 +6,19 @@ Implementation notes for developers and operators. For a friendly overview, see
 ## Contents
 
 1. [Project structure](#project-structure)
-2. [VOX Cinemas Egypt: what we found](#vox-cinemas-egypt-what-we-found)
-3. [Low-volume design](#low-volume-design)
-4. [Configuration](#configuration)
-5. [IMAX data](#imax-data)
-6. [Watch retention](#watch-retention)
-7. [Local setup](#local-setup)
-8. [Tests, lint and audit](#tests-lint-and-audit)
-9. [UI QA checklist](#ui-qa-checklist)
-10. [Deployment on a local laptop](#deployment-on-a-local-laptop)
-11. [Security and privacy](#security-and-privacy)
-12. [Terms of use of the source site](#terms-of-use-of-the-source-site)
-13. [Troubleshooting](#troubleshooting)
+2. [Brand assets](#brand-assets)
+3. [VOX Cinemas Egypt: what we found](#vox-cinemas-egypt-what-we-found)
+4. [Low-volume design](#low-volume-design)
+5. [Configuration](#configuration)
+6. [IMAX data](#imax-data)
+7. [Watch retention](#watch-retention)
+8. [Local setup](#local-setup)
+9. [Tests, lint and audit](#tests-lint-and-audit)
+10. [UI QA checklist](#ui-qa-checklist)
+11. [Deployment on a local laptop](#deployment-on-a-local-laptop)
+12. [Security and privacy](#security-and-privacy)
+13. [Terms of use of the source site](#terms-of-use-of-the-source-site)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -53,6 +54,7 @@ cinema-radar/
 │   ├── base.py             # CinemaProvider abstraction + registry
 │   └── vox.py              # VOX Egypt provider and pure HTML parsers
 ├── data/imax_films.json    # generated IMAX snapshot (CC BY-SA 4.0, see below)
+├── assets/                 # brand mark (logo.svg + PNG exports)
 ├── docs/
 │   ├── TECHNICAL.md        # this file
 │   └── SPEC.md             # product specification
@@ -64,6 +66,25 @@ cinema-radar/
 ├── pyproject.toml          # ruff lint/format configuration
 └── .env.example
 ```
+
+---
+
+## Brand assets
+
+`assets/` holds the one official mark. Every raster file is generated from
+`assets/logo.svg`; never edit a PNG by hand.
+
+| File | Use |
+| --- | --- |
+| `logo.svg` | source of truth — 2048×2048, all text outlined to paths, no external references |
+| `logo-512.png` | README header, chat/social previews |
+| `logo-1024.png` | general raster use |
+| `logo.png` (2048) | high-DPI screens |
+| `logo-4096.png` | master export |
+
+Palette: cream `#F2EDDA` background, ink `#15100C`, red `#C81E1E`. The lockup is
+dark-on-light only — keep it on the cream field. To add a size, render the SVG at
+that exact size; never upscale an existing PNG.
 
 ---
 

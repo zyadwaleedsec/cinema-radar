@@ -1,4 +1,8 @@
-# 🎬 Cinema Radar
+<p align="center">
+  <img src="assets/logo-512.png" width="170" alt="Cinema Radar logo">
+</p>
+
+<h1 align="center">Cinema Radar</h1>
 
 A Telegram bot that watches **VOX Cinemas Egypt** showtimes for you.
 
