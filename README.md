@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-512.png" width="170" alt="Cinema Radar logo">
+  <img src="assets/logo-4096.png" width="170" alt="Cinema Radar logo">
 </p>
 
 <h1 align="center">Cinema Radar</h1>
