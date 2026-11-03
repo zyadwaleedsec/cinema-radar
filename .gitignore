@@ -1,0 +1,41 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Database
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+build/
+dist/
+
+# Tests / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local data (keep the bundled IMAX snapshot)
+data/*
+!data/imax_films.json

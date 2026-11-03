@@ -1,0 +1,14 @@
+# Cinema Radar runtime dependencies (Python 3.12)
+# Pinned to the versions exercised by the test suite.  Review and bump these
+# deliberately; do not widen them into floating ranges.
+aiogram==3.31.0
+httpx==0.28.1
+aiosqlite==0.22.1
+python-dotenv==1.2.4
+beautifulsoup4==4.15.0
+lxml==6.1.3
+tzdata==2026.6
+
+# VOX Egypt resets plain TLS clients; curl_cffi gives us a real Chrome
+# fingerprint.  http_client.py falls back to httpx if this is unavailable.
+curl_cffi==0.17.0

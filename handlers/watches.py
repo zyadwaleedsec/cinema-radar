@@ -1,0 +1,1264 @@
+"""The guided add-watch flow plus watch list/detail management."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from aiogram import F, Router
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, Message
+
+import search
+import strings
+from cache import branches_key, dates_key, movies_key, showtimes_key
+from config import Settings
+from db import Database, DuplicateWatch, WatchLimitReached
+from handlers.utils import answer, edit, int_part, loading, send, split_cb
+from keyboards import (
+    WATCH_PAGE_SIZE,
+    back_home_keyboard,
+    branch_keyboard,
+    confirm_keyboard,
+    date_keyboard,
+    movie_info_keyboard,
+    movie_keyboard,
+    retry_keyboard,
+    search_keyboard,
+    search_results_keyboard,
+    showtime_keyboard,
+    suggestion_keyboard,
+    support_keyboard,
+    watch_created_keyboard,
+    watch_delete_confirm_keyboard,
+    watch_detail_keyboard,
+    watches_clear_confirm_keyboard,
+    watches_keyboard,
+)
+from models import Movie, Showtime, TargetKey, format_key
+from scheduler import Scheduler, expected_opening_for
+from timeutil import day_end_iso, expiry_iso, resolve_timezone, today_iso
+from watcher import VALID_MODES
+
+router = Router(name="watches")
+
+
+class AddWatch(StatesGroup):
+    branch = State()
+    date = State()
+    movie = State()
+    search = State()
+    showtime = State()
+
+
+async def _cached(cache: Any, key: str, ttl: float) -> Any:
+    return await cache.get_json(key, ttl=ttl)
+
+
+async def _ack(callback: CallbackQuery) -> None:
+    """Acknowledge the tap immediately, then show a typing indicator."""
+
+    await answer(callback)
+    await loading(callback)
+
+
+async def _branches(cache: Any, settings: Settings, provider: Any) -> list[dict[str, Any]]:
+    # Read through the provider: it serves the cache first and only fetches
+    # when the cache is empty/stale, so the menu still opens after a restart.
+    branches = [b.__dict__ for b in await provider.get_branches()]
+    if not branches:
+        branches = await _cached(cache, branches_key(settings.provider), settings.cache_static_ttl)
+    return branches
+
+
+def _has_imax(showtimes: list[Showtime]) -> bool:
+    return any(format_key(showtime.hall_type) == "IMAX" for showtime in showtimes)
+
+
+def _imax_extra(movie: dict[str, Any]) -> str:
+    return strings.imax_line(movie.get("imax_status"))
+
+
+async def _imax_status(
+    db: Database, imax: Any, movie: dict[str, Any], showtimes: list[Showtime]
+) -> str | None:
+    """Resolve the IMAX indicator only when the film has an IMAX screening."""
+
+    if not _has_imax(showtimes):
+        return None
+    if movie.get("imax_status"):
+        return str(movie["imax_status"])
+    movie_id = str(movie.get("id") or "")
+    if movie_id:
+        override = await db.get_imax_override(movie_id)
+        if override:
+            return override
+    if imax is None:
+        return None
+    try:
+        return await imax.lookup(movie.get("name", ""))
+    except Exception:
+        return None
+
+
+def _watch_expiry(
+    data: dict[str, Any], scope: str, showtime: dict[str, Any], settings: Settings
+) -> str | None:
+    """When should this watch stop mattering?"""
+
+    date = data.get("date", "")
+    if scope == "movie_all_dates":
+        dates = sorted(
+            value for value in data.get("dates", []) if value >= today_iso(settings.timezone)
+        )[: settings.all_dates_max]
+        return day_end_iso(dates[-1], settings.timezone) if dates else None
+    if scope == "movie":
+        showtimes = [Showtime.from_dict(item) for item in data.get("showtimes", [])]
+        selected = data.get("format")
+        if selected:
+            showtimes = [item for item in showtimes if format_key(item.hall_type) == selected]
+        latest = max(
+            (item.time for item in showtimes if item.time),
+            default=showtime.get("time", ""),
+        )
+        if not latest:
+            return day_end_iso(date, settings.timezone)
+        return expiry_iso(date, latest, settings.timezone)
+    return expiry_iso(date, showtime.get("time", ""), settings.timezone)
+
+
+async def _begin_add(
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+    search_first: bool = False,
+) -> list[dict[str, Any]]:
+    await state.clear()
+    branches = await _branches(cache, settings, provider)
+    if not branches:
+        return []
+    await state.set_state(AddWatch.branch)
+    await state.update_data(branches=branches, search_first=search_first)
+    return branches
+
+
+@router.callback_query(F.data == "menu:add")
+async def add_start(
+    callback: CallbackQuery,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+) -> None:
+    await _ack(callback)
+    branches = await _begin_add(state, cache, settings, provider)
+    if not branches:
+        await edit(callback, strings.no_data(), retry_keyboard("menu:add"))
+        return
+    await edit(callback, strings.choose_branch(), branch_keyboard(branches))
+
+
+@router.message(Command("search"))
+async def search_cmd(
+    message: Message,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+) -> None:
+    parts = (message.text or "").split(maxsplit=1)
+    query = search.clean_query(parts[1]) if len(parts) > 1 else ""
+    branches = await _begin_add(state, cache, settings, provider, search_first=True)
+    if not branches:
+        await message.answer(strings.no_data(), reply_markup=retry_keyboard("menu:search"))
+        return
+    if query:
+        await state.update_data(pending_query=query)
+    await message.answer(
+        strings.search_choose_branch(query), reply_markup=branch_keyboard(branches)
+    )
+
+
+@router.message(Command("add"))
+async def add_cmd(
+    message: Message,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+) -> None:
+    branches = await _begin_add(state, cache, settings, provider)
+    if not branches:
+        await send(message, strings.no_data(), retry_keyboard("menu:add"))
+        return
+    await send(message, strings.choose_branch(), branch_keyboard(branches))
+
+
+@router.callback_query(F.data == "menu:search")
+async def search_menu(
+    callback: CallbackQuery,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+) -> None:
+    await _ack(callback)
+    branches = await _begin_add(state, cache, settings, provider, search_first=True)
+    if not branches:
+        await edit(callback, strings.no_data(), retry_keyboard("menu:search"))
+        return
+    await edit(callback, strings.search_choose_branch(), branch_keyboard(branches))
+
+
+@router.callback_query(AddWatch.branch, F.data.startswith("br_p:"))
+async def branches_page(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    branches = data.get("branches", [])
+    page = int_part(callback.data, 1, 2) or 0
+    text = (
+        strings.search_choose_branch(data.get("pending_query", ""))
+        if data.get("search_first")
+        else strings.choose_branch()
+    )
+    await edit(callback, text, branch_keyboard(branches, page))
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.branch, F.data.startswith("br:"))
+async def branch_chosen(
+    callback: CallbackQuery,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    branches = data.get("branches", [])
+    index = int_part(callback.data, 1, 2) or 0
+    if not (0 <= index < len(branches)):
+        await answer(callback, strings.error_expired(), alert=True)
+        return
+    branch = branches[index]
+    dates = await provider.get_dates(branch["id"])
+    if not dates:
+        dates = await _cached(
+            cache, dates_key(settings.provider, branch["id"]), settings.cache_listings_ttl
+        )
+    if not dates:
+        await edit(callback, strings.no_dates(), retry_keyboard(f"br:{index}"))
+        return
+    await state.update_data(branch=branch, dates=dates)
+    await state.set_state(AddWatch.date)
+    await edit(callback, strings.choose_date(branch["name"]), date_keyboard(dates))
+
+
+@router.callback_query(AddWatch.date, F.data.startswith("dt_p:"))
+async def dates_page(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    dates = data.get("dates", [])
+    branch = data.get("branch", {})
+    page = int_part(callback.data, 1, 2) or 0
+    await edit(
+        callback,
+        strings.choose_date(branch.get("name", "")),
+        date_keyboard(dates, page),
+    )
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.date, F.data.startswith("dt:"))
+async def date_chosen(
+    callback: CallbackQuery,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    dates = data.get("dates", [])
+    branch = data.get("branch", {})
+    index = int_part(callback.data, 1, 2) or 0
+    if not (0 <= index < len(dates)):
+        await answer(callback, strings.error_expired(), alert=True)
+        return
+    chosen = dates[index]
+    # The day the user picked may never have been fetched before (discovery
+    # only reads the default day).  Fetch it once, on demand, through the
+    # shared rate-limited client, then cache it like any other page.
+    movies = [m.__dict__ for m in await provider.get_movies(branch["id"], chosen)]
+    if not movies:
+        movies = await _cached(
+            cache,
+            movies_key(settings.provider, branch["id"], chosen),
+            settings.cache_listings_ttl,
+        )
+    if not movies:
+        await edit(callback, strings.no_movies(), retry_keyboard(f"dt:{index}", "dt_p:0"))
+        return
+    await state.update_data(
+        date=chosen,
+        movies=movies,
+        movie_view=None,
+        search_query="",
+        movies_total=len(movies),
+    )
+    if data.get("search_first"):
+        await state.set_state(AddWatch.search)
+        pending = (data.get("pending_query") or "").strip()
+        if pending:
+            text, keyboard = await _search_movies(pending, state)
+            await edit(callback, text, keyboard)
+        else:
+            await edit(
+                callback,
+                strings.search_prompt(branch.get("name", ""), chosen),
+                search_keyboard(),
+            )
+    else:
+        await state.set_state(AddWatch.movie)
+        await edit(
+            callback,
+            strings.choose_movie(branch.get("name", ""), chosen),
+            movie_keyboard(movies),
+        )
+
+
+@router.callback_query(AddWatch.movie, F.data.startswith("mv_p:"))
+async def movies_page(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    view = data.get("movie_view")
+    movies = view if view is not None else data.get("movies", [])
+    branch = data.get("branch", {})
+    date = data.get("date", "")
+    page = int_part(callback.data, 1, 2) or 0
+    keyboard = (
+        search_results_keyboard(movies, page) if view is not None else movie_keyboard(movies, page)
+    )
+    text = (
+        strings.search_results(
+            data.get("search_query", ""),
+            len(movies),
+            data.get("movies_total", len(movies)),
+        )
+        if view is not None
+        else strings.choose_movie(branch.get("name", ""), date)
+    )
+    await edit(callback, text, keyboard)
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.movie, F.data == "mv_search")
+@router.callback_query(AddWatch.search, F.data == "mv_search")
+async def movie_search_prompt(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    branch = data.get("branch", {})
+    date = data.get("date", "")
+    await state.set_state(AddWatch.search)
+    await edit(
+        callback,
+        strings.search_prompt(branch.get("name", ""), date),
+        search_keyboard(),
+    )
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.movie, F.data == "mv_all")
+@router.callback_query(AddWatch.search, F.data == "mv_all")
+async def show_all_movies(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    movies = data.get("movies", [])
+    branch = data.get("branch", {})
+    date = data.get("date", "")
+    await state.set_state(AddWatch.movie)
+    await state.update_data(movie_view=None, search_query="", movies_total=len(movies))
+    await edit(
+        callback,
+        strings.choose_movie(branch.get("name", ""), date),
+        movie_keyboard(movies),
+    )
+    await answer(callback)
+
+
+@router.callback_query(F.data.startswith("ab:"))
+async def add_back(callback: CallbackQuery, state: FSMContext) -> None:
+    """Move one step back without making a new upstream request."""
+
+    await answer(callback)
+    target = split_cb(callback.data, 2)[1]
+    data = await state.get_data()
+    branches = data.get("branches", [])
+    branch = data.get("branch", {})
+    date = data.get("date", "")
+    dates = data.get("dates", [])
+    movies = data.get("movies", [])
+    movie = data.get("movie", {})
+    if target == "branch" and branches:
+        await state.set_state(AddWatch.branch)
+        text = (
+            strings.search_choose_branch(data.get("pending_query", ""))
+            if data.get("search_first")
+            else strings.choose_branch()
+        )
+        await edit(callback, text, branch_keyboard(branches))
+        return
+    if target == "date" and branch and dates:
+        await state.set_state(AddWatch.date)
+        await edit(
+            callback,
+            strings.choose_date(branch.get("name", "")),
+            date_keyboard(dates),
+        )
+        return
+    if target == "movie" and branch and movies:
+        await state.set_state(AddWatch.movie)
+        view = data.get("movie_view")
+        if view is not None:
+            text = strings.search_results(
+                data.get("search_query", ""),
+                len(view),
+                data.get("movies_total", len(movies)),
+            )
+            await edit(callback, text, search_results_keyboard(view))
+        else:
+            await edit(
+                callback,
+                strings.choose_movie(branch.get("name", ""), date),
+                movie_keyboard(movies),
+            )
+        return
+    if target == "search":
+        await state.set_state(AddWatch.search)
+        await edit(
+            callback,
+            strings.search_prompt(branch.get("name", ""), date),
+            search_keyboard(),
+        )
+        return
+    if target == "showtime" and movie:
+        all_showtimes = [Showtime.from_dict(item) for item in data.get("showtimes", [])]
+        visible = _visible_showtimes(data)
+        if not visible:
+            await edit(callback, strings.error_expired(), back_home_keyboard())
+            return
+        await state.set_state(AddWatch.showtime)
+        await edit(
+            callback,
+            strings.choose_showtime(movie.get("name", ""), date, extra=_imax_extra(movie)),
+            showtime_keyboard(
+                visible,
+                formats=_format_counts(all_showtimes),
+                current_format=data.get("format"),
+                date_count=len(dates),
+            ),
+        )
+        return
+    await edit(callback, strings.error_expired(), back_home_keyboard())
+
+
+async def _search_movies(query: str, state: FSMContext) -> tuple[str, Any]:
+    """Search the current day's movies and return the reply text and keyboard."""
+
+    query = search.clean_query(query)
+    data = await state.get_data()
+    movies = data.get("movies", [])
+    if len(search.normalize(query)) < 2:
+        return strings.search_too_short(), search_keyboard()
+
+    key = lambda movie: movie.get("name", "")  # noqa: E731 - tiny local helper
+    hits = search.rank(query, movies, key=key, limit=20)
+    if hits:
+        view = [hit.item for hit in hits]
+        await state.update_data(
+            movie_view=view,
+            search_query=query,
+            movies_total=len(movies),
+            pending_query="",
+        )
+        await state.set_state(AddWatch.movie)
+        return (
+            strings.search_results(query, len(view), len(movies)),
+            search_results_keyboard(view),
+        )
+
+    suggestions = search.suggest(query, movies, key=key, limit=3)
+    items = [hit.item for hit in suggestions]
+    names = [item.get("name", "") for item in items]
+    await state.update_data(
+        movie_view=items or None,
+        search_query=query,
+        movies_total=len(movies),
+        pending_query="",
+    )
+    if items:
+        await state.set_state(AddWatch.movie)
+        return strings.search_no_results(query, names), suggestion_keyboard(items)
+    # Keep the current state so the user can simply type another query.
+    return strings.search_no_results(query), search_keyboard()
+
+
+async def _search_and_reply(message: Message, state: FSMContext) -> None:
+    text, keyboard = await _search_movies((message.text or "").strip(), state)
+    await message.answer(text, reply_markup=keyboard)
+
+
+@router.message(AddWatch.search)
+async def movie_search_query(message: Message, state: FSMContext) -> None:
+    await _search_and_reply(message, state)
+
+
+@router.message(AddWatch.movie)
+async def movie_list_text_search(message: Message, state: FSMContext) -> None:
+    """Typing a name on the movie list is treated as a search, no button needed."""
+
+    await _search_and_reply(message, state)
+
+
+@router.callback_query(AddWatch.movie, F.data.startswith("mv:"))
+async def movie_chosen(
+    callback: CallbackQuery,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+    db: Database,
+    imax: Any = None,
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    view = data.get("movie_view")
+    movies = view if view is not None else data.get("movies", [])
+    branch = data.get("branch", {})
+    date = data.get("date", "")
+    index = int_part(callback.data, 1, 2) or 0
+    if not (0 <= index < len(movies)):
+        await answer(callback, strings.error_expired(), alert=True)
+        return
+    movie = movies[index]
+    showtimes = list(await provider.get_showtimes(branch["id"], date, movie_id=movie["id"]))
+    if not showtimes:
+        raw = await _cached(
+            cache,
+            showtimes_key(settings.provider, branch["id"], date),
+            settings.cache_showtimes_ttl,
+        )
+        fallback = [Showtime.from_dict(item) for item in (raw or [])]
+        showtimes = [s for s in fallback if s.movie_id == movie["id"]]
+    showtimes.sort(key=lambda s: (s.time, s.hall_type))
+    if not showtimes:
+        await edit(
+            callback,
+            strings.no_showtimes(),
+            retry_keyboard(f"mv:{index}", "mv_all"),
+        )
+        return
+    movie = dict(movie)
+    status = await _imax_status(db, imax, movie, showtimes)
+    if status:
+        movie["imax_status"] = status
+    await state.update_data(
+        movie=movie,
+        showtimes=[s.to_dict() for s in showtimes],
+        format=None,
+    )
+    await state.set_state(AddWatch.showtime)
+    await edit(
+        callback,
+        strings.choose_showtime(
+            movie["name"], date, extra=strings.imax_line(movie.get("imax_status"))
+        ),
+        showtime_keyboard(
+            showtimes,
+            formats=_format_counts(showtimes),
+            date_count=len(data.get("dates", [])),
+        ),
+    )
+
+
+def _format_counts(showtimes: list[Showtime]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for showtime in showtimes:
+        key = format_key(showtime.hall_type)
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _visible_showtimes(data: dict[str, Any]) -> list[Showtime]:
+    showtimes = [Showtime.from_dict(s) for s in data.get("showtimes", [])]
+    selected = data.get("format")
+    if not selected:
+        return showtimes
+    return [s for s in showtimes if format_key(s.hall_type) == selected]
+
+
+@router.callback_query(AddWatch.showtime, F.data.startswith("fm:"))
+async def showtime_format(callback: CallbackQuery, state: FSMContext) -> None:
+    value = split_cb(callback.data, 2)[1]
+    data = await state.get_data()
+    showtimes = [Showtime.from_dict(s) for s in data.get("showtimes", [])]
+    counts = _format_counts(showtimes)
+    selected = None if value == "all" else value
+    if selected is not None and selected not in counts:
+        await answer(callback, strings.format_not_found(), alert=True)
+        return
+    await state.update_data(format=selected)
+    movie = data.get("movie", {})
+    date = data.get("date", "")
+    visible = [s for s in showtimes if selected is None or format_key(s.hall_type) == selected]
+    await edit(
+        callback,
+        strings.choose_showtime(movie.get("name", ""), date, extra=_imax_extra(movie)),
+        showtime_keyboard(
+            visible,
+            formats=counts,
+            current_format=selected,
+            date_count=len(data.get("dates", [])),
+        ),
+    )
+    await answer(
+        callback,
+        strings.format_filtered(strings.format_label(selected))
+        if selected
+        else strings.format_filtered(None),
+    )
+
+
+@router.callback_query(AddWatch.showtime, F.data == "mv:info")
+async def show_movie_info(
+    callback: CallbackQuery,
+    state: FSMContext,
+    provider: Any,
+    db: Database,
+    imax: Any = None,
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    movie_data = data.get("movie", {})
+    movie = Movie(**{name: movie_data.get(name) for name in Movie.__dataclass_fields__})
+    details = movie
+    if hasattr(provider, "get_movie_details"):
+        try:
+            details = await provider.get_movie_details(movie)
+        except Exception:
+            details = movie
+    facts = strings.movie_facts(details.duration_minutes, details.rating, details.language)
+    showtimes = [Showtime.from_dict(item) for item in data.get("showtimes", [])]
+    status = movie_data.get("imax_status")
+    if not status:
+        status = await _imax_status(db, imax, movie_data, showtimes)
+    text = strings.movie_info(
+        details.name,
+        details.synopsis,
+        facts,
+        extra=strings.imax_line(status),
+    )
+    photo_url = details.poster_url or movie_data.get("poster_url")
+    await edit(
+        callback,
+        strings.truncate(text, 1000) if photo_url else text,
+        movie_info_keyboard(details.trailer_url),
+        photo_url=photo_url,
+    )
+
+
+@router.callback_query(AddWatch.showtime, F.data == "info:back")
+async def movie_info_back(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    all_showtimes = [Showtime.from_dict(s) for s in data.get("showtimes", [])]
+    visible = _visible_showtimes(data)
+    movie = data.get("movie", {})
+    date = data.get("date", "")
+    await edit(
+        callback,
+        strings.choose_showtime(movie.get("name", ""), date, extra=_imax_extra(movie)),
+        showtime_keyboard(
+            visible,
+            formats=_format_counts(all_showtimes),
+            current_format=data.get("format"),
+            date_count=len(data.get("dates", [])),
+        ),
+    )
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.showtime, F.data.startswith("st_p:"))
+async def showtimes_page(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    all_showtimes = [Showtime.from_dict(s) for s in data.get("showtimes", [])]
+    visible = _visible_showtimes(data)
+    movie = data.get("movie", {})
+    date = data.get("date", "")
+    page = int_part(callback.data, 1, 2) or 0
+    await edit(
+        callback,
+        strings.choose_showtime(movie.get("name", ""), date, extra=_imax_extra(movie)),
+        showtime_keyboard(
+            visible,
+            page,
+            formats=_format_counts(all_showtimes),
+            current_format=data.get("format"),
+            date_count=len(data.get("dates", [])),
+        ),
+    )
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.showtime, F.data.regexp(r"^st:\d+$"))
+async def showtime_chosen(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    showtimes = _visible_showtimes(data)
+    index = int_part(callback.data, 1, 2) or 0
+    if not (0 <= index < len(showtimes)):
+        await answer(callback, strings.error_expired(), alert=True)
+        return
+    showtime = showtimes[index].to_dict()
+    branch = data.get("branch", {})
+    movie = data.get("movie", {})
+    date = data.get("date", "")
+    await state.update_data(showtime=showtime, scope="showtime")
+    poster = movie.get("poster_url")
+    text = strings.confirm_watch(
+        branch.get("name", ""),
+        date,
+        movie.get("name", ""),
+        showtime["time"],
+        showtime["hall_type"],
+        showtime.get("status", ""),
+    )
+    await edit(
+        callback,
+        strings.truncate(text, 1000) if poster else text,
+        confirm_keyboard(),
+        photo_url=poster,
+    )
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.showtime, F.data == "st:all")
+async def showtime_all_chosen(callback: CallbackQuery, state: FSMContext) -> None:
+    data = await state.get_data()
+    showtimes = _visible_showtimes(data)
+    if not showtimes:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    branch = data.get("branch", {})
+    movie = data.get("movie", {})
+    date = data.get("date", "")
+    first = sorted(showtimes, key=lambda s: (s.time, s.hall_type))[0]
+    statuses = [s.status for s in showtimes]
+    selected = data.get("format")
+    await state.update_data(scope="movie", showtime=first.to_dict(), showtime_count=len(showtimes))
+    poster = movie.get("poster_url")
+    text = strings.confirm_movie_watch(
+        branch.get("name", ""),
+        date,
+        movie.get("name", ""),
+        len(showtimes),
+        statuses,
+        strings.format_label(selected) if selected else None,
+    )
+    await edit(
+        callback,
+        strings.truncate(text, 1000) if poster else text,
+        confirm_keyboard(),
+        photo_url=poster,
+    )
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.showtime, F.data == "st:alldays")
+async def showtime_all_dates(
+    callback: CallbackQuery, state: FSMContext, settings: Settings
+) -> None:
+    data = await state.get_data()
+    dates = sorted(
+        value for value in data.get("dates", []) if value >= today_iso(settings.timezone)
+    )[: settings.all_dates_max]
+    if not dates:
+        await answer(callback, strings.all_dates_unavailable(), alert=True)
+        return
+    branch = data.get("branch", {})
+    movie = data.get("movie", {})
+    selected = data.get("format")
+    await state.update_data(scope="movie_all_dates", date_count=len(dates))
+    poster = movie.get("poster_url")
+    text = strings.confirm_all_dates(
+        branch.get("name", ""),
+        movie.get("name", ""),
+        len(dates),
+        strings.format_label(selected) if selected else None,
+    )
+    await edit(
+        callback,
+        strings.truncate(text, 1000) if poster else text,
+        confirm_keyboard(),
+        photo_url=poster,
+    )
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.showtime, F.data == "add:confirm")
+async def confirm_add(
+    callback: CallbackQuery,
+    state: FSMContext,
+    db: Database,
+    settings: Settings,
+    scheduler: Scheduler,
+    provider: Any,
+    imax: Any = None,
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    branch = data.get("branch", {})
+    movie = data.get("movie", {})
+    date = data.get("date", "")
+    showtime = data.get("showtime", {})
+    scope = data.get("scope", "showtime")
+    movie_scope = scope in {"movie", "movie_all_dates"}
+    all_dates = scope == "movie_all_dates"
+    selected_format = data.get("format")
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    details = movie
+    if hasattr(provider, "get_movie_details"):
+        try:
+            details = (await provider.get_movie_details(Movie(**movie))).__dict__
+        except Exception:
+            details = movie
+    stored_showtimes = [Showtime.from_dict(item) for item in data.get("showtimes", [])]
+    imax_status = movie.get("imax_status") or await _imax_status(db, imax, movie, stored_showtimes)
+    expires_at = _watch_expiry(data, scope, showtime, settings)
+    try:
+        watch_id = await db.add_watch(
+            user_id=int(user["id"]),
+            provider=settings.provider,
+            branch_id=branch.get("id", ""),
+            branch_name=branch.get("name", ""),
+            date="*" if all_dates else date,
+            movie_id=movie.get("id", ""),
+            movie_name=movie.get("name", ""),
+            showtime="*" if movie_scope else showtime.get("time", ""),
+            hall_type=(selected_format or "*") if movie_scope else showtime.get("hall_type", ""),
+            watch_limit=int(user["watch_limit"]),
+            booking_url=None if all_dates else showtime.get("booking_url"),
+            scope=scope,
+            poster_url=details.get("poster_url"),
+            duration_minutes=details.get("duration_minutes"),
+            rating=details.get("rating"),
+            language=details.get("language"),
+            synopsis=details.get("synopsis"),
+            trailer_url=details.get("trailer_url"),
+            imax_status=imax_status or details.get("imax_status"),
+            expires_at=expires_at,
+        )
+    except WatchLimitReached:
+        await edit(
+            callback,
+            strings.watch_limit_reached(
+                int(user["watch_limit"]),
+                settings.supporter_watch_limit,
+                settings.donation_min_amount,
+                bool(user.get("is_supporter")),
+            ),
+            support_keyboard() if not bool(user.get("is_supporter")) else back_home_keyboard(),
+        )
+        await state.clear()
+        return
+    except DuplicateWatch:
+        await edit(callback, strings.duplicate_watch())
+        await state.clear()
+        return
+
+    target = TargetKey(
+        provider=settings.provider,
+        branch_id=branch.get("id", ""),
+        date=date,
+        movie_id=movie.get("id", ""),
+    )
+    if not all_dates:
+        scheduler.add(
+            target, status=showtime.get("status"), expected_open_at=expected_opening_for(date)
+        )
+    await state.clear()
+    if all_dates:
+        text = strings.watch_created_all_dates(
+            branch.get("name", ""),
+            movie.get("name", ""),
+            int(data.get("date_count") or 0),
+            strings.format_label(selected_format) if selected_format else None,
+        )
+    elif movie_scope:
+        text = strings.watch_created_movie(
+            branch.get("name", ""),
+            date,
+            movie.get("name", ""),
+            int(data.get("showtime_count") or 0),
+            strings.format_label(selected_format) if selected_format else None,
+        )
+    else:
+        text = strings.watch_created(
+            branch.get("name", ""),
+            date,
+            movie.get("name", ""),
+            showtime.get("time", ""),
+            showtime.get("hall_type", ""),
+        )
+    await edit(
+        callback,
+        text,
+        watch_created_keyboard(watch_id),
+        photo_url=movie.get("poster_url"),
+    )
+
+
+# ------------------------------------------------------------------ my watches
+
+
+def _watches_view(
+    watches: list[dict[str, Any]], settings: Settings, page: int = 0
+) -> tuple[str, Any]:
+    pages = max(1, (len(watches) + WATCH_PAGE_SIZE - 1) // WATCH_PAGE_SIZE)
+    page = max(0, min(page, pages - 1))
+    if not watches:
+        return strings.no_watches(), watches_keyboard([])
+    start = page * WATCH_PAGE_SIZE
+    visible = watches[start : start + WATCH_PAGE_SIZE]
+    lines = [strings.watches_page_title(len(watches))]
+    current_group = None
+    for watch in visible:
+        group = strings.watches_group(str(watch.get("date") or ""))
+        if group != current_group:
+            lines.append("")
+            lines.append(group)
+            current_group = group
+        lines.append(
+            strings.watch_row(
+                watch["branch_name"],
+                watch["date"],
+                watch["movie_name"],
+                watch["showtime"],
+                watch["hall_type"],
+                watch.get("last_status") or "UNKNOWN",
+                watch.get("last_seats"),
+                watch.get("alert_mode"),
+                watch.get("snoozed_until"),
+                watch.get("scope"),
+            )
+        )
+    page_text = strings.page_label(page, pages)
+    if page_text:
+        lines += ["", page_text]
+    lines += ["", strings.watches_retention_note(settings.watch_retention_days)]
+    return "\n".join(lines), watches_keyboard(watches, page)
+
+
+async def _render_watches(
+    callback: CallbackQuery,
+    db: Database,
+    user: dict[str, Any],
+    settings: Settings,
+    page: int = 0,
+) -> None:
+    watches = await db.list_watches(int(user["id"]))
+    text, keyboard = _watches_view(watches, settings, page)
+    await edit(callback, text, keyboard)
+
+
+@router.callback_query(F.data == "menu:watches")
+async def my_watches(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    await _render_watches(callback, db, user, settings)
+    await answer(callback)
+
+
+@router.callback_query(F.data.startswith("wp:"))
+async def watches_page(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    page = int_part(callback.data, 1, 2) or 0
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    await _render_watches(callback, db, user, settings, page)
+    await answer(callback)
+
+
+@router.message(Command("watches"))
+async def watches_cmd(message: Message, db: Database, settings: Settings) -> None:
+    user = await db.get_or_create_user(message.from_user.id, watch_limit=settings.free_watch_limit)
+    watches = await db.list_watches(int(user["id"]))
+    text, keyboard = _watches_view(watches, settings)
+    await send(message, text, keyboard)
+
+
+async def _owned_watch(
+    callback: CallbackQuery, db: Database, settings: Settings, watch_id: int
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    watch = await db.get_watch(watch_id)
+    if not watch or int(watch["user_id"]) != int(user["id"]) or not watch.get("active"):
+        return None, user
+    return watch, user
+
+
+def _snooze_clock(value: str | None, settings: Settings) -> str | None:
+    if not value:
+        return None
+    try:
+        moment = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return value
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    local = moment.astimezone(resolve_timezone(settings.timezone))
+    return strings.format_time(local.strftime("%H:%M"))
+
+
+async def _render_watch_detail(
+    callback: CallbackQuery, watch: dict[str, Any], settings: Settings
+) -> None:
+    await edit(
+        callback,
+        strings.watch_detail(
+            watch["branch_name"],
+            watch["date"],
+            watch["movie_name"],
+            watch["showtime"],
+            watch["hall_type"],
+            watch.get("alert_mode"),
+            _snooze_clock(watch.get("snoozed_until"), settings),
+            watch.get("scope"),
+        ),
+        watch_detail_keyboard(watch),
+    )
+
+
+@router.callback_query(F.data.startswith("w:cfg:"))
+async def watch_settings(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, user = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await _render_watches(callback, db, user, settings)
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    await _render_watch_detail(callback, watch, settings)
+    await answer(callback)
+
+
+@router.callback_query(F.data.startswith("w:mode:"))
+async def watch_alert_mode(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 4)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    mode = split_cb(callback.data, 4)[3]
+    if mode not in VALID_MODES:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, user = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    await db.set_watch_alert_mode(watch_id, int(user["id"]), mode)
+    watch = await db.get_watch(watch_id)
+    if watch is not None:
+        await _render_watch_detail(callback, watch, settings)
+    await answer(callback, strings.watch_mode_set(mode))
+
+
+@router.callback_query(F.data.startswith("w:snz:"))
+async def watch_snooze(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, user = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    until = datetime.now(UTC) + timedelta(hours=1)
+    await db.snooze_watch(watch_id, int(user["id"]), until.isoformat(timespec="seconds"))
+    watch = await db.get_watch(watch_id)
+    if watch is not None:
+        await _render_watch_detail(callback, watch, settings)
+    await answer(
+        callback,
+        strings.watch_snoozed(_snooze_clock(until.isoformat(), settings) or ""),
+    )
+
+
+@router.callback_query(F.data.startswith("w:snz0:"))
+async def watch_unsnooze(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, _ = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    await db.clear_watch_snooze(watch_id)
+    watch = await db.get_watch(watch_id)
+    if watch is not None:
+        await _render_watch_detail(callback, watch, settings)
+    await answer(callback, strings.watch_unsnoozed())
+
+
+@router.callback_query(F.data.startswith("wa:snz:"))
+async def alert_snooze(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, user = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    until = datetime.now(UTC) + timedelta(hours=1)
+    await db.snooze_watch(watch_id, int(user["id"]), until.isoformat(timespec="seconds"))
+    await answer(
+        callback,
+        strings.watch_snoozed(_snooze_clock(until.isoformat(), settings) or ""),
+    )
+
+
+@router.callback_query(F.data.startswith("wa:del:"))
+async def alert_remove_watch(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, user = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    await db.deactivate_watch(watch_id, user_id=int(user["id"]))
+    await edit(callback, strings.watch_removed_from_alert())
+    await answer(callback, strings.watch_removed())
+
+
+@router.callback_query(F.data.startswith("w:del:"))
+async def delete_watch(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, _ = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    when = strings.relative_date(watch["date"])
+    if watch.get("scope") not in {"movie", "movie_all_dates"} and watch.get("showtime") not in {
+        "",
+        "*",
+    }:
+        when = f"{when} — {strings.format_time(watch['showtime'])}"
+    await edit(
+        callback,
+        strings.confirm_remove_watch(watch["movie_name"], when),
+        watch_delete_confirm_keyboard(watch_id),
+    )
+    await answer(callback)
+
+
+@router.callback_query(F.data.startswith("w:dely:"))
+async def confirm_delete_watch(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    watch, user = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    await db.deactivate_watch(watch_id, user_id=int(user["id"]))
+    await _render_watches(callback, db, user, settings)
+    await answer(callback, strings.watch_removed())
+
+
+@router.callback_query(F.data == "w:all")
+async def delete_all_watches(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    watches = await db.list_watches(int(user["id"]))
+    if not watches:
+        await _render_watches(callback, db, user, settings)
+        await answer(callback)
+        return
+    await edit(
+        callback,
+        strings.confirm_delete_all(len(watches)),
+        watches_clear_confirm_keyboard(),
+    )
+    await answer(callback)
+
+
+@router.callback_query(F.data == "w:ally")
+async def confirm_delete_all_watches(
+    callback: CallbackQuery, db: Database, settings: Settings
+) -> None:
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    await db.deactivate_all_watches(int(user["id"]))
+    await _render_watches(callback, db, user, settings)
+    await answer(callback, strings.all_watches_removed())
+
+
+# -------------------------------------------------------------------- deep links
+async def send_watch_detail_message(
+    message: Message, db: Database, settings: Settings, watch_id: int
+) -> None:
+    """Open one watch from ``t.me/<bot>?start=w<id>`` after checking ownership."""
+
+    user = await db.get_or_create_user(message.from_user.id, watch_limit=settings.free_watch_limit)
+    watch = await db.get_watch(watch_id)
+    if not watch or int(watch["user_id"]) != int(user["id"]) or not watch.get("active"):
+        await send(message, strings.error_expired(), back_home_keyboard())
+        return
+    await send(
+        message,
+        strings.watch_detail(
+            watch["branch_name"],
+            watch["date"],
+            watch["movie_name"],
+            watch["showtime"],
+            watch["hall_type"],
+            watch.get("alert_mode"),
+            _snooze_clock(watch.get("snoozed_until"), settings),
+            watch.get("scope"),
+        ),
+        watch_detail_keyboard(watch),
+    )
+
+
+async def start_branch_deeplink(
+    message: Message,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+    branch_id: str,
+) -> bool:
+    """Jump straight to the date step of ``?start=b<branch>``."""
+
+    branches = await _begin_add(state, cache, settings, provider)
+    branch = next((item for item in branches if str(item.get("id")) == branch_id), None)
+    if branch is None:
+        return False
+    dates = await provider.get_dates(branch["id"])
+    if not dates:
+        dates = await _cached(
+            cache, dates_key(settings.provider, branch["id"]), settings.cache_listings_ttl
+        )
+    if not dates:
+        await state.clear()
+        await send(message, strings.no_dates(), back_home_keyboard())
+        return True
+    await state.update_data(branch=branch, dates=dates)
+    await state.set_state(AddWatch.date)
+    await send(
+        message,
+        strings.choose_date(branch.get("name", "")),
+        date_keyboard(dates),
+    )
+    return True
