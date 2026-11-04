@@ -17,6 +17,8 @@ has one button that opens the cinema's own booking page.
 
 ## What it does
 
+- 🌍 **Arabic or English** — pick your language on first launch and change it
+  anytime from Settings. Every screen, alert and error follows your choice.
 - 🎯 **Watch one showtime, a whole movie/day, or every open day at a branch.**
 - 🎭 **Filter by format** — IMAX, 4DX, VIP, MAX, 3D and whatever VOX lists.
 - 🔔 **Instant alerts** when booking opens, seats come back, or new showtimes appear.
@@ -26,7 +28,11 @@ has one button that opens the cinema's own booking page.
 - 🌙 **Quiet hours**, per-watch alert modes, and a clean paged watch list.
 - 🔐 **Privacy first** — `/delete_me` removes everything; no cards, no phone numbers.
 
-The interface is 100% Egyptian Arabic and 100% inline buttons — no typing needed.
+The interface is fully bilingual — **Egyptian Arabic** (default) and **American
+English** — and uses 100% inline buttons, no typing needed. You choose the
+language before anything else, and Settings (`/language`) changes it later.
+
+Current release: **v1.1.0** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -89,6 +95,7 @@ port or TLS certificate.
 | `/search` | everyone | Find a movie by name |
 | `/watches` | everyone | Manage your watches |
 | `/settings` | everyone | Quiet hours, filters and data controls |
+| `/language` | everyone | Switch between Arabic and English |
 | `/help` | everyone | Help and disclaimer |
 | `/privacy` | everyone | What is stored and how to delete it |
 | `/delete_me` | everyone | Erase your data |
@@ -103,8 +110,9 @@ commands never appear in the public menu.
 
 | File | What is inside |
 | --- | --- |
-| [`docs/TECHNICAL.md`](docs/TECHNICAL.md) | How it works: VOX parsing, polling, cache, full configuration, deployment, troubleshooting |
+| [`docs/TECHNICAL.md`](docs/TECHNICAL.md) | How it works: VOX parsing, polling, cache, languages, versioning, full configuration, deployment, troubleshooting |
 | [`docs/SPEC.md`](docs/SPEC.md) | Product specification and behaviour details |
+| [`CHANGELOG.md`](CHANGELOG.md) | Every release, newest first |
 | [`scripts/cli_test.py`](scripts/cli_test.py) | Live VOX smoke test |
 
 ---
@@ -112,9 +120,9 @@ commands never appear in the public menu.
 ## Privacy
 
 Cinema Radar stores only what it needs to send your alerts: your Telegram id,
-your watches, optional discovery filters, your supporter flag and any donation
-proof you send. It never stores card numbers, bank details, phone numbers or seat
-maps, and it never logs in to VOX.
+your language and watch preferences, your watches, optional discovery filters,
+your supporter flag and any donation proof you send. It never stores card
+numbers, bank details, phone numbers or seat maps, and it never logs in to VOX.
 
 `/privacy` explains everything inside the bot; `/delete_me` erases it all.
 

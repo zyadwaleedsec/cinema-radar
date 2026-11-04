@@ -7,18 +7,19 @@ Implementation notes for developers and operators. For a friendly overview, see
 
 1. [Project structure](#project-structure)
 2. [Brand assets](#brand-assets)
-3. [VOX Cinemas Egypt: what we found](#vox-cinemas-egypt-what-we-found)
-4. [Low-volume design](#low-volume-design)
-5. [Configuration](#configuration)
-6. [IMAX data](#imax-data)
-7. [Watch retention](#watch-retention)
-8. [Local setup](#local-setup)
-9. [Tests, lint and audit](#tests-lint-and-audit)
-10. [UI QA checklist](#ui-qa-checklist)
-11. [Deployment on a local laptop](#deployment-on-a-local-laptop)
-12. [Security and privacy](#security-and-privacy)
-13. [Terms of use of the source site](#terms-of-use-of-the-source-site)
-14. [Troubleshooting](#troubleshooting)
+3. [Languages and versioning](#languages-and-versioning)
+4. [VOX Cinemas Egypt: what we found](#vox-cinemas-egypt-what-we-found)
+5. [Low-volume design](#low-volume-design)
+6. [Configuration](#configuration)
+7. [IMAX data](#imax-data)
+8. [Watch retention](#watch-retention)
+9. [Local setup](#local-setup)
+10. [Tests, lint and audit](#tests-lint-and-audit)
+11. [UI QA checklist](#ui-qa-checklist)
+12. [Deployment on a local laptop](#deployment-on-a-local-laptop)
+13. [Security and privacy](#security-and-privacy)
+14. [Terms of use of the source site](#terms-of-use-of-the-source-site)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -27,8 +28,13 @@ Implementation notes for developers and operators. For a friendly overview, see
 ```
 cinema-radar/
 ├── main.py                 # bootstrap, long polling, background loops, shutdown
+├── version.py              # single source of truth for the SemVer release
 ├── config.py               # every tunable interval/limit; secrets come from .env
-├── strings.py              # all Egyptian-Arabic user-facing text
+├── strings.py              # facade that resolves copy from the active catalog
+├── i18n/
+│   ├── ar.py               # Egyptian Arabic catalog (default)
+│   ├── en.py               # American English catalog
+│   └── __init__.py         # language registry, per-update context, admin language
 ├── search.py               # Arabic/English fuzzy movie search (typo-tolerant)
 ├── models.py               # dataclasses: Branch, Movie, Showtime, events...
 ├── db.py                   # aiosqlite schema + persistence methods
@@ -44,11 +50,12 @@ cinema-radar/
 ├── support.py              # one-off manual donations and admin approval
 ├── stats.py                # internal metrics for the admin dashboard
 ├── feedback.py             # one feedback per user per hour
+├── deeplinks.py            # parks ?start= payloads until a language is chosen
 ├── keyboards.py            # inline keyboards
-├── middleware.py           # per-user anti-spam rate limit
+├── middleware.py           # language gate + per-user anti-spam rate limit
 ├── timeutil.py             # timezone and quiet-hour helpers
 ├── utils.py                # small dependency-free shared helpers
-├── handlers/               # /start, watches, settings, support, feedback, admin
+├── handlers/               # /start, language, watches, settings, support, admin
 ├── ui/                     # screen model, classic + rich renderers, fallback
 ├── providers/
 │   ├── base.py             # CinemaProvider abstraction + registry
@@ -60,10 +67,11 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (152 tests)
+├── tests/                  # pytest suite (167 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
+├── CHANGELOG.md            # release history (Keep a Changelog)
 └── .env.example
 ```
 
@@ -85,6 +93,67 @@ cinema-radar/
 Palette: cream `#F2EDDA` background, ink `#15100C`, red `#C81E1E`. The lockup is
 dark-on-light only — keep it on the cream field. To add a size, render the SVG at
 that exact size; never upscale an existing PNG.
+
+---
+
+## Languages and versioning
+
+### How the interface language is chosen
+
+Egyptian Arabic is the default and American English is the second official
+catalog. The full rule set lives in `i18n/__init__.py`; the important parts are:
+
+- `users.lang` stores `ar` or `en`. A `NULL` value means **not chosen yet** — the
+  bot deliberately does not backfill it, so users who onboarded before v1.1.0 see
+  the picker exactly once.
+- `LanguageMiddleware` runs before the rate limiter. It loads the user row, and
+  for an unchosen user it shows the bilingual picker instead of running the
+  handler. The admin is exempt and defaults to Arabic.
+- A deep link that arrives with the picker (`?start=b…`, `?start=w…`) is parked in
+  `deeplinks.py` (in memory, 10 minutes) and resumed after the choice.
+- `strings.py` is a facade: `strings.dashboard(...)` resolves the active catalog
+  through a `ContextVar`, so handlers never thread a language argument.
+- Background work uses `with i18n.use(lang):` per recipient. Admin and system
+  messages use `i18n.admin_language()`, which is loaded from the admin's stored
+  choice at startup and updated when the admin changes it.
+- The stale-data note is stored as `(minutes, degraded)` in `ui/render.py` and
+  rendered per request, so it follows the reader rather than the health loop.
+
+Telegram command menus are registered twice: Arabic in the default scope and
+English with `language_code="en"`. Telegram chooses a menu using the **client's**
+language, not the bot's stored choice, so an Arabic-speaking user with an English
+Telegram app sees the English command descriptions. This is a Telegram
+limitation; the screens themselves always follow the stored choice.
+
+### Adding or changing copy
+
+1. Add the name to `i18n/ar.py` **and** `i18n/en.py` with the same signature.
+2. Keep dynamic values escaped with `esc(...)`; messages use `parse_mode=HTML`.
+3. Run `python -m pytest tests/test_i18n.py`. It checks catalog parity,
+   signatures, and that English output contains no Arabic (except the bilingual
+   picker and language names).
+
+### Release checklist
+
+The version lives only in `version.py`. Do not hardcode it anywhere else.
+
+1. Pick the next SemVer number: MAJOR for a forced migration, MINOR for a new
+   capability, PATCH for a fix or copy change.
+2. Update `__version__` in `version.py` and `RELEASE_NAME`.
+3. Add a `## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md`, newest first, and
+   update the comparison links at the bottom.
+4. Run the full gate:
+   ```bash
+   python -m pytest
+   python -m ruff check .
+   python -m ruff format --check .
+   ```
+5. Commit the release, then tag it and push:
+   ```bash
+   git tag -a vX.Y.Z -m "Cinema Radar vX.Y.Z"
+   git push origin main --tags
+   ```
+6. Confirm the version in `/help`, Settings, `/admin` and the startup log.
 
 ---
 
@@ -366,7 +435,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `152 passed`.
+Expected: `167 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.
@@ -387,6 +456,15 @@ Configuration lives in [`pyproject.toml`](../pyproject.toml). `ruff` and
 Run these once per release on a real Telegram client:
 
 - [ ] Arabic renders right-to-left; no clipped words at 320 px width.
+- [ ] English screens contain no Arabic text and no left-over RTL punctuation.
+- [ ] A brand-new account sees the bilingual language picker **before** any other
+      screen; choosing English opens onboarding in English.
+- [ ] Switching back to Arabic from Settings re-renders Settings immediately and
+      keeps every watch and preference.
+- [ ] `?start=w<id>` and `?start=b<branch>` tapped before choosing a language
+      resume after the choice instead of being lost.
+- [ ] Alerts arrive in the recipient's stored language, and admin notices use the
+      admin's language.
 - [ ] Every screen has **رجوع** (where a previous step exists) and **الرئيسية**.
 - [ ] A tap is acknowledged in under 200 ms, followed by a typing indicator only
       when a network step is actually slow.

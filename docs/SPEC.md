@@ -63,6 +63,11 @@ without touching the watcher, discovery or bot layers.
   share one global Telegram send limiter.
 - `support.py`: manual donations and the supporter limit.
 - `stats.py`, `feedback.py`: public aggregates and user feedback.
+- `i18n/`: the Arabic and English catalogs, the active-language context and the
+  admin's language. `strings.py` is only a facade over the active catalog.
+- `middleware.py`: the language gate (before anything else) and the per-user rate
+  limiter.
+- `version.py`: the only place the release number is written.
 - `ui/`: classic HTML renderer plus the rich-message renderer with a cached
   capability fallback.
 
@@ -182,6 +187,12 @@ Migrations are applied in place at startup; existing databases keep their data.
 Inline keyboards only, minimal typing, three short onboarding screens on first
 `/start`, then a dashboard with the next watch and the free/supporter limit.
 
+- **Language first**: before onboarding or any command, a new user chooses
+  Egyptian Arabic (default) or American English. Existing users see the picker
+  once. Deep links are remembered and resumed after the choice. Settings and
+  `/language` switch the interface later; the choice is stored per user, and
+  background messages use the recipient's language while admin notices use the
+  admin's language.
 - **Add a watch**: branch → date → movie → showtime → format filter (when
   formats exist) → confirmation. Movie info, synopsis and an external trailer
   button are available before confirming.
@@ -200,8 +211,8 @@ Inline keyboards only, minimal typing, three short onboarding screens on first
 - Deep links: `?start=w<watch_id>` and `?start=b<branch_id>`, usable only by
   their owner.
 - Commands:
-  - public: `/start`, `/add`, `/search`, `/watches`, `/settings`, `/help`,
-    `/cancel`, `/privacy`, `/delete_me`;
+  - public: `/start`, `/add`, `/search`, `/watches`, `/settings`, `/language`,
+    `/help`, `/cancel`, `/privacy`, `/delete_me`;
   - admin (registered only in the admin's private scope): `/admin`, `/status`,
     `/grant`, `/revoke`, `/imax`.
 
@@ -268,9 +279,20 @@ stores no card or bank data.
 
 ## Copy
 
-All user-facing text is simple Egyptian-dialect Arabic that any age group
-understands, and every string lives in `strings.py`. Messages are short and
-end with an obvious next action. Support copy is warm, short and non-pushy.
+All user-facing text is simple Egyptian-dialect Arabic by default, with a full
+American English catalog for users who choose it. Every string lives in
+`i18n/ar.py` and `i18n/en.py`; the two files expose the same names and
+signatures, and `strings.py` resolves the active one. Messages are short and end
+with an obvious next action. Support copy is warm, short and non-pushy. The
+language picker itself is bilingual so a new user can recognize their language
+immediately.
+
+## Versioning
+
+Every release has a Semantic Versioning number. `version.py` is the single source
+of truth; it is displayed in `/help`, Settings, the admin panel and the startup
+log. `CHANGELOG.md` records what changed in each release, and the matching Git tag
+is `vX.Y.Z`.
 
 ## Quality
 
@@ -279,14 +301,17 @@ end with an obvious next action. Support copy is warm, short and non-pushy.
   from cache.
 - `/admin` (admin only): active users and watches, supporters, requests/min,
   cache hit ratio, active targets, slowdown factor, circuit-breaker state, last
-  poll, discovery state, events today, broadcasts sent and queue length.
+  poll, discovery state, events today, broadcasts sent, queue length and the
+  running version.
 - `/status` (admin only): VOX outage state, last success, last error reason,
   breaker, active targets and affected watches.
 - Tests cover: diff/event logic with mocked providers; coalescing (requests equal
   due targets); 429 storms and the circuit breaker; stale-data suppression;
   watch expiry and retention; donation approval/rejection idempotency;
   free vs supporter limits; `/delete_me`; discovery baseline, one-shot events,
-  flapping and the daily cap; the VOX parser; keyboards and UI copy.
+  flapping and the daily cap; the VOX parser; keyboards and UI copy; catalog
+  parity and English purity; the language gate and persistence; and version /
+  changelog consistency.
 - `ruff check` and `ruff format --check` are clean; the suite runs without a
   Telegram token or network access.
 
@@ -301,4 +326,5 @@ The shipped project: application modules, `requirements.txt`,
 `requirements-dev.txt`, `pyproject.toml`, `pytest.ini`, `.env.example`, tests,
 `scripts/cli_test.py` (VOX smoke test) and `scripts/update_imax_list.py`
 (IMAX snapshot generator), plus a README with local setup, configuration,
-low-volume design, privacy notes and troubleshooting.
+low-volume design, privacy notes and troubleshooting, and a `CHANGELOG.md` that
+tracks each version.
