@@ -110,7 +110,7 @@ async def test_outage_alerts_the_admin_once_then_recovery(db, cache, test_settin
             )
 
     assert len(alerts) == 1
-    assert "VOX واقعة" in alerts[0]
+    assert "(فوكس) واقعة" in alerts[0]
     assert "403" in alerts[0]
     assert client.incident_open is True
     assert client.circuit_state == "open"
@@ -119,7 +119,7 @@ async def test_outage_alerts_the_admin_once_then_recovery(db, cache, test_settin
     result = await client.get("https://example.test/showtimes", "k", ttl=1, allow_stale=False)
     assert result.status_code == 200
     assert len(alerts) == 2
-    assert "VOX رجعت" in alerts[1]
+    assert "(فوكس) رجعت" in alerts[1]
     assert client.incident_open is False
     assert client.circuit_state == "closed"
 

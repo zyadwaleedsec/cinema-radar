@@ -363,14 +363,53 @@ def test_freshness_state_is_rendered_in_the_current_language():
         i18n.set_language("en")
         render.set_freshness_state(15, True)
         english = render._decorate(Screen(text="menu")).text
-        assert "VOX is unavailable" in english
+        assert "(VOX) is unavailable" in english
 
         i18n.set_language("ar")
         arabic = render._decorate(Screen(text="menu")).text
-        assert "VOX مش متاح" in arabic
+        assert "(فوكس) مش متاح" in arabic
     finally:
         render.set_freshness_state(0, False)
         i18n.set_language("ar")
+
+
+def test_cinema_name_is_parenthesized_and_localized():
+    ar = i18n.for_language("ar")
+    en = i18n.for_language("en")
+
+    ar_texts = [
+        ar.onboard_intro("Zyad"),
+        ar.onboard_alerts(),
+        ar.onboard_safety(),
+        ar.help_text(),
+        ar.reason_label("http_429"),
+        ar.admin_upstream_down(
+            "network", ar.format_place("vox / mall-of-egypt"), "2026-11-04 12:00:00", 75
+        ),
+        ar.admin_upstream_recovered(5),
+        ar.stale_notice(15, True),
+        ar.admin_status({}),
+    ]
+    assert all("VOX" not in text for text in ar_texts)
+    assert any("(فوكس)" in text for text in ar_texts)
+    assert ar.format_place("vox / mall-of-egypt") == "(فوكس) / mall-of-egypt"
+
+    en_texts = [
+        en.onboard_intro("Zyad"),
+        en.onboard_alerts(),
+        en.onboard_safety(),
+        en.help_text(),
+        en.reason_label("http_429"),
+        en.admin_upstream_down(
+            "network", en.format_place("vox / mall-of-egypt"), "2026-11-04 12:00:00", 75
+        ),
+        en.admin_upstream_recovered(5),
+        en.stale_notice(15, True),
+        en.admin_status({}),
+    ]
+    assert any("(VOX)" in text for text in en_texts)
+    assert all(re.search(r"(?<!\()\bVOX\b", text) is None for text in en_texts)
+    assert en.format_place("vox / mall-of-egypt") == "(VOX) / mall-of-egypt"
 
 
 # --------------------------------------------------------------------- version

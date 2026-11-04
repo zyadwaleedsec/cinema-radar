@@ -11,6 +11,15 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-04
+
+### Changed
+
+- The cinema name is now always written in parentheses and localized:
+  `(فوكس)` / `(فوكس سينما)` in Arabic, `(VOX)` / `(VOX Cinemas)` in English.
+  This covers onboarding, help, privacy, status, reason labels, outage alerts
+  and the technical place line.
+
 ## [1.1.4] - 2026-11-04
 
 ### Fixed
@@ -132,7 +141,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.5...HEAD
+[1.1.5]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.1...v1.1.2

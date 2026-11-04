@@ -173,7 +173,7 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
 
 ADMIN_COMMANDS: tuple[tuple[str, str], ...] = (
     ("admin", "لوحة الأدمن"),
-    ("status", "حالة الاتصال بـ VOX"),
+    ("status", "حالة الاتصال بـ (فوكس)"),
     ("grant", "تفعيل دعم مستخدم"),
     ("revoke", "إلغاء دعم مستخدم"),
     ("imax", "ضبط حالة IMAX لفيلم"),
@@ -252,7 +252,7 @@ def onboard_intro(name: str = "") -> str:
     return (
         "🎬 <b>سينما رادار</b>\n"
         f"أهلاً بيك{who} 👋\n\n"
-        "بتابع حفلات VOX في مصر،\n"
+        "بتابع حفلات (فوكس) في مصر،\n"
         "وأبعتلك أول ما الحجز يفتح\n"
         "أو كرسي يرجع متاح.\n\n"
         "من غير ما تفضل تفتح الموقع كل شوية."
@@ -275,7 +275,7 @@ def onboard_safety() -> str:
         "• البوت مجاني، وبس بيبعتلك لينك الحجز.\n"
         "• مش بيحجز ولا بيدفع مكانك.\n"
         "• مش بيطلب اسمك ولا رقمك ولا بيانات دفع.\n"
-        "• غير رسمي وغير تابع لـ VOX.\n\n"
+        "• غير رسمي وغير تابع لـ (فوكس).\n\n"
         "التفاصيل الكاملة: /privacy\n"
         "مسح بياناتك في أي وقت: /delete_me"
     )
@@ -306,7 +306,7 @@ def help_text() -> str:
         "/privacy إيه البيانات اللي بنحفظها\n"
         "/delete_me مسح بياناتك\n"
         "/cancel إلغاء أي خطوة\n\n"
-        "⚠️ البوت غير رسمي وغير تابع لـ VOX Cinemas. البيانات ممكن تتأخر "
+        "⚠️ البوت غير رسمي وغير تابع لـ (فوكس سينما). البيانات ممكن تتأخر "
         "أو تكون غلط، والحجز بيتم على موقع السينما نفسه.\n\n"
         f"{version_line()}"
     )
@@ -1252,13 +1252,13 @@ def admin_unexpected_error(name: str) -> str:
 
 
 REASON_LABELS_AR = {
-    "http_403": "VOX رافض الطلب (403) — حماية أو بلوك",
-    "http_429": "VOX محدّد الطلبات (429) — rate limit",
-    "http_5xx": "سيرفر VOX بيرجع خطأ (5xx)",
-    "timeout": "انتهت مهلة الاتصال بـ VOX",
+    "http_403": "(فوكس) رافض الطلب (403) — حماية أو بلوك",
+    "http_429": "(فوكس) محدّد الطلبات (429) — rate limit",
+    "http_5xx": "سيرفر (فوكس) بيرجع خطأ (5xx)",
+    "timeout": "انتهت مهلة الاتصال بـ (فوكس)",
     "network": "مشكلة شبكة / TLS / DNS",
-    "parse": "صفحة VOX اتغيرت والبوت مش فاهمها",
-    "empty": "VOX رجّع صفحة فاضية",
+    "parse": "صفحة (فوكس) اتغيرت والبوت مش فاهمها",
+    "empty": "(فوكس) رجّع صفحة فاضية",
     "circuit": "قاطع الدائرة مفتوح بعد فشل متكرر",
     "unknown": "خطأ غير معروف",
 }
@@ -1266,6 +1266,14 @@ REASON_LABELS_AR = {
 
 def reason_label(reason: str) -> str:
     return REASON_LABELS_AR.get(reason, REASON_LABELS_AR["unknown"])
+
+
+def format_place(place: str) -> str:
+    """Show a technical place key with the localized cinema name."""
+
+    if place.startswith("vox"):
+        return "(فوكس)" + place[3:]
+    return place
 
 
 def admin_upstream_down(
@@ -1283,7 +1291,7 @@ def admin_upstream_down(
     )
     affected_line = f"\nمراقبات متأثرة: <b>{affected}</b>" if affected else ""
     return (
-        "⚠️ <b>VOX واقعة</b>\n\n"
+        "⚠️ <b>(فوكس) واقعة</b>\n\n"
         f"السبب: {esc(reason_label(reason))}\n"
         f"المكان: {esc(place or '—')}\n"
         f"آخر نجاح: {esc(last_success or '—')}"
@@ -1295,8 +1303,8 @@ def admin_upstream_down(
 
 def admin_upstream_recovered(minutes: int) -> str:
     if minutes <= 0:
-        return "✅ <b>VOX رجعت</b> — البيانات بتتحدث تاني."
-    return f"✅ <b>VOX رجعت</b> بعد {minutes} دقيقة — البيانات بتتحدث تاني."
+        return "✅ <b>(فوكس) رجعت</b> — البيانات بتتحدث تاني."
+    return f"✅ <b>(فوكس) رجعت</b> بعد {minutes} دقيقة — البيانات بتتحدث تاني."
 
 
 def stale_notice(minutes: int, degraded: bool) -> str:
@@ -1304,7 +1312,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
         return ""
     if degraded:
         return (
-            f"\n\n⚠️ <i>VOX مش متاح دلوقتي. آخر تحديث من {minutes} دقيقة — "
+            f"\n\n⚠️ <i>(فوكس) مش متاح دلوقتي. آخر تحديث من {minutes} دقيقة — "
             "البيانات ممكن تكون قديمة.</i>"
         )
     if minutes >= 10:
@@ -1314,7 +1322,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 def admin_status(data: dict[str, object]) -> str:
     return (
-        "<b>حالة الاتصال بـ VOX</b>\n\n"
+        "<b>حالة الاتصال بـ (فوكس)</b>\n\n"
         f"الحالة: <b>{esc(data.get('state', '—'))}</b>\n"
         f"آخر نجاح: {esc(data.get('last_success', '—'))}\n"
         f"آخر خطأ: {esc(data.get('last_error', '—'))}\n"

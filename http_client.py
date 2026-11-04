@@ -402,12 +402,13 @@ class HttpClient:
             self.incident_open = True
             self.incident_started = self._clock()
             self.incident_reason = reason
-            self.incident_place = _place(target_key, url)
+            place = _place(target_key, url)
+            self.incident_place = place
             retry_seconds = int(self.breaker.remaining_pause) or self.settings.poll_waiting_for_open
             with i18n.use(i18n.admin_language()):
                 alert = strings.admin_upstream_down(
                     reason,
-                    self.incident_place,
+                    strings.format_place(place),
                     _clock_text(self.last_success_wall),
                     retry_seconds,
                     self.affected_hint,

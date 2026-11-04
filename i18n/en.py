@@ -202,7 +202,7 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
 
 ADMIN_COMMANDS: tuple[tuple[str, str], ...] = (
     ("admin", "Admin panel"),
-    ("status", "VOX connection status"),
+    ("status", "(VOX) connection status"),
     ("grant", "Grant a user supporter access"),
     ("revoke", "Revoke supporter access"),
     ("imax", "Set a movie's IMAX status"),
@@ -281,7 +281,7 @@ def onboard_intro(name: str = "") -> str:
     return (
         "🎬 <b>Cinema Radar</b>\n"
         f"Welcome{who} 👋\n\n"
-        "I watch VOX showtimes in Egypt,\n"
+        "I watch (VOX) showtimes in Egypt,\n"
         "and message you the moment booking opens\n"
         "or a seat frees up.\n\n"
         "No more refreshing the site yourself."
@@ -305,7 +305,7 @@ def onboard_safety() -> str:
         "• The bot is free and only sends the booking link.\n"
         "• It never books or pays for you.\n"
         "• It never asks for your name, phone or payment details.\n"
-        "• It is unofficial and not affiliated with VOX.\n\n"
+        "• It is unofficial and not affiliated with (VOX).\n\n"
         "Full details: /privacy\n"
         "Erase your data anytime: /delete_me"
     )
@@ -337,7 +337,7 @@ def help_text() -> str:
         "/privacy What data we store\n"
         "/delete_me Delete your data\n"
         "/cancel Cancel any step\n\n"
-        "⚠️ The bot is unofficial and not affiliated with VOX Cinemas. Data may be "
+        "⚠️ The bot is unofficial and not affiliated with (VOX Cinemas). Data may be "
         "delayed or wrong, and booking happens on the cinema's own site.\n\n"
         f"{version_line()}"
     )
@@ -1290,13 +1290,13 @@ def admin_unexpected_error(name: str) -> str:
 
 
 REASON_LABELS_EN = {
-    "http_403": "VOX rejected the request (403) — protection or block",
-    "http_429": "VOX rate-limited the request (429)",
-    "http_5xx": "VOX server returned an error (5xx)",
-    "timeout": "Timed out connecting to VOX",
+    "http_403": "(VOX) rejected the request (403) — protection or block",
+    "http_429": "(VOX) rate-limited the request (429)",
+    "http_5xx": "(VOX) server returned an error (5xx)",
+    "timeout": "Timed out connecting to (VOX)",
     "network": "Network / TLS / DNS problem",
-    "parse": "VOX page changed and the bot can't read it",
-    "empty": "VOX returned an empty page",
+    "parse": "(VOX) page changed and the bot can't read it",
+    "empty": "(VOX) returned an empty page",
     "circuit": "Circuit breaker open after repeated failures",
     "unknown": "Unknown error",
 }
@@ -1304,6 +1304,14 @@ REASON_LABELS_EN = {
 
 def reason_label(reason: str) -> str:
     return REASON_LABELS_EN.get(reason, REASON_LABELS_EN["unknown"])
+
+
+def format_place(place: str) -> str:
+    """Show a technical place key with the localized cinema name."""
+
+    if place.startswith("vox"):
+        return "(VOX)" + place[3:]
+    return place
 
 
 def admin_upstream_down(
@@ -1321,7 +1329,7 @@ def admin_upstream_down(
     )
     affected_line = f"\nAffected watches: <b>{affected}</b>" if affected else ""
     return (
-        "⚠️ <b>VOX is down</b>\n\n"
+        "⚠️ <b>(VOX) is down</b>\n\n"
         f"Reason: {esc(reason_label(reason))}\n"
         f"Where: {esc(place or '—')}\n"
         f"Last success: {esc(last_success or '—')}"
@@ -1333,8 +1341,8 @@ def admin_upstream_down(
 
 def admin_upstream_recovered(minutes: int) -> str:
     if minutes <= 0:
-        return "✅ <b>VOX is back</b> — data is updating again."
-    return f"✅ <b>VOX is back</b> after {minutes} min — data is updating again."
+        return "✅ <b>(VOX) is back</b> — data is updating again."
+    return f"✅ <b>(VOX) is back</b> after {minutes} min — data is updating again."
 
 
 def stale_notice(minutes: int, degraded: bool) -> str:
@@ -1342,7 +1350,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
         return ""
     if degraded:
         return (
-            f"\n\n⚠️ <i>VOX is unavailable right now. Last update {minutes} min ago — "
+            f"\n\n⚠️ <i>(VOX) is unavailable right now. Last update {minutes} min ago — "
             "data may be stale.</i>"
         )
     if minutes >= 10:
@@ -1352,7 +1360,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 def admin_status(data: dict[str, object]) -> str:
     return (
-        "<b>VOX connection status</b>\n\n"
+        "<b>(VOX) connection status</b>\n\n"
         f"State: <b>{esc(data.get('state', '—'))}</b>\n"
         f"Last success: {esc(data.get('last_success', '—'))}\n"
         f"Last error: {esc(data.get('last_error', '—'))}\n"
