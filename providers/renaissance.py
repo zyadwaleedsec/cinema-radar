@@ -518,6 +518,11 @@ class RenaissanceProvider(CinemaProvider):
             except Exception:
                 logger.debug("Could not read movie page for pre-book dates: %s", slug)
                 continue
+            # A Coming Soon card can show a date strip even when the movie has
+            # no bookable sessions yet ("No Showings Available").  Only count
+            # the dates of movies that can actually be booked.
+            if "data-booking-url" not in html:
+                continue
             for iso in parse_dates(html):
                 if today <= iso <= horizon:
                     extra.add(iso)

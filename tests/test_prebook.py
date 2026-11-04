@@ -25,6 +25,7 @@ MOVIE_HTML = """
   <li><a href="https://rnscinemas.com/en/movie/avengers/16-12-2026">16 Dec</a></li>
   <li><a href="https://rnscinemas.com/en/movie/avengers/17-12-2026">17 Dec</a></li>
 </ul></div>
+<a href="https://rnscinemas.com/en/booking/x" data-booking-url="https://rnscinemas.com/en/booking/x"></a>
 </body></html>
 """
 
@@ -72,6 +73,26 @@ async def test_refresh_prebook_dates_filters_past_and_stores_union(cache, test_s
     with patch("providers.renaissance.today_iso", return_value="2026-11-04"):
         await provider.refresh_prebook_dates()
     assert await provider._prebook_dates() == ["2026-12-16", "2026-12-17"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_prebook_skips_unbookable_movies(cache, test_settings):
+    no_showings = """
+    <html><body>
+    <div class="eventsDays"><ul>
+      <li><a href="https://rnscinemas.com/en/movie/avengers/20-12-2026">20 Dec</a></li>
+    </ul></div>
+    <h3>No Showings Available</h3>
+    </body></html>
+    """
+    provider = _provider(
+        cache,
+        test_settings,
+        {"https://rnscinemas.com/en/movie/avengers": no_showings},
+    )
+    with patch("providers.renaissance.today_iso", return_value="2026-11-04"):
+        await provider.refresh_prebook_dates()
+    assert await provider._prebook_dates() == []
 
 
 @pytest.mark.asyncio
