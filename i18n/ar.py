@@ -953,7 +953,7 @@ def settings_text(
         "<b>⚙️ الإعدادات</b>\n\n"
         "<b>الإشعارات</b>\n"
         f"• رجوع الكراسي: {'مفعل ✅' if notify_cancellations else 'مقفول ⛔'}\n"
-        f"• ساعات الهدوء: {quiet_start}:00 ← {quiet_end}:00 ({watch_quiet})\n"
+        f"• ساعات الهدوء: {format_time(f'{quiet_start}:00')} ← {format_time(f'{quiet_end}:00')} ({watch_quiet})\n"
         f"• أفلام وحجوزات جديدة: {'مفعلة ✅' if discovery_enabled else 'مقفولة ⛔'}\n\n"
         "<b>فلاتر التنبيهات الجديدة</b>\n"
         f"• الفروع: {esc(branches)}\n"
@@ -972,7 +972,7 @@ def quiet_hours_text(start: int, end: int, quiet_watches: bool = True) -> str:
     )
     return (
         "<b>🕰️ ساعات الهدوء</b>\n\n"
-        f"من <b>{start}:00</b> لـ <b>{end}:00</b>.\n"
+        f"من <b>{format_time(f'{start}:00')}</b> لـ <b>{format_time(f'{end}:00')}</b>.\n"
         "مش هنبعت تنبيهات في الوقت ده، إلا لو الحفلة النهاردة أو بكرة.\n"
         f"{watches}\n\n"
         "اختار وقت جاهز، أو اضغط <b>وقت مخصص</b> وابعت مثلًا <code>23-8</code>."
@@ -982,13 +982,14 @@ def quiet_hours_text(start: int, end: int, quiet_watches: bool = True) -> str:
 def quiet_custom_prompt() -> str:
     return (
         "<b>🕰️ وقت مخصص</b>\n\n"
-        "ابعت البداية والنهاية بالساعات فقط، مثلًا: <code>23-8</code>.\n"
+        "ابعت البداية والنهاية بالساعات فقط، مثلًا: <code>23-8</code> "
+        "(من 11 م لـ 8 ص).\n"
         "الساعة بنظام 24 ساعة (0 = 12 بالليل)."
     )
 
 
 def quiet_custom_invalid() -> str:
-    return "مش فاهم الوقت. ابعت مثلًا <code>23-8</code> (من 11 بالليل لـ 8 الصبح)."
+    return "مش فاهم الوقت. ابعت مثلًا <code>23-8</code> (من 11 م لـ 8 ص)."
 
 
 def choose_branches_text() -> str:
@@ -1378,7 +1379,7 @@ def delete_me_done() -> str:
 
 
 def quiet_hours_set(start: int, end: int) -> str:
-    return f"تم ضبط ساعات الهدوء من {start}:00 لـ {end}:00 ✅"
+    return f"تم ضبط ساعات الهدوء من {format_time(f'{start}:00')} لـ {format_time(f'{end}:00')} ✅"
 
 
 def setting_saved() -> str:

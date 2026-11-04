@@ -984,7 +984,7 @@ def settings_text(
         "<b>⚙️ Settings</b>\n\n"
         "<b>Notifications</b>\n"
         f"• Seats back: {'on ✅' if notify_cancellations else 'off ⛔'}\n"
-        f"• Quiet hours: {quiet_start}:00 → {quiet_end}:00 ({watch_quiet})\n"
+        f"• Quiet hours: {format_time(f'{quiet_start}:00')} → {format_time(f'{quiet_end}:00')} ({watch_quiet})\n"
         f"• New movies and bookings: {'on ✅' if discovery_enabled else 'off ⛔'}\n\n"
         "<b>New-alert filters</b>\n"
         f"• Branches: {esc(branches)}\n"
@@ -1003,7 +1003,7 @@ def quiet_hours_text(start: int, end: int, quiet_watches: bool = True) -> str:
     )
     return (
         "<b>🕰️ Quiet hours</b>\n\n"
-        f"From <b>{start}:00</b> to <b>{end}:00</b>.\n"
+        f"From <b>{format_time(f'{start}:00')}</b> to <b>{format_time(f'{end}:00')}</b>.\n"
         "No alerts during these hours, unless the show is today or tomorrow.\n"
         f"{watches}\n\n"
         "Pick a preset, or tap <b>Custom time</b> and send something like <code>23-8</code>."
@@ -1013,7 +1013,8 @@ def quiet_hours_text(start: int, end: int, quiet_watches: bool = True) -> str:
 def quiet_custom_prompt() -> str:
     return (
         "<b>🕰️ Custom time</b>\n\n"
-        "Send the start and end hours only, for example: <code>23-8</code>.\n"
+        "Send the start and end hours only, for example: <code>23-8</code> "
+        "(11 PM to 8 AM).\n"
         "24-hour clock (0 = midnight)."
     )
 
@@ -1415,7 +1416,7 @@ def delete_me_done() -> str:
 
 
 def quiet_hours_set(start: int, end: int) -> str:
-    return f"Quiet hours set from {start}:00 to {end}:00 ✅"
+    return f"Quiet hours set from {format_time(f'{start}:00')} to {format_time(f'{end}:00')} ✅"
 
 
 def setting_saved() -> str:

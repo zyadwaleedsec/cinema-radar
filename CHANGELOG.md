@@ -11,6 +11,22 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-04
+
+### Changed
+
+- After choosing a language from the first-run picker, the three welcome
+  screens now always follow in the chosen language — including for accounts
+  that completed onboarding before the picker existed.
+- Quiet-hours presets, the quiet-hours header and the confirmation message now
+  use readable 12-hour times with AM/PM (`11:00 م` / `11:00 PM`) instead of a
+  bare 24-hour clock.
+
+### Fixed
+
+- The custom quiet-hours prompt and error now show both the 24-hour input and
+  its 12-hour meaning, so the example is unambiguous.
+
 ## [1.1.0] - 2026-11-04
 
 ### Added
@@ -63,6 +79,7 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/zyadwaleedsec/cinema-radar/releases/tag/v1.0.0

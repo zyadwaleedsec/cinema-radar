@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-import deeplinks
 import i18n
 import strings
 from config import Settings
 from db import Database
 from handlers.utils import answer, edit, send
-from keyboards import language_keyboard, main_menu_keyboard, onboarding_keyboard
+from keyboards import language_keyboard, onboarding_keyboard
 
 router = Router(name="language")
 
@@ -42,8 +39,6 @@ async def language_chosen(
     state: FSMContext,
     db: Database,
     settings: Settings,
-    cache: Any = None,
-    provider: Any = None,
 ) -> None:
     parts = (callback.data or "").split(":")
     code = i18n.normalize(parts[2] if len(parts) > 2 else "")
@@ -65,50 +60,13 @@ async def language_chosen(
         await edit(callback, text, keyboard)
         return
 
-    if int(user.get("onboarded") or 0):
-        payload = deeplinks.take(callback.from_user.id)
-        if payload and await _resume_deeplink(
-            callback, payload, state, db, settings, cache, provider
-        ):
-            return
-        from handlers.common import dashboard_text
-
-        name = (callback.from_user.first_name or "") if callback.from_user else ""
-        await edit(callback, await dashboard_text(db, user, settings, name), main_menu_keyboard())
-        return
-
-    # First run: continue with the intro in the chosen language.  Any parked
-    # deep link stays in ``deeplinks`` and is resumed when onboarding finishes.
+    # Picker flow: always follow the choice with the three welcome screens in
+    # the new language.  Any deep link parked by the gate stays in ``deeplinks``
+    # and is resumed when onboarding finishes.
     await state.clear()
     name = (callback.from_user.first_name or "") if callback.from_user else ""
     await edit(
         callback,
         f"{strings.onboard_progress(0)}\n\n{strings.onboard_intro(name)}",
         onboarding_keyboard(0),
-    )
-
-
-async def _resume_deeplink(
-    callback: CallbackQuery,
-    payload: str,
-    state: FSMContext,
-    db: Database,
-    settings: Settings,
-    cache: Any,
-    provider: Any,
-) -> bool:
-    from handlers.common import handle_deep_link
-
-    message = callback.message
-    if message is None:
-        return False
-    return await handle_deep_link(
-        message,
-        payload,
-        state,
-        db,
-        settings,
-        cache,
-        provider,
-        telegram_id=callback.from_user.id,
     )

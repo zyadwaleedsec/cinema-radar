@@ -441,7 +441,8 @@ def quiet_keyboard(
     rows += [
         [
             _btn(
-                f"{s}:00 → {e}:00" + (" ✅" if (s, e) == (current_start, current_end) else ""),
+                f"{strings.format_time(f'{s}:00')} → {strings.format_time(f'{e}:00')}"
+                + (" ✅" if (s, e) == (current_start, current_end) else ""),
                 f"q:{s}:{e}",
             )
         ]

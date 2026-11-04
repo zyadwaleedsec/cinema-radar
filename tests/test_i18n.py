@@ -225,6 +225,63 @@ async def test_admin_skips_the_gate_and_uses_arabic(db, test_settings):
     assert i18n.get_language() == "ar"
 
 
+@pytest.mark.asyncio
+async def test_picker_always_leads_to_onboarding_even_for_existing_users(db, test_settings):
+    from handlers import language
+
+    await db.get_or_create_user(7)
+    await db.mark_user_onboarded(7)
+
+    class FakeState:
+        async def clear(self):
+            pass
+
+    class FakeCallback:
+        data = "lang:set:en"
+        message = object()
+        from_user = User(id=7, is_bot=False, first_name="Tester")
+
+    edits: list[str] = []
+    answers: list[str | None] = []
+
+    async def fake_edit(callback, text, keyboard=None, photo_url=None):
+        edits.append(text)
+
+    async def fake_answer(callback, text=None, alert=False):
+        answers.append(text)
+
+    with (
+        patch.object(language, "edit", fake_edit),
+        patch.object(language, "answer", fake_answer),
+    ):
+        await language.language_chosen(FakeCallback(), FakeState(), db, test_settings)
+
+    assert edits and "Welcome, Tester" in edits[0]
+    assert not ARABIC.search(edits[0])
+    assert answers == [i18n.for_language("en").language_saved()]
+
+
+def test_quiet_hours_show_am_pm_in_both_languages():
+    from keyboards import quiet_keyboard
+
+    def texts(markup):
+        return [button.text for row in markup.inline_keyboard for button in row]
+
+    i18n.set_language("ar")
+    arabic = strings.quiet_hours_text(23, 8)
+    assert "11:00 م" in arabic and "8:00 ص" in arabic
+    assert any("11:00 م → 8:00 ص" in text for text in texts(quiet_keyboard(23, 8)))
+    assert "11:00 م" in strings.quiet_hours_set(23, 8)
+
+    i18n.set_language("en")
+    english = strings.quiet_hours_text(23, 8)
+    assert "11:00 PM" in english and "8:00 AM" in english
+    assert any("11:00 PM → 8:00 AM" in text for text in texts(quiet_keyboard(23, 8)))
+    assert "11:00 PM" in strings.quiet_hours_set(23, 8)
+
+    i18n.set_language("ar")
+
+
 # ---------------------------------------------------------------------- render
 
 
