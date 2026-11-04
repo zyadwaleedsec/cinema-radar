@@ -119,10 +119,10 @@ async def settings_cmd(
 async def open_settings(
     callback: CallbackQuery, db: Database, settings: Settings, state: FSMContext
 ) -> None:
+    await answer(callback)
     await state.clear()
     user, sub = await _user_and_sub(db, callback.from_user.id, settings)
     await _render(callback, user, sub, settings)
-    await answer(callback)
 
 
 @router.callback_query(F.data == "set:cancel")

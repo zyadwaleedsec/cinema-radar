@@ -68,7 +68,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (177 tests)
+├── tests/                  # pytest suite (178 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -444,7 +444,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `177 passed`.
+Expected: `178 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.
@@ -520,6 +520,20 @@ Run exactly one long-polling process per bot token.
 The SQLite database stays at `DB_PATH` (default `cinemaradar.sqlite3`). It is
 git-ignored, so updates never overwrite it. Keep the laptop awake (power plan)
 if you rely on alerts overnight.
+
+---
+
+## Performance notes
+
+- The VOX day page is parsed **once** per fetch; the same `BeautifulSoup` tree
+  feeds `parse_showtimes`, `parse_movies` and `parse_dates`. On a 155 KB page
+  this cut parsing from ~59 ms to ~21 ms.
+- Menus read parsed JSON from the two-level cache. The watcher force-refreshes
+  on its own schedule, so alert detection is never served from stale data.
+- SQLite runs in WAL mode with a 20 MB page cache, memory temp storage and a
+  5-second busy timeout.
+- Top-level menu callbacks are acknowledged before any rendering, so a slow
+  cache build cannot leave the button spinning.
 
 ---
 

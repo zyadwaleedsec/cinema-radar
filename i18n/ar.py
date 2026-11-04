@@ -489,6 +489,10 @@ def no_data() -> str:
     )
 
 
+def loading_branches() -> str:
+    return "⏳ <b>بجيب الفروع…</b>\n\nثانية واحدة 🙏"
+
+
 def no_dates() -> str:
     return (
         "📅 <b>مفيش أيام متاحة</b>\n\n"

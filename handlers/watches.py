@@ -155,6 +155,7 @@ async def add_start(
     provider: Any,
 ) -> None:
     await _ack(callback)
+    await edit(callback, strings.loading_branches(), back_home_keyboard())
     branches = await _begin_add(state, cache, settings, provider)
     if not branches:
         await edit(callback, strings.no_data(), retry_keyboard("menu:add"))
@@ -207,6 +208,7 @@ async def search_menu(
     provider: Any,
 ) -> None:
     await _ack(callback)
+    await edit(callback, strings.loading_branches(), back_home_keyboard())
     branches = await _begin_add(state, cache, settings, provider, search_first=True)
     if not branches:
         await edit(callback, strings.no_data(), retry_keyboard("menu:search"))
@@ -968,17 +970,17 @@ async def _render_watches(
 
 @router.callback_query(F.data == "menu:watches")
 async def my_watches(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    await answer(callback)
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     await _render_watches(callback, db, user, settings)
-    await answer(callback)
 
 
 @router.callback_query(F.data.startswith("wp:"))
 async def watches_page(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    await answer(callback)
     page = int_part(callback.data, 1, 2) or 0
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     await _render_watches(callback, db, user, settings, page)
-    await answer(callback)
 
 
 @router.message(Command("watches"))

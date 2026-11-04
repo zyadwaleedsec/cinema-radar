@@ -27,13 +27,13 @@ class FeedbackFlow(StatesGroup):
 
 @router.callback_query(F.data == "menu:feedback")
 async def feedback_start(callback: CallbackQuery, state: FSMContext) -> None:
+    await answer(callback)
     await state.set_state(FeedbackFlow.category)
     await edit(
         callback,
         strings.feedback_categories_text(),
         feedback_categories_keyboard(),
     )
-    await answer(callback)
 
 
 @router.callback_query(FeedbackFlow.category, F.data.startswith("fc:"))

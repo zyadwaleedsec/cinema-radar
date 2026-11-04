@@ -198,6 +198,9 @@ class Database:
         await self._conn.execute("PRAGMA foreign_keys=ON")
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute("PRAGMA synchronous=NORMAL")
+        await self._conn.execute("PRAGMA busy_timeout=5000")
+        await self._conn.execute("PRAGMA cache_size=-20000")
+        await self._conn.execute("PRAGMA temp_store=MEMORY")
         await self._conn.commit()
 
     async def init_schema(self) -> None:

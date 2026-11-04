@@ -31,13 +31,13 @@ class SupportFlow(StatesGroup):
 
 @router.callback_query(F.data == "menu:support")
 async def support_menu(callback: CallbackQuery, state: FSMContext, settings: Settings) -> None:
+    await answer(callback)
     await state.clear()
     await edit(
         callback,
         strings.support_text(settings.supporter_watch_limit, settings.donation_min_amount),
         support_keyboard(),
     )
-    await answer(callback)
 
 
 @router.callback_query(F.data.in_({"sup:vodafone_cash", "sup:instapay"}))

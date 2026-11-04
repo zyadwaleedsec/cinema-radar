@@ -524,6 +524,10 @@ def no_data() -> str:
     )
 
 
+def loading_branches() -> str:
+    return "⏳ <b>Loading branches…</b>\n\nOne moment."
+
+
 def no_dates() -> str:
     return (
         "📅 <b>No dates available</b>\n\n"

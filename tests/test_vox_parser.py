@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from bs4 import BeautifulSoup
+
 import strings
 from models import AVAILABLE, SOLD_OUT, Movie
 from providers.vox import (
@@ -94,6 +96,16 @@ def test_unavailable_sessions_are_kept_as_sold_out_with_hall():
 
     assert by_time["18:45"].hall_type == "Standard"
     assert by_time["18:45"].status == SOLD_OUT
+
+
+def test_parsers_accept_one_shared_soup():
+    soup = BeautifulSoup(HTML, "lxml")
+
+    assert parse_dates(soup) == parse_dates(HTML)
+    assert parse_movies(soup) == parse_movies(HTML)
+    assert parse_showtimes(soup, "almaza", "2026-12-18") == parse_showtimes(
+        HTML, "almaza", "2026-12-18"
+    )
 
 
 def test_sold_out_button_is_not_labelled_as_not_open():

@@ -11,6 +11,19 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-04
+
+### Performance
+
+- The showtimes page is parsed once per fetch instead of three times: the same
+  `BeautifulSoup` tree is shared by `parse_showtimes`, `parse_movies` and
+  `parse_dates`. Measured on a 155 KB page: **58.8 ms → 21.2 ms** per fetch.
+- SQLite now uses a 20 MB page cache, memory temp storage and a 5 s busy
+  timeout.
+- The main menu callbacks acknowledge the tap before rendering, so slow menu
+  builds no longer leave the button spinning.
+- The add/search menus show a short loading screen while branches are fetched.
+
 ## [2.0.0] - 2026-11-04
 
 ### Added
@@ -189,7 +202,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.6...v2.0.0
 [1.1.6]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.4...v1.1.5

@@ -297,15 +297,16 @@ class VoxProvider(CinemaProvider):
         strict = bool(force_refresh)
         try:
             html = await self._day_html(branch_id, date, force_refresh, strict=strict)
-            showtimes = parse_showtimes(html, branch_id, date)
-            movies = parse_movies(html)
+            soup = BeautifulSoup(html, "lxml")
+            showtimes = parse_showtimes(soup, branch_id, date)
+            movies = parse_movies(soup)
             if movies:
                 await self.cache.put_json(
                     movies_key(self.name, branch_id, date),
                     [m.__dict__ for m in movies],
                     self.settings.cache_listings_ttl,
                 )
-            dates = parse_dates(html)
+            dates = parse_dates(soup)
             if dates:
                 await self.cache.put_json(
                     dates_key(self.name, branch_id), dates, self.settings.cache_listings_ttl
@@ -374,10 +375,11 @@ class VoxProvider(CinemaProvider):
 
         branches = await self.get_branches()
         branch = next((b for b in branches if b.id == branch_id), Branch(branch_id, branch_id))
-        dates = parse_dates(html)
-        movies = parse_movies(html)
+        soup = BeautifulSoup(html, "lxml")
+        dates = parse_dates(soup)
+        movies = parse_movies(soup)
         primary = dates[0] if dates else date_cls.today().isoformat()
-        showtimes = parse_showtimes(html, branch_id, primary)
+        showtimes = parse_showtimes(soup, branch_id, primary)
         overview = BranchOverview(
             branch=branch,
             dates=tuple(dates),
@@ -504,8 +506,8 @@ def parse_branches(html: str) -> list[Branch]:
     return list(found.values())
 
 
-def parse_dates(html: str) -> list[str]:
-    soup = BeautifulSoup(html, "lxml")
+def parse_dates(html: str | BeautifulSoup) -> list[str]:
+    soup = html if isinstance(html, BeautifulSoup) else BeautifulSoup(html, "lxml")
     dates: set[str] = set()
     for anchor in soup.find_all("a", href=True):
         for match in _DATE_PARAM.finditer(anchor["href"]):
@@ -576,8 +578,8 @@ def _movie_identity(article: Any, fallback_slug: str = "") -> tuple[str, str, st
     return movie_id, name, slug
 
 
-def parse_movies(html: str) -> list[Movie]:
-    soup = BeautifulSoup(html, "lxml")
+def parse_movies(html: str | BeautifulSoup) -> list[Movie]:
+    soup = html if isinstance(html, BeautifulSoup) else BeautifulSoup(html, "lxml")
     found: dict[str, Movie] = {}
 
     # Current VOX layout: one <article class="movie-compare"> per movie.
@@ -727,8 +729,8 @@ def _movies_from_showtimes(showtimes: Iterable[Showtime]) -> list[Movie]:
     return list(found.values())
 
 
-def parse_showtimes(html: str, branch_id: str, default_date: str) -> list[Showtime]:
-    soup = BeautifulSoup(html, "lxml")
+def parse_showtimes(html: str | BeautifulSoup, branch_id: str, default_date: str) -> list[Showtime]:
+    soup = html if isinstance(html, BeautifulSoup) else BeautifulSoup(html, "lxml")
     sessions: dict[str, Showtime] = {}
 
     # Current VOX layout: each movie is an <article class="movie-compare">,

@@ -209,13 +209,13 @@ async def menu_home(
     settings: Settings,
 ) -> None:
     await state.clear()
+    await callback.answer()
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     await edit(
         callback,
         await dashboard_text(db, user, settings, _telegram_name_callback(callback)),
         main_menu_keyboard(),
     )
-    await callback.answer()
 
 
 @router.callback_query(F.data == "del:ask")
