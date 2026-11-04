@@ -11,6 +11,20 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-05
+
+### Added
+
+- **Cross-cinema window watch**: the cinema picker now offers `🌍 All cinemas`.
+  Pick a movie, then a day, then Morning (before 5 PM) or Evening (from 5 PM),
+  and the bot watches every show in that period across all VOX and Renaissance
+  branches as one logical watch (`MORNING_END_HOUR` sets the split).
+
+### Removed
+
+- The `/wait <movie>` command and the "wait in all cinemas" buttons; the
+  all-cinemas option in the picker replaces them.
+
 ## [2.4.0] - 2026-11-04
 
 ### Added
@@ -270,7 +284,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.1.0...v2.2.0

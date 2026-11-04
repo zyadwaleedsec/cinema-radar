@@ -70,7 +70,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (202 tests)
+├── tests/                  # pytest suite (201 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -340,11 +340,12 @@ change by re-reading the provider cache
 request. Coming Soon is refreshed at most once per `COMING_SOON_INTERVAL`
 (default one hour), and movie details are cached for a week.
 
-Movie waits (`/wait`, `movie_waits` table) are matched against the movies
-currently on sale at each branch and the bookable Coming Soon titles discovered
-by the pre-book scan, so no extra upstream requests are made for the feature
-itself. A wait is one-shot: the broadcaster sends a single alert and then
-deactivates it.
+The cross-cinema window watch ("All cinemas") stores one `scope="movie"` row
+per branch that has the movie, all sharing a `group_id` so the watch limit
+counts them once. The watcher filters the diff by `time_window` (morning /
+evening, split by `MORNING_END_HOUR`) so only shows in the chosen period alert.
+The day list and the movie's shows are read once per branch from the normal
+cached pages — no extra endpoints.
 
 IMAX matching reads a local JSON snapshot and adds no VOX requests. TMDB is
 contacted only when a film has an IMAX screening and its title is not already in
@@ -386,6 +387,7 @@ from `.env`. Secrets are only read from the environment.
 | `WATCHER_TICK` | `1` | Seconds between scheduler ticks |
 | `WATCH_ALERT_COOLDOWN` | `600` | Per-watch duplicate cooldown |
 | `WATCH_RETENTION_DAYS` | `3` | Days a closed watch is kept before hard deletion |
+| `MORNING_END_HOUR` | `17` | Split hour: shows before it are "morning", at/after "evening" |
 | `IMAX_DATA_PATH` | `data/imax_films.json` | Local IMAX snapshot path |
 | `TMDB_READ_TOKEN` | empty | Optional TMDB read token (title normalisation only) |
 | `TMDB_TIMEOUT` | `10` | TMDB request timeout (seconds) |
@@ -522,7 +524,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `202 passed`.
+Expected: `201 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

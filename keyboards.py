@@ -203,8 +203,21 @@ def cinema_keyboard(providers: list[str], current: str | None = None) -> Any:
         ]
         for name in providers
     ]
+    rows.append([_btn(("✅ " if current == "all" else "") + strings.BTN_ALL_CINEMAS, "pr:all")])
     rows.append([_btn(strings.BTN_HOME, "menu:home")])
     return _markup(rows)
+
+
+def window_keyboard(morning_count: int, evening_count: int) -> Any:
+    """Morning / evening choice for the cross-cinema watch flow."""
+
+    return _markup(
+        [
+            [_btn(strings.BTN_MORNING(morning_count), "win:morning")],
+            [_btn(strings.BTN_EVENING(evening_count), "win:evening")],
+            [_btn(strings.BTN_BACK, "ab:date"), _btn(strings.BTN_HOME, "menu:home")],
+        ]
+    )
 
 
 def branch_keyboard(branches: Iterable[Any], page: int = 0, back_cb: str | None = None) -> Any:
@@ -215,9 +228,9 @@ def branch_keyboard(branches: Iterable[Any], page: int = 0, back_cb: str | None 
     return _markup(rows)
 
 
-def date_keyboard(dates: list[str], page: int = 0) -> Any:
+def date_keyboard(dates: list[str], page: int = 0, back_cb: str = "ab:branch") -> Any:
     rows, _ = paginate(dates, page, "dt", lambda d: strings.relative_date(d))
-    return _markup(_with_back(rows, "ab:branch"))
+    return _markup(_with_back(rows, back_cb))
 
 
 def movie_keyboard(movies: list[Any], page: int = 0, show_search: bool = True) -> Any:
@@ -236,7 +249,6 @@ def search_results_keyboard(movies: list[Any], page: int = 0) -> Any:
             _btn(strings.BTN_ALL_MOVIES, "mv_all"),
         ],
     )
-    rows.insert(-1, [_btn(strings.BTN_MOVIE_WAIT, "mw:add")])
     return _markup(_with_back(rows, "ab:date"))
 
 
@@ -248,7 +260,6 @@ def suggestion_keyboard(movies: list[Any]) -> Any:
             _btn(strings.BTN_ALL_MOVIES, "mv_all"),
         ]
     )
-    rows.append([_btn(strings.BTN_MOVIE_WAIT, "mw:add")])
     rows.append([_btn(strings.BTN_BACK, "ab:date"), _btn(strings.BTN_HOME, "menu:home")])
     return _markup(rows)
 
@@ -260,7 +271,6 @@ def search_keyboard() -> Any:
                 _btn(strings.BTN_SEARCH_AGAIN, "mv_search"),
                 _btn(strings.BTN_ALL_MOVIES, "mv_all"),
             ],
-            [_btn(strings.BTN_MOVIE_WAIT, "mw:add")],
             [_btn(strings.BTN_BACK, "ab:date"), _btn(strings.BTN_HOME, "menu:home")],
         ]
     )
@@ -310,6 +320,15 @@ def confirm_keyboard() -> Any:
         [
             [_btn(strings.BTN_CONFIRM, "add:confirm", style="success")],
             [_btn(strings.BTN_BACK, "ab:showtime"), _btn(strings.BTN_HOME, "menu:home")],
+        ]
+    )
+
+
+def confirm_window_keyboard() -> Any:
+    return _markup(
+        [
+            [_btn(strings.BTN_CONFIRM, "add:confirm_window", style="success")],
+            [_btn(strings.BTN_BACK, "ab:date"), _btn(strings.BTN_HOME, "menu:home")],
         ]
     )
 
@@ -610,28 +629,6 @@ def discovery_keyboard(token: str, booking_url: str | None) -> Any:
     rows.append([_btn(strings.BTN_WATCH_MOVIE, f"dw:{token}")])
     rows.append([_btn(strings.BTN_STOP_ALERTS, "ds:stop")])
     return _markup(rows)
-
-
-def movie_wait_watch_keyboard(token: str, booking_url: str | None) -> Any:
-    """One-tap watch for a movie-wait alert that is now showing."""
-
-    rows = []
-    if booking_url:
-        rows.append([_btn(strings.BTN_OPEN_BOOKING, url=booking_url, style="success")])
-    rows.append([_btn(strings.BTN_WATCH_MOVIE, f"dw:{token}")])
-    rows.append([_btn(strings.BTN_HOME, "menu:home")])
-    return _markup(rows)
-
-
-def movie_wait_keyboard() -> Any:
-    """Action row for a pre-book movie-wait alert (pick the day yourself)."""
-
-    return _markup(
-        [
-            [_btn(strings.BTN_MOVIE_WAIT_OPEN, "menu:add", style="primary")],
-            [_btn(strings.BTN_HOME, "menu:home")],
-        ]
-    )
 
 
 def delete_me_keyboard() -> Any:

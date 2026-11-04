@@ -111,10 +111,23 @@ class RequestCoalescer:
                 self._futures.pop(key, None)
 
 
+def _in_window(showtime: Showtime, window: str | None, morning_end_hour: int) -> bool:
+    """True when ``showtime`` falls inside the requested morning/evening window."""
+
+    if not window:
+        return True
+    try:
+        hour = int(str(showtime.time or "").split(":", 1)[0])
+    except (ValueError, IndexError):
+        return False
+    return hour < morning_end_hour if window == "morning" else hour >= morning_end_hour
+
+
 def compute_watch_events(
     previous: Iterable[Showtime],
     current: Iterable[Showtime],
     watches: Iterable[dict[str, Any]],
+    morning_end_hour: int = 17,
 ) -> list[tuple[dict[str, Any], WatchEvent]]:
     """Pure diff logic, easy to unit-test with mocked provider responses."""
 
@@ -159,6 +172,7 @@ def compute_watch_events(
     for watch in watches:
         if (watch.get("scope") or "showtime") in {"movie", "movie_all_dates"}:
             hall = format_key(watch.get("hall_type"))
+            window = watch.get("time_window")
             if hall == "*":
                 prev_map, curr_map = previous_map, current_map
             else:
@@ -166,6 +180,13 @@ def compute_watch_events(
                     k: v for k, v in previous_map.items() if format_key(v.hall_type) == hall
                 }
                 curr_map = {k: v for k, v in current_map.items() if format_key(v.hall_type) == hall}
+            if window:
+                prev_map = {
+                    k: v for k, v in prev_map.items() if _in_window(v, window, morning_end_hour)
+                }
+                curr_map = {
+                    k: v for k, v in curr_map.items() if _in_window(v, window, morning_end_hour)
+                }
             new_by_movie, opened_by_movie, seats_by_movie = scan(prev_map, curr_map)
             movie_id = watch["movie_id"]
             if movie_id in opened_by_movie:
@@ -524,7 +545,9 @@ class Watcher:
             self._reschedule(target, movie_showtimes, now)
             return sent
 
-        normal_events = compute_watch_events(previous, movie_showtimes, normal_watches)
+        normal_events = compute_watch_events(
+            previous, movie_showtimes, normal_watches, self.settings.morning_end_hour
+        )
         all_events, updates = await self._all_dates_candidates(
             all_dates_watches, previous, movie_showtimes, target
         )
@@ -537,7 +560,9 @@ class Watcher:
                 self._reschedule(target, movie_showtimes, now)
                 return 0
             movie_showtimes = confirmed
-            normal_events = compute_watch_events(previous, movie_showtimes, normal_watches)
+            normal_events = compute_watch_events(
+                previous, movie_showtimes, normal_watches, self.settings.morning_end_hour
+            )
             all_events, updates = await self._all_dates_candidates(
                 all_dates_watches, previous, movie_showtimes, target
             )
@@ -585,7 +610,11 @@ class Watcher:
             if previous_status in {None, "", UNKNOWN} and current_shows:
                 events.append((watch, self._new_date_event(current_shows)))
                 continue
-            events.extend(compute_watch_events(previous_shows, current_shows, [watch]))
+            events.extend(
+                compute_watch_events(
+                    previous_shows, current_shows, [watch], self.settings.morning_end_hour
+                )
+            )
         return events, updates
 
     @staticmethod

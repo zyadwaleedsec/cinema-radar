@@ -195,8 +195,7 @@ BTN_MANAGE_WATCH = "⚙️ Manage watch"
 BTN_LANGUAGE = "🌐 Language"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
-BTN_MOVIE_WAIT = "🔔 Wait for it in all cinemas"
-BTN_MOVIE_WAIT_OPEN = "🎬 Open the cinema"
+BTN_ALL_CINEMAS = "🌍 All cinemas"
 
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
@@ -205,7 +204,6 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
     ("start", "Main menu"),
     ("add", "Add a new watch"),
     ("search", "Search for a movie by name"),
-    ("wait", "Wait for a movie in all cinemas"),
     ("watches", "My watches"),
     ("settings", "Settings"),
     ("help", "Help"),
@@ -400,7 +398,62 @@ def privacy_text() -> str:
 
 # ------------------------------------------------------------------ add watch
 def choose_cinema() -> str:
-    return "🎬 <b>Choose a cinema</b>\n\nPick the cinema you want to watch at."
+    return (
+        "🎬 <b>Choose a cinema</b>\n\n"
+        "Pick the cinema you want to watch at, or «All cinemas» to watch the movie "
+        "across every branch at once."
+    )
+
+
+def BTN_MORNING(count: int) -> str:
+    return f"🌅 Morning shows ({count})"
+
+
+def BTN_EVENING(count: int) -> str:
+    return f"🌙 Evening shows ({count})"
+
+
+def window_label(window: str) -> str:
+    return "Morning shows (before 5 PM)" if window == "morning" else "Evening shows (from 5 PM)"
+
+
+def choose_window(movie: str, date: str) -> str:
+    return (
+        f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}\n\n"
+        "Choose the period to watch across all cinemas:\n"
+        "🌅 <b>Morning</b> — shows before 5 PM\n"
+        "🌙 <b>Evening</b> — shows from 5 PM"
+    )
+
+
+def confirm_window(movie: str, date: str, window: str, branch_count: int) -> str:
+    return (
+        f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
+        f"📅 {relative_date(date)}\n"
+        f"🕐 {window_label(window)}\n"
+        f"🏢 {branch_count} branches\n\n"
+        "You'll watch every show in this period across all cinemas, and get a ping "
+        "when a new show opens or a seat comes back.\n\n"
+        "Confirm the watch?"
+    )
+
+
+def watch_created_window(movie: str, date: str, window: str, branch_count: int) -> str:
+    return (
+        "✅ <b>Watch active</b>\n\n"
+        f"🎬 {esc(movie)}\n"
+        f"📅 {relative_date(date)} · 🕐 {window_label(window)}\n"
+        f"🏢 All cinemas ({branch_count} branches)\n\n"
+        "I'll alert you when a new show opens in this period."
+    )
+
+
+def no_showtimes_window(movie: str, date: str) -> str:
+    return (
+        f"🍿 <b>No shows</b>\n\n"
+        f"No shows for «<b>{esc(movie)}</b>» on {relative_date(date)} at any cinema.\n"
+        "Try another day or period."
+    )
 
 
 def choose_branch() -> str:
@@ -460,45 +513,6 @@ def search_no_results(query: str, suggestions: list[str] | None = None) -> str:
             "Try part of the name,\nthe English title,\nor browse all movies.",
         ]
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------- movie waits
-def movie_wait_created(title: str) -> str:
-    return (
-        "🔔 <b>Done!</b>\n\n"
-        f"I'll watch for “<b>{esc(title)}</b>” and message you the moment it's bookable "
-        "at any cinema (VOX or Renaissance)."
-    )
-
-
-def movie_wait_exists(title: str) -> str:
-    return f"You're already waiting for “<b>{esc(title)}</b>” 🔔 — I'll tell you when it's out."
-
-
-def movie_wait_limit_reached(limit: int) -> str:
-    return f"You've reached the ({limit}) movie-wait limit 🙏\nRemove one and try again."
-
-
-def movie_wait_alert(movie: str, cinema: str, branch: str, date: str) -> str:
-    return (
-        f"🎬 <b>{esc(movie)}</b> is out! 🎉\n{DIVIDER}\n\n"
-        "The movie you were waiting for is now showing at:\n"
-        f"🏢 ({esc(cinema)}) · {esc(branch)}\n"
-        f"📅 {relative_date(date)}\n\n"
-        "Tap below to watch the first showtime."
-    )
-
-
-def movie_wait_prebook(movie: str, cinema: str, first_date: str, last_date: str) -> str:
-    span = relative_date(first_date)
-    if last_date and last_date != first_date:
-        span = f"{relative_date(first_date)} → {relative_date(last_date)}"
-    return (
-        f"🎬 <b>{esc(movie)}</b> opened booking! 🎟️\n{DIVIDER}\n\n"
-        f"The movie you were waiting for opened pre-booking at ({esc(cinema)}):\n"
-        f"📅 {span}\n\n"
-        "Open the cinema and pick the day to create a watch."
-    )
 
 
 def choose_showtime(movie: str, date: str, extra: str = "") -> str:
@@ -582,6 +596,18 @@ def no_data() -> str:
 
 def loading_branches() -> str:
     return "⏳ <b>Loading branches…</b>\n\nOne moment."
+
+
+def loading_showtimes() -> str:
+    return "⏳ <b>Loading shows from all cinemas…</b>\n\nThis can take a few seconds."
+
+
+def window_movie_prompt() -> str:
+    return "🔎 <b>Type the movie name</b>\n\nType the movie you want to watch across all cinemas (Arabic or English)."
+
+
+def choose_date_all_cinemas() -> str:
+    return "📅 <b>Pick a day</b>\n\nPick the day you want to watch across all cinemas."
 
 
 def no_dates() -> str:

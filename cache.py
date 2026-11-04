@@ -207,10 +207,6 @@ def prebook_dates_key(provider: str) -> str:
     return f"{provider}:{_PARSER_VERSION}:prebook"
 
 
-def prebook_movies_key(provider: str) -> str:
-    return f"{provider}:{_PARSER_VERSION}:prebookmovies"
-
-
 def movie_details_key(provider: str, slug: str) -> str:
     return f"{provider}:{_PARSER_VERSION}:movie:{slug}"
 

@@ -166,6 +166,9 @@ class Settings:
     stats_update_hour: int = 0
     daily_stats_days: int = 30
     broadcast_log_days: int = 90
+    # Cross-cinema watch: showtimes before this hour are "morning", at/after are
+    # "evening".
+    morning_end_hour: int = 17
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -245,6 +248,7 @@ class Settings:
             stats_update_hour=_env_int("STATS_UPDATE_HOUR", 0),
             daily_stats_days=_env_int("DAILY_STATS_DAYS", 30),
             broadcast_log_days=_env_int("BROADCAST_LOG_DAYS", 90),
+            morning_end_hour=_env_int("MORNING_END_HOUR", 17),
         )
 
     @property

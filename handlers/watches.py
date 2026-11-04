@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -23,6 +24,7 @@ from keyboards import (
     branch_keyboard,
     cinema_keyboard,
     confirm_keyboard,
+    confirm_window_keyboard,
     date_keyboard,
     movie_info_keyboard,
     movie_keyboard,
@@ -37,6 +39,7 @@ from keyboards import (
     watch_detail_keyboard,
     watches_clear_confirm_keyboard,
     watches_keyboard,
+    window_keyboard,
 )
 from models import Movie, Showtime, TargetKey, format_key
 from scheduler import Scheduler, expected_opening_for
@@ -54,6 +57,8 @@ class AddWatch(StatesGroup):
     movie = State()
     search = State()
     showtime = State()
+    window_movie = State()
+    window = State()
 
 
 async def _cached(cache: Any, key: str, ttl: float) -> Any:
@@ -91,6 +96,71 @@ def _selected_provider(providers: Any, provider: Any, data: dict[str, Any]) -> A
         except Exception:
             pass
     return provider
+
+
+def _window_match(showtime: Showtime, window: str, morning_end_hour: int) -> bool:
+    try:
+        hour = int((showtime.time or "").split(":", 1)[0])
+    except (ValueError, IndexError):
+        return False
+    return hour < morning_end_hour if window == "morning" else hour >= morning_end_hour
+
+
+async def _all_cinemas_dates(providers: Any, provider: Any) -> list[str]:
+    """Union of every enabled branch's bookable dates."""
+
+    dates: set[str] = set()
+    for name in _provider_names(providers, provider):
+        selected = _selected_provider(providers, provider, {"provider_name": name})
+        try:
+            branches = await selected.get_branches()
+        except Exception:
+            continue
+        for branch in branches:
+            try:
+                dates.update(await selected.get_dates(branch.id))
+            except Exception:
+                continue
+    return sorted(dates)
+
+
+async def _collect_window_showtimes(
+    providers: Any, provider: Any, date: str, query: str
+) -> list[dict[str, Any]]:
+    """Fetch the matching movie's showtimes on ``date`` across every branch."""
+
+    results: list[dict[str, Any]] = []
+    for name in _provider_names(providers, provider):
+        selected = _selected_provider(providers, provider, {"provider_name": name})
+        try:
+            branches = await selected.get_branches()
+        except Exception:
+            continue
+        for branch in branches:
+            try:
+                shows = await selected.get_showtimes(branch.id, date)
+            except Exception:
+                continue
+            if not shows:
+                continue
+            hits = search.rank(query, sorted({s.movie_name for s in shows if s.movie_name}))
+            if not hits:
+                continue
+            best_name = hits[0].item
+            movie_shows = [s for s in shows if s.movie_name == best_name]
+            if not movie_shows:
+                continue
+            results.append(
+                {
+                    "branch_id": branch.id,
+                    "branch_name": branch.name,
+                    "provider": name,
+                    "movie_id": movie_shows[0].movie_id,
+                    "movie_name": best_name,
+                    "showtimes": movie_shows,
+                }
+            )
+    return results
 
 
 def _parse_branch_suffix(
@@ -294,6 +364,9 @@ async def cinema_chosen(
     providers: Any = None,
 ) -> None:
     name = split_cb(callback.data, 2)[1]
+    if name == "all":
+        await _all_cinemas_chosen(callback, state, settings, provider, providers)
+        return
     if name not in _provider_names(providers, provider):
         await answer(callback, strings.error_expired(), alert=True)
         return
@@ -311,6 +384,142 @@ async def cinema_chosen(
     await state.set_state(AddWatch.branch)
     text = strings.search_choose_branch(pending_query) if search_first else strings.choose_branch()
     await edit(callback, text, branch_keyboard(branches, back_cb="ab:cinema"))
+
+
+async def _all_cinemas_chosen(
+    callback: CallbackQuery, state: FSMContext, settings: Settings, provider: Any, providers: Any
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    query = search.clean_query(data.get("pending_query") or "")
+    await state.update_data(all_cinemas=True)
+    if len(search.normalize(query)) >= 2:
+        await _all_cinemas_show_date(callback, state, provider, providers)
+        return
+    await state.set_state(AddWatch.window_movie)
+    await edit(callback, strings.window_movie_prompt(), back_home_keyboard())
+
+
+async def _all_cinemas_show_date(
+    callback: CallbackQuery, state: FSMContext, provider: Any, providers: Any
+) -> None:
+    await edit(callback, strings.loading_branches(), back_home_keyboard())
+    dates = await _all_cinemas_dates(providers, provider)
+    if not dates:
+        await edit(callback, strings.no_dates(), retry_keyboard("menu:add"))
+        return
+    await state.update_data(dates=dates)
+    await state.set_state(AddWatch.date)
+    await edit(
+        callback, strings.choose_date_all_cinemas(), date_keyboard(dates, back_cb="ab:cinema")
+    )
+
+
+@router.message(AddWatch.window_movie)
+async def window_movie_query(
+    message: Message, state: FSMContext, provider: Any, providers: Any = None
+) -> None:
+    title = search.clean_query(message.text or "")
+    if len(search.normalize(title)) < 2:
+        await send(message, strings.search_too_short(), back_home_keyboard())
+        return
+    await state.update_data(pending_query=title)
+    dates = await _all_cinemas_dates(providers, provider)
+    if not dates:
+        await send(message, strings.no_dates(), retry_keyboard("menu:add"))
+        return
+    await state.update_data(dates=dates)
+    await state.set_state(AddWatch.date)
+    await send(
+        message, strings.choose_date_all_cinemas(), date_keyboard(dates, back_cb="ab:cinema")
+    )
+
+
+@router.callback_query(AddWatch.window, F.data.startswith("win:"))
+async def window_chosen(callback: CallbackQuery, state: FSMContext, settings: Settings) -> None:
+    window = split_cb(callback.data, 2)[1]
+    if window not in {"morning", "evening"}:
+        await answer(callback, strings.error_expired(), alert=True)
+        return
+    data = await state.get_data()
+    await state.update_data(window=window)
+    date = data.get("date", "")
+    movie_name = data.get("movie_name", data.get("pending_query", ""))
+    branch_count = sum(
+        1
+        for br in data.get("window_branches", [])
+        if any(_window_match(s, window, settings.morning_end_hour) for s in br["showtimes"])
+    )
+    await edit(
+        callback,
+        strings.confirm_window(movie_name, date, window, branch_count),
+        confirm_window_keyboard(),
+    )
+
+
+@router.callback_query(AddWatch.window, F.data == "add:confirm_window")
+async def confirm_window_watch(
+    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    window = data.get("window")
+    date = data.get("date", "")
+    movie_name = data.get("movie_name", data.get("pending_query", ""))
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    group_id = secrets.token_urlsafe(16)
+    entries: list[dict[str, Any]] = []
+    for br in data.get("window_branches", []):
+        shows = [s for s in br["showtimes"] if _window_match(s, window, settings.morning_end_hour)]
+        if not shows:
+            continue
+        entries.append(
+            {
+                "provider": br["provider"],
+                "branch_id": br["branch_id"],
+                "branch_name": br["branch_name"],
+                "date": date,
+                "movie_id": br["movie_id"],
+                "movie_name": br["movie_name"],
+                # A sentinel that keeps morning/evening distinct in the UNIQUE
+                # index (showtime is ignored by the movie-scope renderer).
+                "showtime": window,
+                "hall_type": "*",
+                "scope": "movie",
+                "group_id": group_id,
+                "time_window": window,
+                "expires_at": day_end_iso(date, settings.timezone),
+            }
+        )
+    if not entries:
+        await edit(callback, strings.no_showtimes_window(movie_name, date), back_home_keyboard())
+        await state.clear()
+        return
+    try:
+        ids = await db.add_watch_group(int(user["id"]), int(user["watch_limit"]), entries)
+    except WatchLimitReached:
+        await edit(
+            callback,
+            strings.watch_limit_reached(
+                int(user["watch_limit"]),
+                settings.supporter_watch_limit,
+                settings.donation_min_amount,
+                bool(user.get("is_supporter")),
+            ),
+            support_keyboard() if not bool(user.get("is_supporter")) else back_home_keyboard(),
+        )
+        await state.clear()
+        return
+    except DuplicateWatch:
+        await edit(callback, strings.duplicate_watch())
+        await state.clear()
+        return
+    await state.clear()
+    await edit(
+        callback,
+        strings.watch_created_window(movie_name, date, window, len(entries)),
+        watch_created_keyboard(ids[0]),
+    )
 
 
 @router.callback_query(AddWatch.branch, F.data.startswith("br_p:"))
@@ -365,12 +574,63 @@ async def dates_page(callback: CallbackQuery, state: FSMContext) -> None:
     dates = data.get("dates", [])
     branch = data.get("branch", {})
     page = int_part(callback.data, 1, 2) or 0
-    await edit(
-        callback,
-        strings.choose_date(branch.get("name", "")),
-        date_keyboard(dates, page),
-    )
+    if data.get("all_cinemas"):
+        await edit(
+            callback,
+            strings.choose_date_all_cinemas(),
+            date_keyboard(dates, page, back_cb="ab:cinema"),
+        )
+    else:
+        await edit(
+            callback,
+            strings.choose_date(branch.get("name", "")),
+            date_keyboard(dates, page),
+        )
     await answer(callback)
+
+
+async def _all_cinemas_date_chosen(
+    callback: CallbackQuery,
+    state: FSMContext,
+    settings: Settings,
+    provider: Any,
+    providers: Any,
+    data: dict[str, Any],
+) -> None:
+    dates = data.get("dates", [])
+    index = int_part(callback.data, 1, 2) or 0
+    if not (0 <= index < len(dates)):
+        await answer(callback, strings.error_expired(), alert=True)
+        return
+    chosen = dates[index]
+    query = search.clean_query(data.get("pending_query") or "")
+    await edit(callback, strings.loading_showtimes(), back_home_keyboard())
+    grouped = await _collect_window_showtimes(providers, provider, chosen, query)
+    if not grouped:
+        await edit(
+            callback,
+            strings.no_showtimes_window(query, chosen),
+            retry_keyboard(f"dt:{index}"),
+        )
+        return
+    movie_name = grouped[0]["movie_name"]
+    morning = sum(
+        1
+        for br in grouped
+        for s in br["showtimes"]
+        if _window_match(s, "morning", settings.morning_end_hour)
+    )
+    evening = sum(
+        1
+        for br in grouped
+        for s in br["showtimes"]
+        if _window_match(s, "evening", settings.morning_end_hour)
+    )
+    await state.update_data(date=chosen, movie_name=movie_name, window_branches=grouped)
+    await state.set_state(AddWatch.window)
+    await edit(
+        callback, strings.choose_window(movie_name, chosen), window_keyboard(morning, evening)
+    )
 
 
 @router.callback_query(AddWatch.date, F.data.startswith("dt:"))
@@ -384,6 +644,9 @@ async def date_chosen(
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
+    if data.get("all_cinemas"):
+        await _all_cinemas_date_chosen(callback, state, settings, provider, providers, data)
+        return
     provider = _selected_provider(providers, provider, data)
     dates = data.get("dates", [])
     branch = data.get("branch", {})
@@ -526,13 +789,20 @@ async def add_back(
         back_cb = "ab:cinema" if data.get("provider_name") else None
         await edit(callback, text, branch_keyboard(branches, back_cb=back_cb))
         return
-    if target == "date" and branch and dates:
+    if target == "date" and dates and (branch or data.get("all_cinemas")):
         await state.set_state(AddWatch.date)
-        await edit(
-            callback,
-            strings.choose_date(branch.get("name", "")),
-            date_keyboard(dates),
-        )
+        if data.get("all_cinemas"):
+            await edit(
+                callback,
+                strings.choose_date_all_cinemas(),
+                date_keyboard(dates, back_cb="ab:cinema"),
+            )
+        else:
+            await edit(
+                callback,
+                strings.choose_date(branch.get("name", "")),
+                date_keyboard(dates),
+            )
         return
     if target == "movie" and branch and movies:
         await state.set_state(AddWatch.movie)
@@ -636,51 +906,6 @@ async def movie_list_text_search(message: Message, state: FSMContext) -> None:
     """Typing a name on the movie list is treated as a search, no button needed."""
 
     await _search_and_reply(message, state)
-
-
-async def _create_movie_wait(db: Database, settings: Settings, telegram_id: int, title: str) -> str:
-    """Create a "tell me when this movie is bookable" wait, if allowed."""
-
-    user = await db.get_or_create_user(telegram_id, watch_limit=settings.free_watch_limit)
-    normalized = search.compact(title)
-    if await db.get_movie_wait(int(user["id"]), normalized):
-        return strings.movie_wait_exists(title)
-    if await db.count_active_movie_waits(int(user["id"])) >= int(user["watch_limit"]):
-        return strings.movie_wait_limit_reached(int(user["watch_limit"]))
-    await db.add_movie_wait(int(user["id"]), title, normalized)
-    return strings.movie_wait_created(title)
-
-
-@router.message(Command("wait"))
-async def wait_cmd(message: Message, db: Database, settings: Settings) -> None:
-    parts = (message.text or "").split(maxsplit=1)
-    title = search.clean_query(parts[1]) if len(parts) > 1 else ""
-    if len(search.normalize(title)) < 2:
-        await send(message, strings.search_too_short(), back_home_keyboard())
-        return
-    await send(
-        message,
-        await _create_movie_wait(db, settings, message.from_user.id, title),
-        back_home_keyboard(),
-    )
-
-
-@router.callback_query(F.data == "mw:add")
-async def add_movie_wait(
-    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
-) -> None:
-    await _ack(callback)
-    data = await state.get_data()
-    title = search.clean_query(data.get("search_query") or "")
-    await state.clear()
-    if len(search.normalize(title)) < 2:
-        await edit(callback, strings.search_too_short(), back_home_keyboard())
-        return
-    await edit(
-        callback,
-        await _create_movie_wait(db, settings, callback.from_user.id, title),
-        back_home_keyboard(),
-    )
 
 
 @router.callback_query(AddWatch.movie, F.data.startswith("mv:"))
@@ -1106,9 +1331,12 @@ def _watches_view(
         if group != current_group:
             lines += ["", group]
             current_group = group
+        branch_label = watch["branch_name"]
+        if watch.get("time_window"):
+            branch_label += f" · {strings.window_label(watch['time_window'])}"
         lines.append(
             strings.watch_row(
-                watch["branch_name"],
+                branch_label,
                 watch["date"],
                 watch["movie_name"],
                 watch["showtime"],

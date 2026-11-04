@@ -162,8 +162,7 @@ BTN_MANAGE_WATCH = "⚙️ إدارة المراقبة"
 BTN_LANGUAGE = "🌐 اللغة"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
-BTN_MOVIE_WAIT = "🔔 استناه في كل السينمات"
-BTN_MOVIE_WAIT_OPEN = "🎬 افتح السينما"
+BTN_ALL_CINEMAS = "🌍 كل السينمات"
 
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
@@ -172,7 +171,6 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
     ("start", "القائمة الرئيسية"),
     ("add", "ضيف مراقبة جديدة"),
     ("search", "دوّر على فيلم بالاسم"),
-    ("wait", "استنى فيلم في كل السينمات"),
     ("watches", "مراقباتي"),
     ("settings", "الإعدادات"),
     ("help", "المساعدة"),
@@ -366,7 +364,62 @@ def privacy_text() -> str:
 
 # ------------------------------------------------------------------ add watch
 def choose_cinema() -> str:
-    return "🎬 <b>اختار السينما</b>\n\nاختار السينما اللي عايز تراقب منها."
+    return (
+        "🎬 <b>اختار السينما</b>\n\n"
+        "اختار السينما اللي عايز تراقب منها.\n"
+        "ولو عايز تراقب الفيلم في كل الفروع مرة واحدة، اختار «كل السينمات»."
+    )
+
+
+def BTN_MORNING(count: int) -> str:
+    return f"🌅 حفلات صباحية ({count})"
+
+
+def BTN_EVENING(count: int) -> str:
+    return f"🌙 حفلات مسائية ({count})"
+
+
+def window_label(window: str) -> str:
+    return "حفلات صباحية (قبل 5 مساءً)" if window == "morning" else "حفلات مسائية (من 5 مساءً)"
+
+
+def choose_window(movie: str, date: str) -> str:
+    return (
+        f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}\n\n"
+        "اختار الفترة اللي عايز تراقبها في كل السينمات:\n"
+        "🌅 <b>صباحي</b> — الحفلات قبل 5 مساءً\n"
+        "🌙 <b>مسائي</b> — الحفلات من 5 مساءً"
+    )
+
+
+def confirm_window(movie: str, date: str, window: str, branch_count: int) -> str:
+    return (
+        f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
+        f"📅 {relative_date(date)}\n"
+        f"🕐 {window_label(window)}\n"
+        f"🏢 {branch_count} فرع\n\n"
+        "هتراقب كل الحفلات المتاحة في الفترة دي في كل السينمات، "
+        "وهبعتلك أول ما حفلة جديدة تفتح أو كرسي يرجع.\n\n"
+        "تأكد المراقبة؟"
+    )
+
+
+def watch_created_window(movie: str, date: str, window: str, branch_count: int) -> str:
+    return (
+        "✅ <b>تم تفعيل المراقبة</b>\n\n"
+        f"🎬 {esc(movie)}\n"
+        f"📅 {relative_date(date)} · 🕐 {window_label(window)}\n"
+        f"🏢 كل السينمات ({branch_count} فرع)\n\n"
+        "هبعتلك تنبيه أول ما يفتح حجز أو يظهر وقت جديد في الفترة دي."
+    )
+
+
+def no_showtimes_window(movie: str, date: str) -> str:
+    return (
+        f"🍿 <b>مفيش حفلات</b>\n\n"
+        f"مفيش حفلات لـ «<b>{esc(movie)}</b>» في {relative_date(date)} في أي سينما.\n"
+        "جرّب يوم تاني أو فترة تانية."
+    )
 
 
 def choose_branch() -> str:
@@ -424,45 +477,6 @@ def search_no_results(query: str, suggestions: list[str] | None = None) -> str:
             "جرّب جزء من الاسم،\nأو اكتبه بالإنجليزي،\nأو شوف كل الأفلام.",
         ]
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------- movie waits
-def movie_wait_created(title: str) -> str:
-    return (
-        "🔔 <b>تمام!</b>\n\n"
-        f"هستنى «<b>{esc(title)}</b>» وأبعتلك أول ما يبقى متاح للحجز "
-        "في أي سينما (VOX أو رينيسانس)."
-    )
-
-
-def movie_wait_exists(title: str) -> str:
-    return f"أصلًا بتستنى «<b>{esc(title)}</b>» 🔔 — هقولّك أول ما ينزل."
-
-
-def movie_wait_limit_reached(limit: int) -> str:
-    return f"وصلت للحد الأقصى ({limit} فيلم) من «الاستناه» 🙏\nشيل واحد منهم وجرّب تاني."
-
-
-def movie_wait_alert(movie: str, cinema: str, branch: str, date: str) -> str:
-    return (
-        f"🎬 <b>{esc(movie)}</b> نزل! 🎉\n{DIVIDER}\n\n"
-        "الفيلم اللي كنت مستنيه بقى متاح دلوقتي في:\n"
-        f"🏢 ({esc(cinema)}) · {esc(branch)}\n"
-        f"📅 {relative_date(date)}\n\n"
-        "اضغط تحت عشان تراقب أول حفلة."
-    )
-
-
-def movie_wait_prebook(movie: str, cinema: str, first_date: str, last_date: str) -> str:
-    span = relative_date(first_date)
-    if last_date and last_date != first_date:
-        span = f"{relative_date(first_date)} → {relative_date(last_date)}"
-    return (
-        f"🎬 <b>{esc(movie)}</b> فتح حجزه! 🎟️\n{DIVIDER}\n\n"
-        f"الفيلم اللي كنت مستنيه فتح الحجز المسبق في ({esc(cinema)}):\n"
-        f"📅 {span}\n\n"
-        "افتح السينما واختار اليوم عشان تعمل مراقبة."
-    )
 
 
 def choose_showtime(movie: str, date: str, extra: str = "") -> str:
@@ -543,6 +557,18 @@ def no_data() -> str:
 
 def loading_branches() -> str:
     return "⏳ <b>بجيب الفروع…</b>\n\nثانية واحدة 🙏"
+
+
+def loading_showtimes() -> str:
+    return "⏳ <b>بجيب الحفلات من كل السينمات…</b>\n\nدي ممكن تاخد شوية ثواني 🙏"
+
+
+def window_movie_prompt() -> str:
+    return "🔎 <b>اكتب اسم الفيلم</b>\n\nاكتب اسم الفيلم اللي عايز تراقبه في كل السينمات (عربي أو إنجليزي)."
+
+
+def choose_date_all_cinemas() -> str:
+    return "📅 <b>اختار اليوم</b>\n\nاختار اليوم اللي عايز تراقب فيه في كل السينمات."
 
 
 def no_dates() -> str:
