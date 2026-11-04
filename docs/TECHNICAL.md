@@ -85,10 +85,10 @@ cinema-radar/
 | File | Use |
 | --- | --- |
 | `logo.svg` | source of truth — 2048×2048, all text outlined to paths, no external references |
-| `logo-512.png` | README header, chat/social previews |
+| `logo-512.png` | chat/social previews and lightweight embeds |
 | `logo-1024.png` | general raster use |
 | `logo.png` (2048) | high-DPI screens |
-| `logo-4096.png` | master export |
+| `logo-4096.png` | master export; README header |
 
 Palette: cream `#F2EDDA` background, ink `#15100C`, red `#C81E1E`. The lockup is
 dark-on-light only — keep it on the cream field. To add a size, render the SVG at
