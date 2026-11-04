@@ -11,6 +11,25 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-11-04
+
+### Fixed
+
+- A transient transport error no longer sends a false "VOX is down" alert when
+  the retry succeeds. Failures are counted once per logical fetch, after the
+  retries are exhausted.
+- A transport error now drops the pooled HTTP session before the retry, so a
+  stale keep-alive connection cannot make the next attempt fail too.
+- curl_cffi timeouts are classified as timeouts instead of generic network
+  errors in the admin alert.
+
+### Changed
+
+- Reworked the three welcome screens in both languages: shorter lines, one idea
+  per line, and commands at the end of a line for a cleaner RTL layout.
+- The outage alert now shows the last success time to the second, and a recovery
+  under a minute no longer claims "1 minute".
+
 ## [1.1.3] - 2026-11-04
 
 ### Fixed
@@ -113,7 +132,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.0...v1.1.1

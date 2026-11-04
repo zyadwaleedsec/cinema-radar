@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 from datetime import datetime
 
 import pytest
 
-from http_client import CircuitBreaker, CircuitOpenError, HttpClient, UpstreamError
+from http_client import (
+    CircuitBreaker,
+    CircuitOpenError,
+    HttpClient,
+    UpstreamError,
+    reason_for_exception,
+)
 
 
 class Response:
@@ -115,6 +122,55 @@ async def test_outage_alerts_the_admin_once_then_recovery(db, cache, test_settin
     assert "VOX رجعت" in alerts[1]
     assert client.incident_open is False
     assert client.circuit_state == "closed"
+
+
+@pytest.mark.asyncio
+async def test_successful_retry_does_not_alert_the_admin(db, cache, test_settings, clock):
+    alerts: list[str] = []
+
+    async def admin(text: str) -> None:
+        alerts.append(text)
+
+    class FlakySession:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def get(self, url, headers=None, timeout=None):
+            self.calls += 1
+            if self.calls == 1:
+                raise OSError("connection reset by peer")
+            return Response(200, "<html>ok</html>")
+
+    session = FlakySession()
+    settings = replace(test_settings, max_retries=1)
+    client = HttpClient(
+        settings,
+        cache,
+        session=session,
+        clock=clock,
+        sleep=clock.sleep,
+        on_admin_message=admin,
+    )
+
+    result = await client.get("https://example.test/showtimes", "k", ttl=100, allow_stale=False)
+
+    assert result.status_code == 200
+    assert session.calls == 2
+    assert alerts == []
+    assert client.incident_open is False
+
+
+def test_transport_errors_are_classified_for_the_admin():
+    class CurlTimeout(OSError):
+        pass
+
+    class CurlTimeoutError(OSError):
+        code = 28
+
+    assert reason_for_exception(TimeoutError("slow")) == "timeout"
+    assert reason_for_exception(CurlTimeout("timed out")) == "timeout"
+    assert reason_for_exception(CurlTimeoutError("curl: (28)")) == "timeout"
+    assert reason_for_exception(OSError("connection reset")) == "network"
 
 
 @pytest.mark.asyncio

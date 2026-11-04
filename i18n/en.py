@@ -279,33 +279,35 @@ def page_label(page: int, pages: int) -> str:
 def onboard_intro(name: str = "") -> str:
     who = f", {esc(name)}" if name else ""
     return (
-        f"Welcome{who} to <b>Cinema Radar</b> 🎬\n\n"
-        "I watch VOX showtimes in Egypt and message you the moment booking opens "
+        "🎬 <b>Cinema Radar</b>\n"
+        f"Welcome{who} 👋\n\n"
+        "I watch VOX showtimes in Egypt,\n"
+        "and message you the moment booking opens\n"
         "or a seat frees up.\n\n"
-        "No need to keep refreshing the site — I'll do it for you."
+        "No more refreshing the site yourself."
     )
 
 
 def onboard_alerts() -> str:
     return (
-        "<b>What you'll get</b> 🔔\n\n"
-        "• <b>Booking opened</b> — as soon as a showtime goes on sale.\n"
-        "• <b>Seats came back</b> — when a sold-out show frees up a seat.\n"
-        "• <b>New dates</b> — when a movie you track on every date opens a new day.\n\n"
-        "You can pick the alert type for each watch from "
-        "<b>⚙️ Alert settings</b>, and snooze alerts whenever you like."
+        "🔔 <b>What you'll get</b>\n\n"
+        "• <b>Booking opened</b> — when a showtime goes on sale.\n"
+        "• <b>Seats came back</b> — when a sold-out show frees up.\n"
+        "• <b>New dates</b> — when a movie opens a new day.\n\n"
+        "Set the alert type for each watch in\n"
+        "⚙️ Alert settings."
     )
 
 
 def onboard_safety() -> str:
     return (
-        "<b>Before we start — a few important things</b> 🙏\n\n"
-        "• The bot is free and only sends you the booking link — it never books or pays for you.\n"
-        "• It never asks for your name, phone number or any payment details.\n"
-        "• It is unofficial and not affiliated with VOX Cinemas; data may be delayed "
-        "or wrong.\n\n"
-        "All the details are in /privacy, and you can delete your data anytime "
-        "with /delete_me."
+        "🙏 <b>Before we start</b>\n\n"
+        "• The bot is free and only sends the booking link.\n"
+        "• It never books or pays for you.\n"
+        "• It never asks for your name, phone or payment details.\n"
+        "• It is unofficial and not affiliated with VOX.\n\n"
+        "Full details: /privacy\n"
+        "Erase your data anytime: /delete_me"
     )
 
 

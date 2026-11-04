@@ -87,6 +87,21 @@ def reason_for_status(status: int) -> str:
     return f"http_{status}" if status else "unknown"
 
 
+def reason_for_exception(exc: BaseException) -> str:
+    """Classify transport failures, including curl_cffi's own exception tree.
+
+    curl_cffi's ``Timeout`` inherits ``OSError`` but not ``TimeoutError`` or
+    ``httpx.TimeoutException``, so without the name/code check a timeout would
+    be reported as a generic network problem.
+    """
+
+    if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+        return "timeout"
+    if type(exc).__name__.endswith("Timeout") or getattr(exc, "code", None) == 28:
+        return "timeout"
+    return "network"
+
+
 def _place(target_key: str | None, url: str | None) -> str:
     if target_key:
         return target_key.replace(":", " / ")
@@ -98,7 +113,7 @@ def _place(target_key: str | None, url: str | None) -> str:
 def _clock_text(value: float | None) -> str:
     if not value:
         return "—"
-    return datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M")
+    return datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class TokenBucket:
@@ -309,6 +324,27 @@ class HttpClient:
                     await result
             self._session = None
 
+    async def _discard_session(self) -> None:
+        """Throw away a pooled session after a transport error.
+
+        Keep-alive connections can be closed by the upstream after idle time;
+        reusing one produces a spurious "network" failure.  The retry then
+        starts a fresh connection instead of repeating the same dead socket.
+        """
+
+        if not self._owns_session or self._session is None:
+            return
+        session, self._session = self._session, None
+        close = getattr(session, "aclose", None) or getattr(session, "close", None)
+        if close is None:
+            return
+        try:
+            result = close()
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception:  # pragma: no cover - closing must never mask the retry
+            logger.debug("Could not close the failed HTTP session", exc_info=True)
+
     # ------------------------------------------------------------------ metrics
     @property
     def slowdown_factor(self) -> float:
@@ -350,7 +386,6 @@ class HttpClient:
         self,
         target_key: str | None,
         reason: str,
-        retry_after: float | None = None,
         url: str | None = None,
     ) -> None:
         self.failures_total += 1
@@ -379,8 +414,6 @@ class HttpClient:
                     opened,
                 )
             await self._notify_admin(alert)
-        if retry_after:
-            await self._sleep(retry_after)
 
     async def report_failure(
         self, reason: str, target_key: str | None = None, url: str | None = None
@@ -409,7 +442,8 @@ class HttpClient:
         was_open = self.breaker.record_success()
         if self.incident_open:
             started = self.incident_started or self._clock()
-            minutes = max(1, int((self._clock() - started) / 60))
+            # Do not claim "1 minute" for a blip that recovered in seconds.
+            minutes = max(0, int((self._clock() - started) / 60))
             self.incident_open = False
             self.incident_started = None
             self.incident_reason = ""
@@ -543,7 +577,6 @@ class HttpClient:
                 if status in {429, 403} or 500 <= status < 600:
                     retry_after = _retry_after_seconds(response)
                     reason = reason_for_status(status)
-                    await self._record_failure(target_key, reason, retry_after, url)
                     last_exc = UpstreamError(
                         f"HTTP {status}",
                         status,
@@ -552,7 +585,12 @@ class HttpClient:
                         fetched_at=cached.fetched_at if cached else None,
                     )
                     if attempt + 1 < attempts:
+                        if retry_after:
+                            await self._sleep(retry_after)
                         continue
+                    # Count one failure per logical fetch, not per attempt: a
+                    # transient error that succeeds on retry must not alert.
+                    await self._record_failure(target_key, reason, url=url)
                     if cached is not None and allow_stale:
                         return FetchResult(
                             text=cached.payload,
@@ -577,14 +615,13 @@ class HttpClient:
 
             except (httpx.TimeoutException, httpx.TransportError, OSError) as exc:
                 last_exc = exc
-                reason = (
-                    "timeout"
-                    if isinstance(exc, (httpx.TimeoutException, TimeoutError))
-                    else "network"
-                )
-                await self._record_failure(target_key, reason, url=url)
+                reason = reason_for_exception(exc)
                 if attempt + 1 < attempts:
+                    await self._discard_session()
                     continue
+                # One failure per logical fetch: a retry that succeeds is not an
+                # outage and must not page the admin.
+                await self._record_failure(target_key, reason, url=url)
                 if cached is not None and allow_stale:
                     return FetchResult(
                         text=cached.payload,
