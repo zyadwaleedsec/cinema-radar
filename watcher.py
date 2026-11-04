@@ -293,7 +293,13 @@ class Watcher:
         await self._delete_old_watches(now)
         rows = await self.db.active_watch_targets()
         active_keys: set[str] = set()
+        supported = getattr(self.providers, "names", None)
+        supported = supported() if callable(supported) else None
         for row in rows:
+            if supported is not None and row["provider"] not in supported:
+                # A database can outlive a provider switch; keep the old rows
+                # stored but do not schedule work the current process cannot do.
+                continue
             target = TargetKey(
                 provider=row["provider"],
                 branch_id=row["branch_id"],

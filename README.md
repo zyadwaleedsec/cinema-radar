@@ -4,7 +4,8 @@
 
 <h1 align="center">Cinema Radar</h1>
 
-A Telegram bot that watches **VOX Cinemas Egypt** showtimes for you.
+A Telegram bot that watches **VOX Cinemas** and **Renaissance Cinemas** showtimes
+in Egypt for you.
 
 Pick a branch, date, movie and showtime. Cinema Radar checks it quietly in the
 background and messages you the moment booking opens — or when a sold-out show
@@ -20,7 +21,9 @@ has one button that opens the cinema's own booking page.
 - 🌍 **Arabic or English** — pick your language on first launch and change it
   anytime from Settings. Every screen, alert and error follows your choice.
 - 🎯 **Watch one showtime, a whole movie/day, or every open day at a branch.**
-- 🎭 **Filter by format** — IMAX, 4DX, VIP, MAX, 3D and whatever VOX lists.
+- 🎭 **Filter by format** — IMAX, 4DX, VIP, MAX, DBOX, 3D and whatever the
+  provider lists.
+- 🏢 **Two cinemas** — VOX or Renaissance, selected with `PROVIDER` in `.env`.
 - 🔔 **Instant alerts** when booking opens, seats come back, or new showtimes appear.
 - 🆕 **Optional release alerts** for new movies, new dates and Coming Soon titles.
 - 🔎 **Search in Arabic or English**, typos included (سبايدر مان → Spider-Man).
@@ -36,7 +39,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v2.0.1** — see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v2.1.0** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -75,6 +78,7 @@ Open `.env` and set these values:
 | `BOT_TOKEN` | the token from @BotFather (required) |
 | `ADMIN_ID` | your numeric Telegram id (from @userinfobot) |
 | `DONATION_PHONE` | optional; the Vodafone Cash / InstaPay number users see |
+| `PROVIDER` | `vox` (default) or `renaissance` |
 
 Without `ADMIN_ID`, admin commands and admin alerts stay disabled; without
 `DONATION_PHONE`, the manual donation flow is hidden.
@@ -127,7 +131,7 @@ commands never appear in the public menu.
 
 | File | What is inside |
 | --- | --- |
-| [`docs/TECHNICAL.md`](docs/TECHNICAL.md) | How it works: VOX parsing, polling, cache, languages, versioning, full configuration, deployment, troubleshooting |
+| [`docs/TECHNICAL.md`](docs/TECHNICAL.md) | How it works: provider parsing, polling, cache, languages, versioning, full configuration, deployment, troubleshooting |
 | [`docs/SPEC.md`](docs/SPEC.md) | Product specification and behaviour details |
 | [`CHANGELOG.md`](CHANGELOG.md) | Every release, newest first |
 | [`scripts/cli_test.py`](scripts/cli_test.py) | Live VOX smoke test |
@@ -139,7 +143,7 @@ commands never appear in the public menu.
 Cinema Radar stores what it needs to run: your Telegram id, language and
 preferences, your watches, optional discovery filters, your supporter flag, and
 any donation proof or feedback you send. It never asks for card or bank details,
-never requires a phone number, and never logs in to VOX.
+never requires a phone number, and never logs in to the cinema site.
 
 Anything you type yourself in a donation note or feedback — including a phone
 number or email — is stored exactly as you wrote it. `/delete_me` deletes every
@@ -153,9 +157,9 @@ the chat.
 ## Disclaimer
 
 Cinema Radar is **not affiliated with, endorsed by or sponsored by VOX
-Cinemas**. Showtime data can be delayed, incomplete or wrong — always confirm on
-the cinema's official website. Booking, payment and tickets happen entirely on
-the cinema's site.
+Cinemas or Renaissance Cinemas**. Showtime data can be delayed, incomplete or
+wrong — always confirm on the cinema's official website. Booking, payment and
+tickets happen entirely on the cinema's site.
 
 The IMAX snapshot in `data/imax_films.json` is derived from Wikipedia and is
 licensed **CC BY-SA 4.0**.

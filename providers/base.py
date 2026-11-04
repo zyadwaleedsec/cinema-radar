@@ -71,6 +71,12 @@ class ProviderRegistry:
     def __init__(self, providers: Iterable[CinemaProvider]) -> None:
         self._providers = {p.name: p for p in providers}
 
+    def names(self) -> tuple[str, ...]:
+        return tuple(self._providers)
+
+    def __contains__(self, name: object) -> bool:
+        return name in self._providers
+
     def get(self, name: str) -> CinemaProvider:
         try:
             return self._providers[name]

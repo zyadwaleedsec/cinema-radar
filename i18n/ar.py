@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import date as date_cls
 
+from config import settings as _app_settings
 from i18n.base import esc
 from imax import CERTIFIED_DIGITAL, FULL_70MM, PARTIAL_70MM, PARTIAL_DIGITAL, UNKNOWN
 from models import (
@@ -27,6 +28,10 @@ from version import __version__
 CODE = "ar"
 NAME = "العربية"
 RTL = True
+
+
+def cinema_name() -> str:
+    return "رينيسانس" if _app_settings.provider == "renaissance" else "فوكس"
 
 
 def format_time(value: str) -> str:
@@ -174,7 +179,7 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
 
 ADMIN_COMMANDS: tuple[tuple[str, str], ...] = (
     ("admin", "لوحة الأدمن"),
-    ("status", "حالة الاتصال بـ (فوكس)"),
+    ("status", f"حالة الاتصال بـ ({cinema_name()})"),
     ("grant", "تفعيل دعم مستخدم"),
     ("revoke", "إلغاء دعم مستخدم"),
     ("imax", "ضبط حالة IMAX لفيلم"),
@@ -255,7 +260,7 @@ def onboard_intro(name: str = "") -> str:
         "🎬 <b>سينما رادار</b>\n"
         f"{DIVIDER}\n"
         f"أهلاً بيك{who} 👋\n\n"
-        "بتابع حفلات (فوكس) في مصر،\n"
+        f"بتابع حفلات ({cinema_name()}) في مصر،\n"
         "وأبعتلك أول ما الحجز يفتح\n"
         "أو كرسي يرجع متاح.\n\n"
         "من غير ما تفضل تفتح الموقع كل شوية."
@@ -278,7 +283,7 @@ def onboard_safety() -> str:
         "• البوت مجاني، وبس بيبعتلك لينك الحجز.\n"
         "• مش بيحجز ولا بيدفع مكانك.\n"
         "• مش بيطلب اسمك ولا رقمك ولا بيانات دفع.\n"
-        "• غير رسمي وغير تابع لـ (فوكس).\n\n"
+        f"• غير رسمي وغير تابع لـ ({cinema_name()}).\n\n"
         "التفاصيل الكاملة: /privacy\n"
         "مسح بياناتك في أي وقت: /delete_me"
     )
@@ -321,7 +326,7 @@ def help_text() -> str:
         "/privacy — الخصوصية\n"
         "/delete_me — امسح بياناتي\n"
         "/cancel — إلغاء الخطوة\n\n"
-        "⚠️ البوت غير رسمي وغير تابع لـ (فوكس سينما).\n"
+        f"⚠️ البوت غير رسمي وغير تابع لـ ({cinema_name()} سينما).\n"
         "البيانات ممكن تتأخر أو تكون غلط،\n"
         "والحجز بيتم على موقع السينما نفسه.\n\n"
         f"{version_line()}"
@@ -1364,13 +1369,13 @@ def admin_unexpected_error(name: str) -> str:
 
 
 REASON_LABELS_AR = {
-    "http_403": "(فوكس) رافض الطلب (403) — حماية أو بلوك",
-    "http_429": "(فوكس) محدّد الطلبات (429) — rate limit",
-    "http_5xx": "سيرفر (فوكس) بيرجع خطأ (5xx)",
-    "timeout": "انتهت مهلة الاتصال بـ (فوكس)",
+    "http_403": f"({cinema_name()}) رافض الطلب (403) — حماية أو بلوك",
+    "http_429": f"({cinema_name()}) محدّد الطلبات (429) — rate limit",
+    "http_5xx": f"سيرفر ({cinema_name()}) بيرجع خطأ (5xx)",
+    "timeout": f"انتهت مهلة الاتصال بـ ({cinema_name()})",
     "network": "مشكلة شبكة / TLS / DNS",
-    "parse": "صفحة (فوكس) اتغيرت والبوت مش فاهمها",
-    "empty": "(فوكس) رجّع صفحة فاضية",
+    "parse": f"صفحة ({cinema_name()}) اتغيرت والبوت مش فاهمها",
+    "empty": f"({cinema_name()}) رجّع صفحة فاضية",
     "circuit": "قاطع الدائرة مفتوح بعد فشل متكرر",
     "unknown": "خطأ غير معروف",
 }
@@ -1384,7 +1389,9 @@ def format_place(place: str) -> str:
     """Show a technical place key with the localized cinema name."""
 
     if place.startswith("vox"):
-        return "(فوكس)" + place[3:]
+        return f"({cinema_name()})" + place[3:]
+    if place.startswith("renaissance"):
+        return f"({cinema_name()})" + place[len("renaissance") :]
     return place
 
 
@@ -1403,7 +1410,7 @@ def admin_upstream_down(
     )
     affected_line = f"\nمراقبات متأثرة: <b>{affected}</b>" if affected else ""
     return (
-        "⚠️ <b>(فوكس) واقعة</b>\n\n"
+        f"⚠️ <b>({cinema_name()}) واقعة</b>\n\n"
         f"السبب: {esc(reason_label(reason))}\n"
         f"المكان: {esc(place or '—')}\n"
         f"آخر نجاح: {esc(last_success or '—')}"
@@ -1415,8 +1422,8 @@ def admin_upstream_down(
 
 def admin_upstream_recovered(minutes: int) -> str:
     if minutes <= 0:
-        return "✅ <b>(فوكس) رجعت</b> — البيانات بتتحدث تاني."
-    return f"✅ <b>(فوكس) رجعت</b> بعد {minutes} دقيقة — البيانات بتتحدث تاني."
+        return f"✅ <b>({cinema_name()}) رجعت</b> — البيانات بتتحدث تاني."
+    return f"✅ <b>({cinema_name()}) رجعت</b> بعد {minutes} دقيقة — البيانات بتتحدث تاني."
 
 
 def stale_notice(minutes: int, degraded: bool) -> str:
@@ -1424,7 +1431,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
         return ""
     if degraded:
         return (
-            f"\n\n⚠️ <i>(فوكس) مش متاح دلوقتي. آخر تحديث من {minutes} دقيقة — "
+            f"\n\n⚠️ <i>({cinema_name()}) مش متاح دلوقتي. آخر تحديث من {minutes} دقيقة — "
             "البيانات ممكن تكون قديمة.</i>"
         )
     if minutes >= 10:
@@ -1434,7 +1441,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 def admin_status(data: dict[str, object]) -> str:
     return (
-        f"📡 <b>حالة الاتصال بـ (فوكس)</b>\n{DIVIDER}\n\n"
+        f"📡 <b>حالة الاتصال بـ ({cinema_name()})</b>\n{DIVIDER}\n\n"
         f"• الحالة: <b>{esc(data.get('state', '—'))}</b>\n"
         f"• آخر نجاح: {esc(data.get('last_success', '—'))}\n"
         f"• آخر خطأ: {esc(data.get('last_error', '—'))}\n"

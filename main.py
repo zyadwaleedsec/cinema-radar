@@ -31,7 +31,7 @@ from http_client import HttpClient
 from imax import load_default_service
 from middleware import LanguageMiddleware, RateLimitMiddleware
 from notifier import Notifier, TelegramSender
-from providers import ProviderRegistry, VoxProvider
+from providers import ProviderRegistry, RenaissanceProvider, VoxProvider
 from scheduler import Scheduler
 from stats import StatsService
 from support import SupportService
@@ -101,12 +101,18 @@ async def run() -> None:
     sender = TelegramSender(bot, settings)
     notifier = Notifier(sender, db, settings)
     http = HttpClient(settings, cache, on_admin_message=notifier.send_admin)
-    try:
-        imax = load_default_service(cache)
-    except Exception:
-        logger.exception("IMAX snapshot could not be loaded; the indicator is disabled")
-        imax = None
-    provider = VoxProvider(http, cache, settings)
+    imax = None
+    if settings.provider == "vox":
+        try:
+            imax = load_default_service(cache)
+        except Exception:
+            logger.exception("IMAX snapshot could not be loaded; the indicator is disabled")
+            imax = None
+    provider = (
+        RenaissanceProvider(http, cache, settings)
+        if settings.provider == "renaissance"
+        else VoxProvider(http, cache, settings)
+    )
     providers = ProviderRegistry([provider])
     scheduler = Scheduler(settings, time.time)
     broadcaster = Broadcaster(settings, db, sender)

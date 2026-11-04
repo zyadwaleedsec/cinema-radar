@@ -9,17 +9,18 @@ Implementation notes for developers and operators. For a friendly overview, see
 2. [Brand assets](#brand-assets)
 3. [Languages and versioning](#languages-and-versioning)
 4. [VOX Cinemas Egypt: what we found](#vox-cinemas-egypt-what-we-found)
-5. [Low-volume design](#low-volume-design)
-6. [Configuration](#configuration)
-7. [IMAX data](#imax-data)
-8. [Watch retention](#watch-retention)
-9. [Local setup](#local-setup)
-10. [Tests, lint and audit](#tests-lint-and-audit)
-11. [UI QA checklist](#ui-qa-checklist)
-12. [Deployment on a local laptop](#deployment-on-a-local-laptop)
-13. [Security and privacy](#security-and-privacy)
-14. [Terms of use of the source site](#terms-of-use-of-the-source-site)
-15. [Troubleshooting](#troubleshooting)
+5. [Renaissance Cinemas provider](#renaissance-cinemas-provider)
+6. [Low-volume design](#low-volume-design)
+7. [Configuration](#configuration)
+8. [IMAX data](#imax-data)
+9. [Watch retention](#watch-retention)
+10. [Local setup](#local-setup)
+11. [Tests, lint and audit](#tests-lint-and-audit)
+12. [UI QA checklist](#ui-qa-checklist)
+13. [Deployment on a local laptop](#deployment-on-a-local-laptop)
+14. [Security and privacy](#security-and-privacy)
+15. [Terms of use of the source site](#terms-of-use-of-the-source-site)
+16. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -60,6 +61,7 @@ cinema-radar/
 │   └── theme.py            # dividers, progress bars and shared visual tokens
 ├── providers/
 │   ├── base.py             # CinemaProvider abstraction + registry
+│   ├── renaissance.py      # Renaissance Cinemas provider and parsers
 │   └── vox.py              # VOX Egypt provider and pure HTML parsers
 ├── data/imax_films.json    # generated IMAX snapshot (CC BY-SA 4.0, see below)
 ├── assets/                 # brand mark (logo.svg + PNG exports)
@@ -68,7 +70,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (178 tests)
+├── tests/                  # pytest suite (186 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -236,6 +238,55 @@ silently hammering the site.
 
 ---
 
+## Renaissance Cinemas provider
+
+Set `PROVIDER=renaissance` to run the same bot against
+[`rnscinemas.com`](https://rnscinemas.com). The provider lives in
+`providers/renaissance.py` and implements the same `CinemaProvider` contract,
+so the watcher, scheduler, cache, alerts and discovery need no changes.
+
+### Pages used
+
+| Page | Purpose |
+| --- | --- |
+| `/en/cinemas` | Branch list; also `/ar/cinemas` has Arabic names |
+| `/en/cinemas/<slug>` | Ten-day date strip + first day's showtimes |
+| `/en/cinemas/<slug>/DD-MM-YYYY` | Every movie/session for one day |
+| `/en/movie/<slug>` | Poster, duration, rating, synopsis, trailer |
+| `/en/coming-soon` | Announced releases |
+
+The site is server-rendered; no JSON API is required. Date URLs accept any
+`DD-MM-YYYY` value, so a watch can fetch a date outside the visible ten-day
+strip. The strip itself is still ten days, so `get_dates` returns that window
+and new dates appear as the window rolls forward.
+
+### Parsing rules
+
+- Available sessions: `<a class="js-booking-confirm-link" data-booking-url=...>`.
+- Sessions closed for online booking: `<a class="disabled">`; the page tells
+  users to buy at the cinema. The bot maps these to `SOLD_OUT` (status-based
+  alerts only).
+- Time: `data-event-time` (`04:30 PM`) normalized to 24-hour `HH:MM`.
+- Title: `data-movie-name-en`; branch/date from the page URL and `data-*`.
+- Hall: the format heading (`VIP`, `Regular`, `Premium`, `DBOX`, `Balcone`,
+  `Special`) plus `3D` when `data-is-3d="1"`; `Regular` maps to `Standard`.
+- After-midnight sessions are moved to the next calendar day.
+- The same booking id can appear under several format headings; the provider
+  merges those and keeps the more specific hall (VIP over Standard).
+
+### Known limitations
+
+- **No seat counts.** Renaissance does not expose `seats_available`; watches
+  detect availability status changes and new showtimes, not a seat total.
+- **No explicit "not on sale" status.** A day with no sessions means no data;
+  `disabled` means online booking is closed / box office only.
+- **Ten-day date strip** (arbitrary date URLs still work if you know the date).
+- **Cloudflare** fronts the site; `HTTP_IMPERSONATE=chrome124` is recommended.
+  There is no `ETag`/`Last-Modified`, so conditional requests cannot help.
+- HTML can change; parser tests live in `tests/test_renaissance.py`.
+
+---
+
 ## Low-volume design
 
 1. **Per-target heap scheduler** — no global polling cycle. Each
@@ -294,7 +345,9 @@ from `.env`. Secrets are only read from the environment.
 | `UI_RENDERER` | `auto` | `auto` = rich with classic fallback, `rich`, or `classic` |
 | `DB_PATH` | `cinemaradar.sqlite3` | SQLite file |
 | `TIMEZONE` | `Africa/Cairo` | Quiet hours, daily caps, stats |
-| `VOX_BASE_URL` | `https://egy.voxcinemas.com` | Provider base URL |
+| `PROVIDER` | `vox` | `vox` or `renaissance` |
+| `VOX_BASE_URL` | `https://egy.voxcinemas.com` | VOX provider base URL |
+| `RENAISSANCE_BASE_URL` | `https://rnscinemas.com` | Renaissance provider base URL |
 | `HTTP_IMPERSONATE` | empty | e.g. `chrome124` (needs `curl_cffi`) |
 | `GLOBAL_RATE_LIMIT` | `1.0` | Upstream requests/second |
 | `MAX_CONNECTIONS` | `2` | Max concurrent upstream connections |
@@ -444,7 +497,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `178 passed`.
+Expected: `186 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.
@@ -552,21 +605,23 @@ if you rely on alerts overnight.
 - Card numbers, bank details and seat maps are never requested or stored.
   Free-text donation notes and feedback are stored as written, so a phone number
   or email typed there is stored with that message.
-- The bot never logs in to VOX, never books, never pays, and never handles
-  tickets.
+- The bot never logs in to a cinema site, never books, never pays, and never
+  handles tickets.
 
 ---
 
-## Terms of use of the source site
+## Terms of use of the source sites
 
 This project is an **unofficial** monitoring tool. Before scaling it, the
-developer/operator **must review VOX Cinemas' terms of service** and any
-applicable Egyptian law. The design intentionally keeps request volume very low
-(one global request per second, max two connections, jittered per-target
-intervals, conditional requests, caching, circuit breaker). Do not raise these
-limits to scrape aggressively. If VOX asks you to stop, or changes its terms,
-**disable or remove the provider** (`PROVIDER` / `providers/vox.py`) and keep the
-rest of the bot running with another provider.
+developer/operator **must review the terms of service of the cinema they
+monitor** (VOX Cinemas or Renaissance Cinemas) and any applicable Egyptian law.
+The design intentionally keeps request volume very low (one global request per
+second, max two connections, jittered per-target intervals, conditional
+requests, caching, circuit breaker). Do not raise these limits to scrape
+aggressively. If a cinema asks you to stop, or changes its terms,
+**disable or remove the provider** (`PROVIDER` / `providers/vox.py` or
+`providers/renaissance.py`) and keep the rest of the bot running with another
+provider.
 
 The bot only sends links to the cinema's own site. It does not bypass
 authentication, access booking or seat-map pages, or automate purchases.

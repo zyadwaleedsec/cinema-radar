@@ -70,6 +70,7 @@ class Settings:
 
     # ------------------------------------------------------------------ upstream
     http_base_url: str = "https://egy.voxcinemas.com"
+    renaissance_base_url: str = "https://rnscinemas.com"
     http_user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -166,9 +167,10 @@ class Settings:
             db_path=_env("DB_PATH", "cinemaradar.sqlite3"),
             log_level=_env("LOG_LEVEL", "INFO").upper(),
             timezone=_env("TIMEZONE", "Africa/Cairo"),
-            provider=_env("PROVIDER", "vox"),
+            provider=_env("PROVIDER", "vox").lower(),
             ui_renderer=_env_choice("UI_RENDERER", "auto", {"auto", "rich", "classic"}),
             http_base_url=_env("VOX_BASE_URL", "https://egy.voxcinemas.com"),
+            renaissance_base_url=_env("RENAISSANCE_BASE_URL", "https://rnscinemas.com"),
             http_user_agent=_env(
                 "HTTP_USER_AGENT",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

@@ -9,18 +9,19 @@
 
 ## Goal
 
-Cinema Radar is a Telegram bot that monitors VOX Cinemas Egypt showtimes and
-tells users when booking opens or when a sold-out session frees up seats. It
-also announces new movies, newly opened dates and new showtimes to users who opt
-in.
+Cinema Radar is a Telegram bot that monitors VOX Cinemas and Renaissance
+Cinemas showtimes and tells users when booking opens or when a sold-out session
+frees up seats. It also announces new movies, newly opened dates and new
+showtimes to users who opt in.
 
 Users pick a branch, date, movie, showtime and optional screening format. The
 bot watches that target and sends an alert with a button that opens the cinema's
-own booking page. The bot **never books, pays or logs in to VOX**; it only sends
-a link.
+own booking page. The bot **never books, pays or logs in to the cinema site**;
+it only sends a link.
 
-VOX is the first provider. The design keeps room for adding other cinemas
-without touching the watcher, discovery or bot layers.
+VOX and Renaissance are supported. The active cinema is selected with
+`PROVIDER`; the provider contract keeps the watcher, discovery and bot layers
+unchanged when another cinema is added.
 
 ## Stack
 
@@ -38,11 +39,14 @@ without touching the watcher, discovery or bot layers.
 - `providers/base.py`: abstract `CinemaProvider` with `get_branches()`,
   `get_dates(branch)`, `get_movies(branch, date)` and
   `get_showtimes(branch, date, movie)` returning time, hall/format, status and
-  booking URL. VOX does not expose seat counts, so they are not part of the
-  contract and `/booking/.../seats` is never requested.
+  booking URL. Some providers do not expose seat counts, so they are not part of
+  the contract and `/booking/.../seats` is never requested.
 - `providers/vox.py`: VOX implementation. It reads the endpoints the site
   actually uses, prefers whole-branch+day responses over per-movie calls, and
   documents the findings in the README.
+- `providers/renaissance.py`: Renaissance implementation. It reads the public
+  branch/day/movie pages; online booking is available/disabled, and no seat
+  counts are exposed.
 - `http_client.py`: one persistent httpx client (keep-alive, gzip, realistic
   User-Agent, optional curl_cffi TLS fingerprint) wrapped with the global rate
   limiter, adaptive backoff and circuit breaker.
@@ -73,7 +77,7 @@ without touching the watcher, discovery or bot layers.
 
 ## Polling and caching
 
-Goal: the minimum number of requests to VOX, spread evenly over time and
+Goal: the minimum number of requests to the cinema, spread evenly over time and
 self-throttling. These rules apply to every upstream request, including
 discovery.
 
@@ -259,8 +263,8 @@ stores no card or bank data.
 
 ## Security, privacy and legal
 
-- The bot only sends booking links. It never logs in to VOX, never submits
-  bookings, never handles tickets or card data.
+- The bot only sends booking links. It never logs in to a cinema site, never
+  submits bookings, never handles tickets or card data.
 - Minimum data: `telegram_id`, watches, subscriptions, supporter flag,
   donations, and feedback. A username is stored only inside feedback rows.
 - `/privacy` explains exactly what is stored and why, in the user's chosen
@@ -269,11 +273,11 @@ stores no card or bank data.
   watches, subscriptions, feedback, donations and proof references; only
   anonymous counters remain.
 - Add a disclaimer in `/help` and the README: the bot is unofficial, not
-  affiliated with VOX Cinemas, availability data can be delayed or wrong, and
-  booking happens on the cinema's own site.
+  affiliated with VOX Cinemas or Renaissance Cinemas, availability data can be
+  delayed or wrong, and booking happens on the cinema's own site.
 - The README must include a "Terms of use of the source site" section: review
-  VOX's terms before scaling, keep request volume low as designed, and remove or
-  disable the provider if requested.
+  each cinema's terms before scaling, keep request volume low as designed, and
+  remove or disable the provider if requested.
 - Validate all callback data and user input; parameterized SQL only; handle
   Telegram errors without leaking tracebacks to users; secrets only in `.env`.
 - Admin-only commands check `ADMIN_ID` on every call.
@@ -298,28 +302,29 @@ is `vX.Y.Z`.
 ## Quality
 
 - Structured logging, a global error handler and graceful shutdown.
-- If VOX returns an unexpected format, log it, alert the admin and keep running
-  from cache.
+- If a provider returns an unexpected format, log it, alert the admin and keep
+  running from cache.
 - `/admin` (admin only): active users and watches, supporters, requests/min,
   cache hit ratio, active targets, slowdown factor, circuit-breaker state, last
   poll, discovery state, events today, broadcasts sent, queue length and the
   running version.
-- `/status` (admin only): VOX outage state, last success, last error reason,
-  breaker, active targets and affected watches.
+- `/status` (admin only): provider outage state, last success, last error
+  reason, breaker, active targets and affected watches.
 - Tests cover: diff/event logic with mocked providers; coalescing (requests equal
   due targets); 429 storms and the circuit breaker; stale-data suppression;
   watch expiry and retention; donation approval/rejection idempotency;
   free vs supporter limits; `/delete_me`; discovery baseline, one-shot events,
-  flapping and the daily cap; the VOX parser; keyboards and UI copy; catalog
-  parity and English purity; the language gate and persistence; and version /
-  changelog consistency.
+  flapping and the daily cap; the VOX and Renaissance parsers; keyboards and UI
+  copy; catalog parity and English purity; the language gate and persistence;
+  and version / changelog consistency.
 - `ruff check` and `ruff format --check` are clean; the suite runs without a
   Telegram token or network access.
 
 ## Future (not built)
 
-Additional cinema providers. The provider contract already isolates them from
-the watcher, discovery and bot layers.
+A cinema picker so one bot can serve VOX and Renaissance side by side. The
+provider contract and the `provider` columns already isolate them from the
+watcher, discovery and bot layers.
 
 ## Deliverables
 

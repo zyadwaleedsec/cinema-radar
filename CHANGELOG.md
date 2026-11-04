@@ -11,6 +11,26 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-04
+
+### Added
+
+- **Renaissance Cinemas Egypt provider**: branches, dates, movies, showtimes,
+  movie details and Coming Soon, all parsed from the public server-rendered
+  pages.
+- `PROVIDER=renaissance` switches the bot to Renaissance; `PROVIDER=vox`
+  remains the default. `RENAISSANCE_BASE_URL` is configurable.
+- The cinema name in onboarding, help, status, alerts and reason labels is now
+  dynamic, so copy says `(فوكس)` / `(VOX)` or `(رينيسانس)` / `(Renaissance)`.
+- DBOX, Balcone and Special formats are recognised by the filters.
+
+### Notes
+
+- Renaissance does not expose seat counts. Availability comes from the
+  bookable/disabled markup, so seat-count alerts are status-based.
+- The provider runs in single-provider mode for now; the cinema picker for
+  using both providers in one bot is the next step.
+
 ## [2.0.1] - 2026-11-04
 
 ### Performance
@@ -202,7 +222,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.6...v2.0.0
 [1.1.6]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.5...v1.1.6
