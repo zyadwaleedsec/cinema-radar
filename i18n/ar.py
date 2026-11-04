@@ -162,6 +162,8 @@ BTN_MANAGE_WATCH = "⚙️ إدارة المراقبة"
 BTN_LANGUAGE = "🌐 اللغة"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
+BTN_MOVIE_WAIT = "🔔 استناه في كل السينمات"
+BTN_MOVIE_WAIT_OPEN = "🎬 افتح السينما"
 
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
@@ -170,6 +172,7 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
     ("start", "القائمة الرئيسية"),
     ("add", "ضيف مراقبة جديدة"),
     ("search", "دوّر على فيلم بالاسم"),
+    ("wait", "استنى فيلم في كل السينمات"),
     ("watches", "مراقباتي"),
     ("settings", "الإعدادات"),
     ("help", "المساعدة"),
@@ -421,6 +424,45 @@ def search_no_results(query: str, suggestions: list[str] | None = None) -> str:
             "جرّب جزء من الاسم،\nأو اكتبه بالإنجليزي،\nأو شوف كل الأفلام.",
         ]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- movie waits
+def movie_wait_created(title: str) -> str:
+    return (
+        "🔔 <b>تمام!</b>\n\n"
+        f"هستنى «<b>{esc(title)}</b>» وأبعتلك أول ما يبقى متاح للحجز "
+        "في أي سينما (VOX أو رينيسانس)."
+    )
+
+
+def movie_wait_exists(title: str) -> str:
+    return f"أصلًا بتستنى «<b>{esc(title)}</b>» 🔔 — هقولّك أول ما ينزل."
+
+
+def movie_wait_limit_reached(limit: int) -> str:
+    return f"وصلت للحد الأقصى ({limit} فيلم) من «الاستناه» 🙏\nشيل واحد منهم وجرّب تاني."
+
+
+def movie_wait_alert(movie: str, cinema: str, branch: str, date: str) -> str:
+    return (
+        f"🎬 <b>{esc(movie)}</b> نزل! 🎉\n{DIVIDER}\n\n"
+        "الفيلم اللي كنت مستنيه بقى متاح دلوقتي في:\n"
+        f"🏢 ({esc(cinema)}) · {esc(branch)}\n"
+        f"📅 {relative_date(date)}\n\n"
+        "اضغط تحت عشان تراقب أول حفلة."
+    )
+
+
+def movie_wait_prebook(movie: str, cinema: str, first_date: str, last_date: str) -> str:
+    span = relative_date(first_date)
+    if last_date and last_date != first_date:
+        span = f"{relative_date(first_date)} → {relative_date(last_date)}"
+    return (
+        f"🎬 <b>{esc(movie)}</b> فتح حجزه! 🎟️\n{DIVIDER}\n\n"
+        f"الفيلم اللي كنت مستنيه فتح الحجز المسبق في ({esc(cinema)}):\n"
+        f"📅 {span}\n\n"
+        "افتح السينما واختار اليوم عشان تعمل مراقبة."
+    )
 
 
 def choose_showtime(movie: str, date: str, extra: str = "") -> str:

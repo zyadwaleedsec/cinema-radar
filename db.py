@@ -166,6 +166,18 @@ CREATE TABLE IF NOT EXISTS discovery_actions (
     provider TEXT NOT NULL DEFAULT 'vox',
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS movie_waits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    normalized TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    notified_at TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(user_id, normalized)
+);
+CREATE INDEX IF NOT EXISTS idx_movie_waits_active ON movie_waits(active, normalized);
 """
 
 
@@ -422,6 +434,7 @@ class Database:
             return False
         async with self._write_lock:
             await self.conn.execute("DELETE FROM discovery_alerts WHERE user_id = ?", (user["id"],))
+            await self.conn.execute("DELETE FROM movie_waits WHERE user_id = ?", (user["id"],))
             await self.conn.execute("DELETE FROM feedback WHERE user_id = ?", (user["id"],))
             await self.conn.execute("DELETE FROM donations WHERE user_id = ?", (user["id"],))
             await self.conn.execute("DELETE FROM subscriptions WHERE user_id = ?", (user["id"],))
@@ -1153,4 +1166,52 @@ class Database:
         return await self.fetchone(
             "SELECT * FROM discovery_actions WHERE token = ? AND created_at >= ?",
             (token, cutoff),
+        )
+
+    # ------------------------------------------------------------ movie waits
+    async def add_movie_wait(self, user_id: int, title: str, normalized: str) -> bool:
+        """Create a "tell me when this movie is bookable" wait.  Returns False
+        when the user already waits for the same normalised title."""
+
+        cur = await self.execute(
+            "INSERT OR IGNORE INTO movie_waits (user_id, title, normalized, created_at, active) "
+            "VALUES (?, ?, ?, ?, 1)",
+            (user_id, title, normalized, utc_now_iso()),
+        )
+        return bool(cur.rowcount)
+
+    async def count_active_movie_waits(self, user_id: int) -> int:
+        return int(
+            await self.scalar(
+                "SELECT COUNT(*) FROM movie_waits WHERE user_id = ? AND active = 1",
+                (user_id,),
+                default=0,
+            )
+        )
+
+    async def list_user_movie_waits(self, user_id: int) -> list[dict[str, Any]]:
+        return await self.fetchall(
+            "SELECT * FROM movie_waits WHERE user_id = ? AND active = 1 ORDER BY id",
+            (user_id,),
+        )
+
+    async def get_movie_wait(self, user_id: int, normalized: str) -> dict[str, Any] | None:
+        return await self.fetchone(
+            "SELECT * FROM movie_waits WHERE user_id = ? AND normalized = ?",
+            (user_id, normalized),
+        )
+
+    async def list_active_movie_waits(self) -> list[dict[str, Any]]:
+        """All active waits, joined to the owning user for alert delivery."""
+
+        return await self.fetchall(
+            "SELECT w.*, u.telegram_id, u.lang, u.quiet_start, u.quiet_end "
+            "FROM movie_waits w JOIN users u ON u.id = w.user_id "
+            "WHERE w.active = 1 ORDER BY w.id"
+        )
+
+    async def mark_movie_wait_notified(self, wait_id: int) -> None:
+        await self.execute(
+            "UPDATE movie_waits SET active = 0, notified_at = ? WHERE id = ?",
+            (utc_now_iso(), wait_id),
         )

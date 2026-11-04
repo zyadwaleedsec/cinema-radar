@@ -323,6 +323,7 @@ class DiscoveryJob:
         self.provider_last_run: dict[str, float] = {}
         self.provider_last_error: dict[str, str] = {}
         self.provider_events: dict[str, int] = {}
+        self._now_showing: list[dict[str, Any]] = []
 
     async def run_once(
         self, now: float | None = None, branch_ids: Iterable[str] | None = None
@@ -330,6 +331,8 @@ class DiscoveryJob:
         now = self._clock() if now is None else now
         wanted = set(branch_ids) if branch_ids is not None else None
         queued = 0
+        self._now_showing = []
+        wait_candidates: list[dict[str, Any]] = []
         for provider_name in self.providers.names():
             provider = self.providers.get(provider_name)
             self.provider_last_run[provider_name] = now
@@ -345,6 +348,20 @@ class DiscoveryJob:
                 continue
             self.provider_last_error.pop(provider_name, None)
             upcoming = await self._upcoming_state(provider, now)
+            if hasattr(provider, "get_prebook_movies"):
+                wait_candidates.extend(
+                    {
+                        "title": item.get("title") or item.get("slug") or "",
+                        "movie_id": item.get("slug") or "",
+                        "provider": provider_name,
+                        "dates": list(item.get("dates") or []),
+                        "branch_id": None,
+                        "branch_name": None,
+                        "date": None,
+                        "booking_url": None,
+                    }
+                    for item in await provider.get_prebook_movies()
+                )
             for branch in branches:
                 if wanted is not None and branch.id not in wanted:
                     continue
@@ -363,7 +380,27 @@ class DiscoveryJob:
             self.provider_events[provider_name] = self.provider_events.get(provider_name, 0)
             if upcoming is not None:
                 await self._save_upcoming(upcoming, now, provider)
+        await self._flush_movie_waits(wait_candidates, now)
         return queued
+
+    async def _flush_movie_waits(self, candidates: list[dict[str, Any]], now: float) -> None:
+        """Alert users waiting for a movie that is now bookable.
+
+        ``candidates`` combines the currently-showing movies collected while
+        scanning branch overviews with the bookable Coming Soon titles from the
+        pre-book scan.  The broadcaster matches them against active waits.
+        """
+
+        candidates.extend(self._now_showing)
+        self._now_showing = []
+        if not candidates or self.broadcaster is None:
+            return
+        if not hasattr(self.broadcaster, "notify_movie_waits"):
+            return
+        try:
+            await self.broadcaster.notify_movie_waits(candidates, now)
+        except Exception:
+            logger.exception("Movie-wait notification failed")
 
     def _due(self, branch_id: str, now: float) -> bool:
         return now >= self._next_allowed.get(branch_id, 0.0)
@@ -441,6 +478,25 @@ class DiscoveryJob:
             enriched.append(replace(event, movie=details[key]))
         return enriched
 
+    def _collect_now_showing(self, overview: BranchOverview, provider: Any, branch: Branch) -> None:
+        """Remember every movie currently on sale at a branch so waits for a
+        title that is already showing can fire too (not only brand-new ones)."""
+
+        for movie in overview.movies:
+            showtime = next((s for s in overview.showtimes if s.movie_id == movie.id), None)
+            self._now_showing.append(
+                {
+                    "title": movie.name,
+                    "movie_id": movie.id or movie.slug,
+                    "provider": provider.name,
+                    "branch_id": branch.id,
+                    "branch_name": branch.name,
+                    "date": overview.fetched_date
+                    or (overview.dates[0] if overview.dates else None),
+                    "booking_url": showtime.booking_url if showtime else None,
+                }
+            )
+
     async def _process_branch(
         self,
         branch: Branch,
@@ -449,6 +505,7 @@ class DiscoveryJob:
         upcoming: _UpcomingState | None = None,
     ) -> int:
         overview = await provider.get_branch_overview(branch.id, force_refresh=True)
+        self._collect_now_showing(overview, provider, branch)
         if upcoming is not None and upcoming.baseline:
             # Anything already on sale while the Coming Soon baseline is being
             # taken is not a new release; never alert for it later.

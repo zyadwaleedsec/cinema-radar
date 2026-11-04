@@ -70,7 +70,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (196 tests)
+├── tests/                  # pytest suite (202 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -340,6 +340,12 @@ change by re-reading the provider cache
 request. Coming Soon is refreshed at most once per `COMING_SOON_INTERVAL`
 (default one hour), and movie details are cached for a week.
 
+Movie waits (`/wait`, `movie_waits` table) are matched against the movies
+currently on sale at each branch and the bookable Coming Soon titles discovered
+by the pre-book scan, so no extra upstream requests are made for the feature
+itself. A wait is one-shot: the broadcaster sends a single alert and then
+deactivates it.
+
 IMAX matching reads a local JSON snapshot and adds no VOX requests. TMDB is
 contacted only when a film has an IMAX screening and its title is not already in
 the snapshot, and the result is cached for 30 days.
@@ -516,7 +522,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `196 passed`.
+Expected: `202 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

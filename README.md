@@ -26,6 +26,8 @@ has one button that opens the cinema's own booking page.
 - 🏢 **Two cinemas** — VOX and Renaissance run together; pick one in-app, or
   limit to a single cinema with `PROVIDERS` in `.env`.
 - 🔔 **Instant alerts** when booking opens, seats come back, or new showtimes appear.
+- ⏳ **Wait for a movie** — `/wait <movie>` (or the button in search) tells you the
+  moment a title you're waiting for becomes bookable in any cinema.
 - 🆕 **Optional release alerts** for new movies, new dates and Coming Soon titles.
 - 🔎 **Search in Arabic or English**, typos included (سبايدر مان → Spider-Man).
 - 🎬 **Movie cards** with poster, duration, rating, language, synopsis and trailer.
@@ -40,7 +42,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v2.3.0** — see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v2.4.0** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

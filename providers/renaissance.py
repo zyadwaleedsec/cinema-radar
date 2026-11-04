@@ -37,6 +37,7 @@ from cache import (
     movies_key,
     overview_key,
     prebook_dates_key,
+    prebook_movies_key,
     showtimes_key,
 )
 from config import Settings
@@ -480,20 +481,22 @@ class RenaissanceProvider(CinemaProvider):
         )
         return list(cached) if cached is not None else []
 
-    async def refresh_prebook_dates(self, force_refresh: bool = False) -> None:
+    async def refresh_prebook_dates(self, force_refresh: bool = False) -> list[dict[str, Any]]:
         """Rebuild the bookable Coming Soon dates from the movie pages.
 
         The branch page only exposes a ten-day strip, but pre-book titles keep
         their bookable dates on their own ``/en/movie/<slug>`` page (sometimes
-        months ahead).  This scans those pages once per ``prebook_dates_ttl``
-        and caches the union so ``get_dates`` can offer them in the picker.
+        months ahead).  This scans those pages once per ``prebook_dates_ttl``,
+        caches the date union for ``get_dates`` and returns the bookable movies
+        so discovery can alert users who are waiting for them.
         """
 
         key = prebook_dates_key(self.name)
+        movies_key = prebook_movies_key(self.name)
         if not force_refresh:
-            cached = await self.cache.get_json(key, ttl=self.settings.prebook_dates_ttl)
+            cached = await self.cache.get_json(movies_key, ttl=self.settings.prebook_dates_ttl)
             if cached is not None:
-                return
+                return list(cached)
         movies = await self.get_coming_soon()
         today = today_iso(self.settings.timezone)
         try:
@@ -503,6 +506,7 @@ class RenaissanceProvider(CinemaProvider):
         except ValueError:
             horizon = today
         extra: set[str] = set()
+        bookable: list[dict[str, Any]] = []
         for movie in movies:
             slug = (movie.slug or movie.id or "").strip()
             if not slug:
@@ -523,10 +527,24 @@ class RenaissanceProvider(CinemaProvider):
             # the dates of movies that can actually be booked.
             if "data-booking-url" not in html:
                 continue
-            for iso in parse_dates(html):
-                if today <= iso <= horizon:
-                    extra.add(iso)
+            dates = sorted(iso for iso in parse_dates(html) if today <= iso <= horizon)
+            if not dates:
+                continue
+            extra.update(dates)
+            bookable.append(
+                {"title": movie.name or slug, "slug": slug, "provider": self.name, "dates": dates}
+            )
         await self.cache.put_json(key, sorted(extra), self.settings.prebook_dates_ttl)
+        await self.cache.put_json(movies_key, bookable, self.settings.prebook_dates_ttl)
+        return bookable
+
+    async def get_prebook_movies(self) -> list[dict[str, Any]]:
+        """The cached bookable Coming Soon movies (no network)."""
+
+        cached = await self.cache.get_json(
+            prebook_movies_key(self.name), ttl=self.settings.prebook_dates_ttl
+        )
+        return list(cached) if cached is not None else []
 
     async def get_movies(
         self, branch_id: str, date: str, force_refresh: bool = False

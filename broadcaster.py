@@ -12,6 +12,7 @@ from datetime import date as date_cls
 from typing import Any
 
 import i18n
+import search
 import strings
 from config import Settings
 from db import Database
@@ -123,6 +124,133 @@ class Broadcaster:
                 if self.stats is not None:
                     self.stats.note_broadcast()
         return sent
+
+    async def notify_movie_waits(
+        self, candidates: list[dict[str, Any]], now: float | None = None
+    ) -> int:
+        """Alert users waiting for a movie that has become bookable.
+
+        ``candidates`` describe movies that are on sale right now (with a
+        ``branch_id``/``date``) or opening pre-book (``dates`` only).  Each
+        active wait is alerted once and then deactivated.
+        """
+
+        if not candidates:
+            return 0
+        waits = await self.db.list_active_movie_waits()
+        if not waits:
+            return 0
+        now = self._clock() if now is None else now
+        day = self._local_day(now)
+
+        # Keep one candidate per title; the first (now-showing, with a branch)
+        # is preferred over pre-book-only candidates.
+        unique: list[dict[str, Any]] = []
+        seen_titles: set[str] = set()
+        for candidate in candidates:
+            key = search.normalize(candidate.get("title") or "")
+            if not key or key in seen_titles:
+                continue
+            seen_titles.add(key)
+            unique.append(candidate)
+
+        sent = 0
+        notified: set[int] = set()
+        for candidate in unique:
+            title = candidate.get("title") or ""
+            for wait in waits:
+                if wait["id"] in notified:
+                    continue
+                if search.score(wait["title"], title) < 0.90:
+                    continue
+                if self._wait_is_quiet(wait, candidate, now):
+                    continue
+                user_id = int(wait["user_id"])
+                count = await self.db.get_discovery_count(user_id, day)
+                if count >= self.settings.discovery_daily_cap:
+                    continue
+                with i18n.use(wait.get("lang")):
+                    text, keyboard = await self._movie_wait_message(wait, candidate, user_id)
+                try:
+                    await self.sender.send(int(wait["telegram_id"]), text, keyboard)
+                except UserBlocked:
+                    logger.info("Deactivated blocked movie-wait user %s", wait["telegram_id"])
+                    await self.db.mark_movie_wait_notified(wait["id"])
+                    notified.add(wait["id"])
+                    continue
+                except Exception:
+                    logger.exception("Movie-wait alert failed for %s", wait["telegram_id"])
+                    continue
+                await self.db.mark_movie_wait_notified(wait["id"])
+                notified.add(wait["id"])
+                await self.db.increment_discovery_count(user_id, day)
+                sent += 1
+                self.sent += 1
+                if self.stats is not None:
+                    self.stats.note_broadcast()
+        return sent
+
+    def _wait_is_quiet(self, wait: dict[str, Any], candidate: dict[str, Any], now: float) -> bool:
+        start = int(
+            wait.get("quiet_start")
+            if wait.get("quiet_start") is not None
+            else self.settings.quiet_start
+        )
+        end = int(
+            wait.get("quiet_end") if wait.get("quiet_end") is not None else self.settings.quiet_end
+        )
+        if not is_quiet_time(now, start, end, self.settings.timezone):
+            return False
+        dates = candidate.get("dates") or []
+        date_text = candidate.get("date") or (dates[0] if dates else None)
+        if not date_text:
+            return True
+        try:
+            event_date = date_cls.fromisoformat(date_text)
+        except (TypeError, ValueError):
+            return True
+        return not (0 <= (event_date - local_date(now, self.settings.timezone)).days <= 1)
+
+    async def _movie_wait_message(
+        self, wait: dict[str, Any], candidate: dict[str, Any], user_id: int
+    ) -> tuple[str, Any]:
+        from keyboards import movie_wait_keyboard, movie_wait_watch_keyboard
+
+        title = candidate.get("title") or ""
+        provider = candidate.get("provider") or "vox"
+        branch_name = candidate.get("branch_name")
+        date_text = candidate.get("date")
+
+        if branch_name and date_text:
+            token = secrets.token_urlsafe(16)
+            await self.db.add_discovery_action(
+                token,
+                user_id,
+                candidate["branch_id"],
+                branch_name,
+                date_text,
+                candidate["movie_id"],
+                title,
+                provider,
+            )
+            text = strings.movie_wait_alert(
+                title,
+                strings.cinema_name(provider),
+                branch_name,
+                date_text,
+            )
+            keyboard = movie_wait_watch_keyboard(
+                token=token, booking_url=candidate.get("booking_url")
+            )
+            return text, keyboard
+
+        dates = candidate.get("dates") or []
+        first_date = dates[0] if dates else ""
+        last_date = dates[-1] if dates else ""
+        text = strings.movie_wait_prebook(
+            title, strings.cinema_name(provider), first_date, last_date
+        )
+        return text, movie_wait_keyboard()
 
     def _filter_events(
         self, sub: dict[str, Any], events: list[DiscoveryEvent]

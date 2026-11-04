@@ -11,6 +11,19 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-04
+
+### Added
+
+- **Movie waits** (`/wait <movie>`): tell the bot a title you're waiting for
+  and it messages you once the movie becomes bookable at any cinema — now
+  showing or opened for pre-booking. The search screens also offer a
+  "wait in all cinemas" button next to "search again".
+- Waits match Arabic transliterations and partial English titles (for example
+  `افنجرز` → `Avengers: Doomsday`) and are one-shot: after the alert they
+  deactivate.
+- The limit reuses the normal watch limit (2 free / 10 supporter).
+
 ## [2.3.0] - 2026-11-04
 
 ### Added
@@ -257,7 +270,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.1...v2.1.0

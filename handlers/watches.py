@@ -638,6 +638,51 @@ async def movie_list_text_search(message: Message, state: FSMContext) -> None:
     await _search_and_reply(message, state)
 
 
+async def _create_movie_wait(db: Database, settings: Settings, telegram_id: int, title: str) -> str:
+    """Create a "tell me when this movie is bookable" wait, if allowed."""
+
+    user = await db.get_or_create_user(telegram_id, watch_limit=settings.free_watch_limit)
+    normalized = search.compact(title)
+    if await db.get_movie_wait(int(user["id"]), normalized):
+        return strings.movie_wait_exists(title)
+    if await db.count_active_movie_waits(int(user["id"])) >= int(user["watch_limit"]):
+        return strings.movie_wait_limit_reached(int(user["watch_limit"]))
+    await db.add_movie_wait(int(user["id"]), title, normalized)
+    return strings.movie_wait_created(title)
+
+
+@router.message(Command("wait"))
+async def wait_cmd(message: Message, db: Database, settings: Settings) -> None:
+    parts = (message.text or "").split(maxsplit=1)
+    title = search.clean_query(parts[1]) if len(parts) > 1 else ""
+    if len(search.normalize(title)) < 2:
+        await send(message, strings.search_too_short(), back_home_keyboard())
+        return
+    await send(
+        message,
+        await _create_movie_wait(db, settings, message.from_user.id, title),
+        back_home_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "mw:add")
+async def add_movie_wait(
+    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
+) -> None:
+    await _ack(callback)
+    data = await state.get_data()
+    title = search.clean_query(data.get("search_query") or "")
+    await state.clear()
+    if len(search.normalize(title)) < 2:
+        await edit(callback, strings.search_too_short(), back_home_keyboard())
+        return
+    await edit(
+        callback,
+        await _create_movie_wait(db, settings, callback.from_user.id, title),
+        back_home_keyboard(),
+    )
+
+
 @router.callback_query(AddWatch.movie, F.data.startswith("mv:"))
 async def movie_chosen(
     callback: CallbackQuery,

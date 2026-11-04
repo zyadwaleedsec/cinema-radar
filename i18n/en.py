@@ -195,6 +195,8 @@ BTN_MANAGE_WATCH = "⚙️ Manage watch"
 BTN_LANGUAGE = "🌐 Language"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
+BTN_MOVIE_WAIT = "🔔 Wait for it in all cinemas"
+BTN_MOVIE_WAIT_OPEN = "🎬 Open the cinema"
 
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
@@ -203,6 +205,7 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
     ("start", "Main menu"),
     ("add", "Add a new watch"),
     ("search", "Search for a movie by name"),
+    ("wait", "Wait for a movie in all cinemas"),
     ("watches", "My watches"),
     ("settings", "Settings"),
     ("help", "Help"),
@@ -457,6 +460,45 @@ def search_no_results(query: str, suggestions: list[str] | None = None) -> str:
             "Try part of the name,\nthe English title,\nor browse all movies.",
         ]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- movie waits
+def movie_wait_created(title: str) -> str:
+    return (
+        "🔔 <b>Done!</b>\n\n"
+        f"I'll watch for “<b>{esc(title)}</b>” and message you the moment it's bookable "
+        "at any cinema (VOX or Renaissance)."
+    )
+
+
+def movie_wait_exists(title: str) -> str:
+    return f"You're already waiting for “<b>{esc(title)}</b>” 🔔 — I'll tell you when it's out."
+
+
+def movie_wait_limit_reached(limit: int) -> str:
+    return f"You've reached the ({limit}) movie-wait limit 🙏\nRemove one and try again."
+
+
+def movie_wait_alert(movie: str, cinema: str, branch: str, date: str) -> str:
+    return (
+        f"🎬 <b>{esc(movie)}</b> is out! 🎉\n{DIVIDER}\n\n"
+        "The movie you were waiting for is now showing at:\n"
+        f"🏢 ({esc(cinema)}) · {esc(branch)}\n"
+        f"📅 {relative_date(date)}\n\n"
+        "Tap below to watch the first showtime."
+    )
+
+
+def movie_wait_prebook(movie: str, cinema: str, first_date: str, last_date: str) -> str:
+    span = relative_date(first_date)
+    if last_date and last_date != first_date:
+        span = f"{relative_date(first_date)} → {relative_date(last_date)}"
+    return (
+        f"🎬 <b>{esc(movie)}</b> opened booking! 🎟️\n{DIVIDER}\n\n"
+        f"The movie you were waiting for opened pre-booking at ({esc(cinema)}):\n"
+        f"📅 {span}\n\n"
+        "Open the cinema and pick the day to create a watch."
+    )
 
 
 def choose_showtime(movie: str, date: str, extra: str = "") -> str:
