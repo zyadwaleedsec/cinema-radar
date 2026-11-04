@@ -9,8 +9,12 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
+import deeplinks
+import i18n
 import strings
 from config import Settings
+from db import Database
+from keyboards import language_keyboard
 
 
 class RateLimitMiddleware(BaseMiddleware):
@@ -62,3 +66,81 @@ class RateLimitMiddleware(BaseMiddleware):
             return None
         bucket.append(now)
         return await handler(event, data)
+
+
+class LanguageMiddleware(BaseMiddleware):
+    """Load the user's language and block the app until they choose one.
+
+    Runs before the rate limiter so even the "slow down" message is localized.
+    A user with ``users.lang IS NULL`` (everyone on first run, including people
+    who onboarded before English existed) only sees the bilingual picker until
+    they tap a language.  The admin is exempt and defaults to Arabic so the
+    hidden commands keep working.
+    """
+
+    def __init__(self, db: Database, settings: Settings) -> None:
+        self.db = db
+        self.settings = settings
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        user = data.get("event_from_user")
+        if user is None:
+            return await handler(event, data)
+
+        row = await self.db.get_or_create_user(user.id, watch_limit=self.settings.free_watch_limit)
+        data["user_row"] = row
+        lang = row.get("lang")
+        is_admin = bool(self.settings.admin_id) and user.id == self.settings.admin_id
+
+        if not lang and is_admin:
+            lang = i18n.DEFAULT_LANGUAGE
+
+        if not lang and not _is_language_choice(event):
+            if isinstance(event, Message):
+                _remember_deeplink(event)
+            await _show_language_picker(event, getattr(user, "language_code", None))
+            return None
+
+        # The picker callback runs in the new language; its handler sets the
+        # catalog before answering.
+        if lang:
+            i18n.set_language(lang)
+        data["lang"] = i18n.get_language()
+        return await handler(event, data)
+
+
+def _is_language_choice(event: TelegramObject) -> bool:
+    return isinstance(event, CallbackQuery) and (event.data or "").startswith("lang:set:")
+
+
+def _remember_deeplink(message: Message) -> None:
+    text = (message.text or "").strip()
+    if not text.startswith("/start"):
+        return
+    parts = text.split(maxsplit=1)
+    if len(parts) > 1:
+        deeplinks.remember(message.from_user.id, parts[1])
+
+
+async def _show_language_picker(event: TelegramObject, language_code: str | None = None) -> None:
+    # Lead with the language of their Telegram app when we can guess it.
+    catalog = i18n.for_language(language_code or i18n.DEFAULT_LANGUAGE)
+    text = catalog.language_screen()
+    keyboard = language_keyboard()
+    if isinstance(event, CallbackQuery):
+        from handlers.utils import answer
+
+        await answer(event)
+        if event.message is not None:
+            try:
+                await event.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+            except Exception:
+                await event.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+        return
+    if isinstance(event, Message):
+        await event.answer(text, reply_markup=keyboard, parse_mode="HTML")

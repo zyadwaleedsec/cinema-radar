@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import i18n
 import strings
 from config import Settings
 from db import Database
@@ -69,15 +70,16 @@ class SupportService:
     ) -> None:
         from keyboards import donation_admin_keyboard
 
-        text = strings.support_admin_new(
-            donation_id,
-            telegram_id,
-            method,
-            amount,
-            note,
-            self.settings.donation_min_amount,
-            below_minimum,
-        )
+        with i18n.use(i18n.admin_language()):
+            text = strings.support_admin_new(
+                donation_id,
+                telegram_id,
+                method,
+                amount,
+                note,
+                self.settings.donation_min_amount,
+                below_minimum,
+            )
         if not self.settings.admin_id:
             return
         keyboard = donation_admin_keyboard(donation_id)
@@ -106,11 +108,11 @@ class SupportService:
         if changed and telegram_id is not None:
             donation = await self.db.get_donation(donation_id)
             amount = donation.get("amount") if donation else None
+            user = await self.db.get_user(telegram_id)
+            with i18n.use((user or {}).get("lang")):
+                text = strings.support_approved(amount, self.settings.supporter_watch_limit)
             try:
-                await self.sender.send(
-                    telegram_id,
-                    strings.support_approved(amount, self.settings.supporter_watch_limit),
-                )
+                await self.sender.send(telegram_id, text)
             except Exception:
                 logger.exception("Could not thank the supporter")
         return changed, telegram_id
@@ -118,8 +120,11 @@ class SupportService:
     async def reject(self, donation_id: int, admin_id: int) -> tuple[bool, int | None]:
         changed, telegram_id = await self.db.reject_donation(donation_id, admin_id)
         if changed and telegram_id is not None:
+            user = await self.db.get_user(telegram_id)
+            with i18n.use((user or {}).get("lang")):
+                text = strings.support_rejected()
             try:
-                await self.sender.send(telegram_id, strings.support_rejected())
+                await self.sender.send(telegram_id, text)
             except Exception:
                 logger.exception("Could not inform a rejected donor")
         return changed, telegram_id

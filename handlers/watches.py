@@ -1206,11 +1206,16 @@ async def confirm_delete_all_watches(
 
 # -------------------------------------------------------------------- deep links
 async def send_watch_detail_message(
-    message: Message, db: Database, settings: Settings, watch_id: int
+    message: Message,
+    db: Database,
+    settings: Settings,
+    watch_id: int,
+    telegram_id: int | None = None,
 ) -> None:
     """Open one watch from ``t.me/<bot>?start=w<id>`` after checking ownership."""
 
-    user = await db.get_or_create_user(message.from_user.id, watch_limit=settings.free_watch_limit)
+    tid = telegram_id or message.from_user.id
+    user = await db.get_or_create_user(tid, watch_limit=settings.free_watch_limit)
     watch = await db.get_watch(watch_id)
     if not watch or int(watch["user_id"]) != int(user["id"]) or not watch.get("active"):
         await send(message, strings.error_expired(), back_home_keyboard())
@@ -1238,6 +1243,7 @@ async def start_branch_deeplink(
     settings: Settings,
     provider: Any,
     branch_id: str,
+    telegram_id: int | None = None,
 ) -> bool:
     """Jump straight to the date step of ``?start=b<branch>``."""
 

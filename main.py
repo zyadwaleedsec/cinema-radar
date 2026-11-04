@@ -18,6 +18,7 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent, MenuButtonCommands
 
+import i18n
 import strings
 from broadcaster import Broadcaster
 from cache import Cache
@@ -28,14 +29,15 @@ from feedback import FeedbackService
 from handlers import routers
 from http_client import HttpClient
 from imax import load_default_service
-from middleware import RateLimitMiddleware
+from middleware import LanguageMiddleware, RateLimitMiddleware
 from notifier import Notifier, TelegramSender
 from providers import ProviderRegistry, VoxProvider
 from scheduler import Scheduler
 from stats import StatsService
 from support import SupportService
 from timeutil import local_now
-from ui.render import set_freshness_note
+from ui.render import set_freshness_state
+from version import __version__
 from watcher import Watcher
 
 logger = logging.getLogger(__name__)
@@ -144,9 +146,11 @@ async def run() -> None:
     dp = Dispatcher(storage=MemoryStorage())
     for router in routers:
         dp.include_router(router)
+    language_gate = LanguageMiddleware(db, settings)
     rate_limiter = RateLimitMiddleware(settings)
-    dp.message.middleware(rate_limiter)
-    dp.callback_query.middleware(rate_limiter)
+    for observer in (dp.message, dp.callback_query):
+        observer.middleware(language_gate)
+        observer.middleware(rate_limiter)
 
     dp["db"] = db
     dp["cache"] = cache
@@ -159,6 +163,7 @@ async def run() -> None:
     dp["discovery"] = discovery
     dp["imax"] = imax
     dp["http"] = http
+    dp["notifier"] = notifier
 
     tasks: list[asyncio.Task[Any]] = []
 
@@ -170,14 +175,16 @@ async def run() -> None:
         )
         for row in trimmed:
             try:
-                await sender.send(
-                    row["telegram_id"], strings.watches_trimmed(row["removed"], row["limit"])
-                )
+                with i18n.use(row.get("lang")):
+                    text = strings.watches_trimmed(row["removed"], row["limit"])
+                await sender.send(row["telegram_id"], text)
             except Exception:
                 logger.warning("Could not tell %s about trimmed watches", row["telegram_id"])
         await db.set_meta("watch_limits_v2", "done")
         await notifier.send_admin(
-            strings.admin_limits_applied(len(trimmed), sum(int(row["removed"]) for row in trimmed))
+            lambda: strings.admin_limits_applied(
+                len(trimmed), sum(int(row["removed"]) for row in trimmed)
+            )
         )
 
     async def freshness_loop() -> None:
@@ -185,13 +192,13 @@ async def run() -> None:
             try:
                 age = http.seconds_since_success
                 if age is None:
-                    set_freshness_note("")
+                    set_freshness_state(0, False)
                 else:
                     minutes = int(age // 60)
                     if http.incident_open:
-                        set_freshness_note(strings.stale_notice(max(minutes, 1), True))
+                        set_freshness_state(max(minutes, 1), True)
                     else:
-                        set_freshness_note(strings.stale_notice(minutes, False))
+                        set_freshness_state(minutes, False)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -218,7 +225,9 @@ async def run() -> None:
     @dp.errors()
     async def on_error(event: ErrorEvent) -> bool:
         logger.exception("Unhandled update error: %s", event.exception)
-        await notifier.send_admin(strings.admin_unexpected_error(type(event.exception).__name__))
+        await notifier.send_admin(
+            lambda: strings.admin_unexpected_error(type(event.exception).__name__)
+        )
         update = event.update
         try:
             if update.callback_query:
@@ -271,6 +280,8 @@ async def run() -> None:
             await asyncio.sleep(3600)
 
     async def on_startup() -> None:
+        admin_row = await db.get_user(settings.admin_id) if settings.admin_id else None
+        i18n.set_admin_language((admin_row or {}).get("lang") or i18n.DEFAULT_LANGUAGE)
         try:
             me = await bot.me()
             if me.username:
@@ -279,13 +290,17 @@ async def run() -> None:
         except Exception:
             logger.exception("Could not read the bot username; deep links are disabled")
         try:
-            public = _commands(strings.PUBLIC_COMMANDS)
-            await bot.set_my_commands(public)
-            if settings.admin_id:
-                await bot.set_my_commands(
-                    public + _commands(strings.ADMIN_COMMANDS),
-                    scope=BotCommandScopeChat(chat_id=settings.admin_id),
-                )
+            for lang in i18n.SUPPORTED_LANGUAGES:
+                catalog = i18n.for_language(lang)
+                language_code = "" if lang == i18n.DEFAULT_LANGUAGE else lang
+                public = _commands(catalog.PUBLIC_COMMANDS)
+                await bot.set_my_commands(public, language_code=language_code)
+                if settings.admin_id:
+                    await bot.set_my_commands(
+                        public + _commands(catalog.ADMIN_COMMANDS),
+                        scope=BotCommandScopeChat(chat_id=settings.admin_id),
+                        language_code=language_code,
+                    )
             await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         except Exception:
             logger.exception("Could not register commands / menu button")
@@ -298,7 +313,7 @@ async def run() -> None:
         tasks.append(asyncio.create_task(health_loop(), name="health-loop"))
         await watcher.sync_targets()
         logger.info("Cinema Radar started with %s active targets", len(scheduler))
-        await notifier.send_admin(strings.admin_started())
+        await notifier.send_admin(lambda: strings.admin_started())
 
     async def on_shutdown() -> None:
         for task in tasks:
@@ -313,6 +328,8 @@ async def run() -> None:
 
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
+
+    logger.info("Cinema Radar v%s starting", __version__)
 
     try:
         await dp.start_polling(bot, drop_pending_updates=True)

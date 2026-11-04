@@ -8,6 +8,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+import i18n
 import strings
 from config import Settings
 from db import Database
@@ -155,6 +156,18 @@ class Notifier:
         return f"https://t.me/{self.bot_username}?start=w{watch_id}"
 
     async def send_watch_alert(self, watch: dict[str, Any], event: Any) -> None:
+        with i18n.use(watch.get("lang")):
+            text, keyboard = self._watch_alert_payload(watch, event)
+        try:
+            await self.sender.send(
+                int(watch["telegram_id"]), text, keyboard, photo_url=watch.get("poster_url")
+            )
+        except UserBlocked:
+            await self._deactivate(int(watch["telegram_id"]))
+            logger.info("Deactivated blocked user %s", watch["telegram_id"])
+            raise
+
+    def _watch_alert_payload(self, watch: dict[str, Any], event: Any) -> tuple[str, Any]:
         showtime = event.showtime
         movie_scope = (watch.get("scope") or "showtime") in {"movie", "movie_all_dates"}
         times = list(event.times or ())
@@ -224,16 +237,30 @@ class Notifier:
             watch.get("trailer_url"),
             self.manage_url(int(watch["id"])),
         )
+        return text, keyboard
+
+    async def send_watch_reminder(self, watch: dict[str, Any]) -> None:
+        with i18n.use(watch.get("lang")):
+            text = self._watch_reminder_text(watch)
+            keyboard = watch_alert_keyboard(
+                int(watch["id"]),
+                watch.get("booking_url"),
+                watch.get("trailer_url"),
+                self.manage_url(int(watch["id"])),
+            )
         try:
             await self.sender.send(
-                int(watch["telegram_id"]), text, keyboard, photo_url=watch.get("poster_url")
+                int(watch["telegram_id"]),
+                text,
+                keyboard,
+                photo_url=watch.get("poster_url"),
             )
         except UserBlocked:
             await self._deactivate(int(watch["telegram_id"]))
             logger.info("Deactivated blocked user %s", watch["telegram_id"])
             raise
 
-    async def send_watch_reminder(self, watch: dict[str, Any]) -> None:
+    def _watch_reminder_text(self, watch: dict[str, Any]) -> str:
         text = strings.watch_reminder(
             watch["movie_name"],
             watch["branch_name"],
@@ -252,49 +279,47 @@ class Notifier:
         imax = strings.imax_line(watch.get("imax_status"))
         if imax:
             text += f"\n\n{imax}"
-        keyboard = watch_alert_keyboard(
-            int(watch["id"]),
-            watch.get("booking_url"),
-            watch.get("trailer_url"),
-            self.manage_url(int(watch["id"])),
-        )
-        try:
-            await self.sender.send(
-                int(watch["telegram_id"]),
-                text,
-                keyboard,
-                photo_url=watch.get("poster_url"),
-            )
-        except UserBlocked:
-            await self._deactivate(int(watch["telegram_id"]))
-            logger.info("Deactivated blocked user %s", watch["telegram_id"])
-            raise
+        return text
 
     async def send_watch_expired(self, telegram_id: int, watches: list[dict[str, Any]]) -> None:
         """One grouped cleanup notice per user, no matter how many watches ended."""
 
-        rows = [
-            strings.watch_expired_row(
-                watch["movie_name"],
-                watch["branch_name"],
-                str(watch.get("date") or ""),
-                str(watch.get("showtime") or ""),
-            )
-            for watch in watches[:15]
-        ]
-        text = strings.watch_expired_summary(rows, more=max(0, len(watches) - 15))
+        lang = watches[0].get("lang") if watches else None
+        if not lang:
+            user = await self.db.get_user(telegram_id)
+            lang = (user or {}).get("lang")
+        with i18n.use(lang):
+            rows = [
+                strings.watch_expired_row(
+                    watch["movie_name"],
+                    watch["branch_name"],
+                    str(watch.get("date") or ""),
+                    str(watch.get("showtime") or ""),
+                )
+                for watch in watches[:15]
+            ]
+            text = strings.watch_expired_summary(rows, more=max(0, len(watches) - 15))
+            keyboard = watch_expired_keyboard()
         try:
-            await self.sender.send(telegram_id, text, watch_expired_keyboard())
+            await self.sender.send(telegram_id, text, keyboard)
         except UserBlocked:
             await self._deactivate(telegram_id)
             logger.info("Deactivated blocked user %s", telegram_id)
             raise
 
-    async def send_admin(self, text: str) -> None:
+    async def send_admin(self, text: str | Callable[[], str]) -> None:
+        """Send an operator message in the admin's own language.
+
+        A callable is preferred: it is evaluated here so the text is built under
+        the admin's catalog even when the caller runs in a background task.
+        """
+
         if not self.settings.admin_id:
             return
+        with i18n.use(i18n.admin_language()):
+            body = text() if callable(text) else text
         try:
-            await self.sender.send(self.settings.admin_id, text)
+            await self.sender.send(self.settings.admin_id, body)
         except Exception:
             logger.exception("Could not send admin message")
 

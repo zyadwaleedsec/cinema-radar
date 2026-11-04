@@ -27,6 +27,7 @@ from typing import Any
 
 import httpx
 
+import i18n
 import strings
 from cache import Cache
 from config import Settings
@@ -368,8 +369,8 @@ class HttpClient:
             self.incident_reason = reason
             self.incident_place = _place(target_key, url)
             retry_seconds = int(self.breaker.remaining_pause) or self.settings.poll_waiting_for_open
-            await self._notify_admin(
-                strings.admin_upstream_down(
+            with i18n.use(i18n.admin_language()):
+                alert = strings.admin_upstream_down(
                     reason,
                     self.incident_place,
                     _clock_text(self.last_success_wall),
@@ -377,7 +378,7 @@ class HttpClient:
                     self.affected_hint,
                     opened,
                 )
-            )
+            await self._notify_admin(alert)
         if retry_after:
             await self._sleep(retry_after)
 
@@ -413,9 +414,13 @@ class HttpClient:
             self.incident_started = None
             self.incident_reason = ""
             self.incident_place = ""
-            await self._notify_admin(strings.admin_upstream_recovered(minutes))
+            with i18n.use(i18n.admin_language()):
+                recovered = strings.admin_upstream_recovered(minutes)
+            await self._notify_admin(recovered)
         elif was_open:
-            await self._notify_admin(strings.admin_upstream_recovered(0))
+            with i18n.use(i18n.admin_language()):
+                recovered = strings.admin_upstream_recovered(0)
+            await self._notify_admin(recovered)
 
     # ------------------------------------------------------------------- fetch
     async def get(

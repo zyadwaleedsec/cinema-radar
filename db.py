@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
     quiet_end INTEGER,
     quiet_watches INTEGER NOT NULL DEFAULT 1,
     onboarded INTEGER NOT NULL DEFAULT 0,
+    lang TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -206,6 +207,7 @@ class Database:
         # ``CREATE TABLE IF NOT EXISTS`` never adds columns to an existing
         # database, so upgrade older installs in place.
         await self._ensure_column("users", "quiet_watches", "INTEGER NOT NULL DEFAULT 1")
+        await self._ensure_column("users", "lang", "TEXT")
         onboarded_added = await self._ensure_column(
             "users", "onboarded", "INTEGER NOT NULL DEFAULT 0"
         )
@@ -355,6 +357,11 @@ class Database:
     async def mark_user_onboarded(self, telegram_id: int) -> None:
         await self.execute("UPDATE users SET onboarded = 1 WHERE telegram_id = ?", (telegram_id,))
 
+    async def set_user_language(self, telegram_id: int, lang: str) -> None:
+        """Persist the interface language chosen in onboarding or settings."""
+
+        await self.execute("UPDATE users SET lang = ? WHERE telegram_id = ?", (lang, telegram_id))
+
     async def update_user_settings(self, user_id: int, **fields: Any) -> None:
         allowed = {
             "notify_cancellations",
@@ -404,7 +411,7 @@ class Database:
             "UPDATE users SET watch_limit = CASE WHEN is_supporter = 1 THEN ? ELSE ? END",
             (supporter_limit, free_limit),
         )
-        users = await self.fetchall("SELECT id, telegram_id, is_supporter FROM users")
+        users = await self.fetchall("SELECT id, telegram_id, is_supporter, lang FROM users")
         now = utc_now_iso()
         trimmed: list[dict[str, Any]] = []
         for user in users:
@@ -578,7 +585,7 @@ class Database:
 
         return await self.fetchall(
             """
-            SELECT w.*, u.telegram_id
+            SELECT w.*, u.telegram_id, u.lang
             FROM watches w JOIN users u ON u.id = w.user_id
             WHERE w.expiry_notified = 0
               AND (
@@ -670,7 +677,7 @@ class Database:
         return await self.fetchall(
             """
             SELECT w.*, u.telegram_id, u.quiet_start, u.quiet_end,
-                   u.notify_cancellations, u.quiet_watches
+                   u.notify_cancellations, u.quiet_watches, u.lang
             FROM watches w JOIN users u ON u.id = w.user_id
             WHERE w.active = 1 AND w.provider = ?
               AND (w.branch_id = ? OR w.branch_id = '*')
@@ -773,7 +780,7 @@ class Database:
     async def list_due_snoozes(self, now_iso: str) -> list[dict[str, Any]]:
         return await self.fetchall(
             """
-            SELECT w.*, u.telegram_id, u.quiet_start, u.quiet_end, u.quiet_watches
+            SELECT w.*, u.telegram_id, u.quiet_start, u.quiet_end, u.quiet_watches, u.lang
             FROM watches w JOIN users u ON u.id = w.user_id
             WHERE w.active = 1 AND w.snoozed_until IS NOT NULL AND w.snoozed_until <= ?
             ORDER BY w.id
@@ -831,7 +838,7 @@ class Database:
     async def list_active_subscriptions(self) -> list[dict[str, Any]]:
         return await self.fetchall(
             """
-            SELECT s.*, u.telegram_id, u.quiet_start, u.quiet_end, u.is_supporter
+            SELECT s.*, u.telegram_id, u.quiet_start, u.quiet_end, u.is_supporter, u.lang
             FROM subscriptions s JOIN users u ON u.id = s.user_id
             WHERE s.active = 1
             """

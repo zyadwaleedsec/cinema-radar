@@ -11,6 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
+import i18n
 import strings
 from cache import branches_key
 from config import Settings
@@ -99,6 +100,7 @@ def _settings_view(
         types or ALL_EVENT_TYPES,
         sub.get("hall_type") if sub else None,
         bool(user.get("quiet_watches", 1)),
+        i18n.get_language(),
     )
     return text, settings_keyboard(user, sub)
 

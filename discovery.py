@@ -16,6 +16,7 @@ from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass, replace
 from typing import Any
 
+import i18n
 import strings
 from cache import Cache
 from config import Settings
@@ -330,7 +331,9 @@ class DiscoveryJob:
         except Exception as exc:
             self.last_error = f"{type(exc).__name__}: {exc}"
             logger.exception("Discovery could not list branches")
-            await self._admin(strings.admin_discovery_branches_failed(exc))
+            with i18n.use(i18n.admin_language()):
+                alert = strings.admin_discovery_branches_failed(exc)
+            await self._admin(alert)
             return 0
         upcoming = await self._upcoming_state(provider, now)
         wanted = set(branch_ids) if branch_ids is not None else None
@@ -346,7 +349,9 @@ class DiscoveryJob:
             except Exception as exc:
                 self.last_error = f"{type(exc).__name__}: {exc}"
                 logger.exception("Discovery failed for %s", branch.id)
-                await self._admin(strings.admin_discovery_branch_failed(branch.name, exc))
+                with i18n.use(i18n.admin_language()):
+                    alert = strings.admin_discovery_branch_failed(branch.name, exc)
+                await self._admin(alert)
         if upcoming is not None:
             await self._save_upcoming(upcoming, now)
         return queued

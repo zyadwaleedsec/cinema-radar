@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import i18n
 import strings
 from config import Settings
 from db import Database
@@ -31,5 +32,7 @@ class FeedbackService:
             except (TypeError, ValueError):
                 pass
         await self.db.add_feedback(int(user["id"]), username, text.strip()[:4000])
-        await self.notifier.send_admin(strings.feedback_admin(telegram_id, username, text))
+        with i18n.use(i18n.admin_language()):
+            notice = strings.feedback_admin(telegram_id, username, text)
+        await self.notifier.send_admin(notice)
         return True

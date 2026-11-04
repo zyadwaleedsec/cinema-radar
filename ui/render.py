@@ -9,6 +9,7 @@ from typing import Any
 
 from aiogram.exceptions import TelegramBadRequest
 
+import strings
 from ui import classic, rich
 from ui.screen import Screen
 
@@ -23,18 +24,36 @@ _RICH_REJECTION_HINTS = ("rich", "unsupported", "unknown method", "not supported
 
 # A short "last updated" / outage note appended to text screens by the health
 # loop.  Keeping it here avoids threading the HTTP client through every handler.
+# The note is rendered at decoration time so it follows each user's language.
 _freshness_note = ""
+_freshness_state: tuple[int, bool] | None = None
 
 
 def set_freshness_note(note: str) -> None:
-    global _freshness_note
+    global _freshness_note, _freshness_state
     _freshness_note = note or ""
+    _freshness_state = None
+
+
+def set_freshness_state(minutes: int, degraded: bool) -> None:
+    """Record freshness as data; the copy is built for the active language."""
+
+    global _freshness_note, _freshness_state
+    _freshness_note = ""
+    _freshness_state = (int(minutes), bool(degraded))
+
+
+def _freshness_text() -> str:
+    if _freshness_state is not None:
+        return strings.stale_notice(*_freshness_state)
+    return _freshness_note
 
 
 def _decorate(screen: Screen) -> Screen:
-    if not _freshness_note or screen.photo_url:
+    note = _freshness_text()
+    if not note or screen.photo_url:
         return screen
-    return replace(screen, text=screen.text + _freshness_note)
+    return replace(screen, text=screen.text + note)
 
 
 def reset_capability() -> None:

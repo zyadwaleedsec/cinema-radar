@@ -9,6 +9,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+import deeplinks
 import strings
 from config import Settings
 from db import Database
@@ -22,10 +23,11 @@ from keyboards import (
 
 router = Router(name="common")
 
-ONBOARD_SCREENS = (strings.onboard_intro, strings.onboard_alerts, strings.onboard_safety)
+# Resolve the copy at call time so onboarding follows the chosen language.
+ONBOARD_SCREENS = ("onboard_intro", "onboard_alerts", "onboard_safety")
 
 
-async def _dashboard_text(
+async def dashboard_text(
     db: Database, user: dict[str, Any], settings: Settings, name: str = ""
 ) -> str:
     watches = await db.list_watches(int(user["id"]))
@@ -50,10 +52,10 @@ async def _dashboard_text(
 async def show_home(message: Message, db: Database, settings: Settings) -> None:
     user = await db.get_or_create_user(message.from_user.id, watch_limit=settings.free_watch_limit)
     name = (message.from_user.first_name or "") if message.from_user else ""
-    await send(message, await _dashboard_text(db, user, settings, name), main_menu_keyboard())
+    await send(message, await dashboard_text(db, user, settings, name), main_menu_keyboard())
 
 
-async def _handle_deep_link(
+async def handle_deep_link(
     message: Message,
     payload: str,
     state: FSMContext,
@@ -61,17 +63,22 @@ async def _handle_deep_link(
     settings: Settings,
     cache: Any,
     provider: Any,
+    telegram_id: int | None = None,
 ) -> bool:
     payload = payload.strip()
     if payload.startswith("w") and payload[1:].isdigit():
         from handlers.watches import send_watch_detail_message
 
-        await send_watch_detail_message(message, db, settings, int(payload[1:]))
+        await send_watch_detail_message(
+            message, db, settings, int(payload[1:]), telegram_id=telegram_id
+        )
         return True
     if payload.startswith("b") and len(payload) > 1:
         from handlers.watches import start_branch_deeplink
 
-        return await start_branch_deeplink(message, state, cache, settings, provider, payload[1:])
+        return await start_branch_deeplink(
+            message, state, cache, settings, provider, payload[1:], telegram_id=telegram_id
+        )
     return False
 
 
@@ -89,11 +96,11 @@ async def start(
     parts = (message.text or "").split(maxsplit=1)
     payload = parts[1].strip() if len(parts) > 1 else ""
     if payload and int(user.get("onboarded") or 0):
-        handled = await _handle_deep_link(message, payload, state, db, settings, cache, provider)
+        handled = await handle_deep_link(message, payload, state, db, settings, cache, provider)
         if handled:
             return
     if int(user.get("onboarded") or 0):
-        await send(message, await _dashboard_text(db, user, settings), main_menu_keyboard())
+        await send(message, await dashboard_text(db, user, settings), main_menu_keyboard())
         return
     await send(
         message,
@@ -112,6 +119,8 @@ async def onboarding_step(
     state: FSMContext,
     db: Database,
     settings: Settings,
+    cache: Any = None,
+    provider: Any = None,
 ) -> None:
     step = (callback.data or "").split(":", 1)[1]
     if step == "done":
@@ -120,9 +129,26 @@ async def onboarding_step(
         user = await db.get_or_create_user(
             callback.from_user.id, watch_limit=settings.free_watch_limit
         )
+        payload = deeplinks.take(callback.from_user.id)
+        if (
+            payload
+            and callback.message is not None
+            and await handle_deep_link(
+                callback.message,
+                payload,
+                state,
+                db,
+                settings,
+                cache,
+                provider,
+                telegram_id=callback.from_user.id,
+            )
+        ):
+            await callback.answer()
+            return
         await edit(
             callback,
-            await _dashboard_text(db, user, settings, _telegram_name_callback(callback)),
+            await dashboard_text(db, user, settings, _telegram_name_callback(callback)),
             main_menu_keyboard(),
         )
         await callback.answer()
@@ -131,7 +157,7 @@ async def onboarding_step(
         await callback.answer(strings.error_expired(), show_alert=True)
         return
     index = int(step)
-    screen = ONBOARD_SCREENS[index]
+    screen = getattr(strings, ONBOARD_SCREENS[index])
     text = screen(_telegram_name_callback(callback)) if index == 0 else screen()
     await edit(
         callback,
@@ -176,7 +202,7 @@ async def menu_home(
 ) -> None:
     await state.clear()
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
-    await edit(callback, await _dashboard_text(db, user, settings), main_menu_keyboard())
+    await edit(callback, await dashboard_text(db, user, settings), main_menu_keyboard())
     await callback.answer()
 
 

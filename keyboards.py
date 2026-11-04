@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+import i18n
 import strings
 from models import CANONICAL_FORMATS
 
@@ -101,6 +102,20 @@ def onboarding_keyboard(step: int) -> Any:
         footer.insert(0, _btn(strings.BTN_BACK, f"ob:{step - 1}"))
     rows.append(footer)
     return _markup(rows)
+
+
+def language_keyboard(source: str = "") -> Any:
+    """Bilingual picker; ``source="s"`` returns to Settings after the change."""
+
+    suffix = f":{source}" if source else ""
+    return _markup(
+        [
+            [
+                _btn(strings.BTN_ARABIC, f"lang:set:ar{suffix}"),
+                _btn(strings.BTN_ENGLISH, f"lang:set:en{suffix}"),
+            ]
+        ]
+    )
 
 
 def retry_keyboard(retry_cb: str, back_cb: str = "menu:home") -> Any:
@@ -400,6 +415,11 @@ def settings_keyboard(user: dict[str, Any], subscription: dict[str, Any] | None)
                 _btn(strings.BTN_TYPES_FILTER, "set:types"),
             ],
             [_btn(strings.BTN_HALL_FILTER, "set:hall")],
+            [
+                _btn(
+                    f"{strings.BTN_LANGUAGE}: {i18n.language_name(i18n.get_language())}", "set:lang"
+                )
+            ],
             [_btn(strings.BTN_DELETE_MY_DATA, "del:ask", style="danger")],
             [_btn(strings.BTN_HOME, "menu:home")],
         ]

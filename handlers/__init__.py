@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from handlers import admin, common, discovery, feedback, settings, support, watches
+from handlers import admin, common, discovery, feedback, language, settings, support, watches
 
 routers = [
     common.router,
+    language.router,
     watches.router,
     settings.router,
     support.router,

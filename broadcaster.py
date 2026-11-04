@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterable
 from datetime import date as date_cls
 from typing import Any
 
+import i18n
 import strings
 from config import Settings
 from db import Database
@@ -103,7 +104,8 @@ class Broadcaster:
             for branch_events in by_branch.values():
                 if count >= self.settings.discovery_daily_cap:
                     break
-                text, keyboard = await self._build_message(int(sub["user_id"]), branch_events)
+                with i18n.use(sub.get("lang")):
+                    text, keyboard = await self._build_message(int(sub["user_id"]), branch_events)
                 photo = branch_events[0].movie.poster_url if len(branch_events) == 1 else None
                 try:
                     await self.sender.send(int(sub["telegram_id"]), text, keyboard, photo_url=photo)
@@ -201,7 +203,8 @@ class Broadcaster:
         if not channel:
             return
         for event in events:
-            text = strings.discovery_channel(_event_text(event))
+            with i18n.use(i18n.DEFAULT_LANGUAGE):
+                text = strings.discovery_channel(_event_text(event))
             try:
                 await self.sender.send(channel, text, photo_url=event.movie.poster_url)
             except Exception:
