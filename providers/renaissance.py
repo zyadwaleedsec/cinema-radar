@@ -36,6 +36,7 @@ from cache import (
     movie_details_key,
     movies_key,
     overview_key,
+    prebook_dates_key,
     showtimes_key,
 )
 from config import Settings
@@ -50,6 +51,7 @@ from models import (
     Showtime,
 )
 from providers.base import CinemaProvider, UpstreamFormatError
+from timeutil import today_iso
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,14 @@ def from_rns_date(raw: str) -> str:
         return datetime.strptime(raw, "%d-%m-%Y").date().isoformat()
     except (TypeError, ValueError):
         return raw
+
+
+def _merge_dates(strip: list[str], extra: list[str]) -> list[str]:
+    """Union of the branch date strip and bookable pre-book dates, sorted."""
+
+    merged = {d for d in strip if d}
+    merged.update(d for d in extra if d)
+    return sorted(merged)
 
 
 def normalize_time(raw: str) -> str | None:
@@ -438,10 +448,11 @@ class RenaissanceProvider(CinemaProvider):
 
     async def get_dates(self, branch_id: str, force_refresh: bool = False) -> list[str]:
         key = dates_key(self.name, branch_id)
+        extra = await self._prebook_dates()
         if not force_refresh:
             cached = await self.cache.get_json(key, ttl=self.settings.cache_listings_ttl)
             if cached is not None:
-                return list(cached)
+                return _merge_dates(cached, extra)
         url = f"{self.base_url}/en/cinemas/{_url_part(branch_id)}"
         try:
             html = await self._fetch(
@@ -458,7 +469,59 @@ class RenaissanceProvider(CinemaProvider):
             dates = []
         if dates:
             await self.cache.put_json(key, dates, self.settings.cache_listings_ttl)
-        return dates
+        return _merge_dates(dates, extra)
+
+    async def _prebook_dates(self) -> list[str]:
+        """The cached union of bookable Coming Soon dates (see
+        :meth:`refresh_prebook_dates`)."""
+
+        cached = await self.cache.get_json(
+            prebook_dates_key(self.name), ttl=self.settings.prebook_dates_ttl
+        )
+        return list(cached) if cached is not None else []
+
+    async def refresh_prebook_dates(self, force_refresh: bool = False) -> None:
+        """Rebuild the bookable Coming Soon dates from the movie pages.
+
+        The branch page only exposes a ten-day strip, but pre-book titles keep
+        their bookable dates on their own ``/en/movie/<slug>`` page (sometimes
+        months ahead).  This scans those pages once per ``prebook_dates_ttl``
+        and caches the union so ``get_dates`` can offer them in the picker.
+        """
+
+        key = prebook_dates_key(self.name)
+        if not force_refresh:
+            cached = await self.cache.get_json(key, ttl=self.settings.prebook_dates_ttl)
+            if cached is not None:
+                return
+        movies = await self.get_coming_soon()
+        today = today_iso(self.settings.timezone)
+        try:
+            horizon = (
+                date_cls.fromisoformat(today) + timedelta(days=self.settings.prebook_dates_max_days)
+            ).isoformat()
+        except ValueError:
+            horizon = today
+        extra: set[str] = set()
+        for movie in movies:
+            slug = (movie.slug or movie.id or "").strip()
+            if not slug:
+                continue
+            raw_key = _raw_key(f"{key}:{slug}")
+            try:
+                html = await self._fetch(
+                    f"{self.base_url}/en/movie/{_url_part(slug)}",
+                    raw_key,
+                    self.settings.prebook_dates_ttl,
+                    force_refresh,
+                )
+            except Exception:
+                logger.debug("Could not read movie page for pre-book dates: %s", slug)
+                continue
+            for iso in parse_dates(html):
+                if today <= iso <= horizon:
+                    extra.add(iso)
+        await self.cache.put_json(key, sorted(extra), self.settings.prebook_dates_ttl)
 
     async def get_movies(
         self, branch_id: str, date: str, force_refresh: bool = False

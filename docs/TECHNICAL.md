@@ -70,7 +70,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (191 tests)
+├── tests/                  # pytest suite (195 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -270,6 +270,12 @@ The site is server-rendered; no JSON API is required. Date URLs accept any
 strip. The strip itself is still ten days, so `get_dates` returns that window
 and new dates appear as the window rolls forward.
 
+Coming Soon titles can be bookable far ahead (for example a December premiere
+while the strip still ends mid-November). Their bookable dates live on each
+movie page, not the branch page, so `refresh_prebook_dates` scans the
+coming-soon movie pages on the `PREBOOK_DATES_TTL` cadence and merges those
+dates into `get_dates`.
+
 ### Parsing rules
 
 - Available sessions: `<a class="js-booking-confirm-link" data-booking-url=...>`.
@@ -385,6 +391,8 @@ from `.env`. Secrets are only read from the environment.
 | `COMING_SOON_INTERVAL` | `3600` | How often `/movies/comingsoon` is refreshed |
 | `CACHE_COMING_SOON_TTL` | `3600` | Coming Soon listing cache TTL |
 | `CACHE_MOVIE_DETAILS_TTL` | `604800` | Poster/duration/rating/language/synopsis/trailer cache (7 days) |
+| `PREBOOK_DATES_TTL` | `10800` | How often Renaissance pre-book dates are re-scanned (3 h) |
+| `PREBOOK_DATES_MAX_DAYS` | `120` | Horizon for bookable Coming Soon dates |
 | `FREE_WATCH_LIMIT` | `2` | Free active-watch limit |
 | `SUPPORTER_WATCH_LIMIT` | `10` | Limit after an approved donation |
 | `DONATION_MIN_AMOUNT` | `50` | Minimum one-off donation (EGP); lower amounts are flagged to the admin but can still be approved |
@@ -508,7 +516,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `191 passed`.
+Expected: `195 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

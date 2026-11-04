@@ -98,6 +98,10 @@ class Settings:
     cache_coming_soon_ttl: int = 3600  # /movies/comingsoon listing
     cache_movie_details_ttl: int = 7 * 24 * 3600  # poster / duration / rating / language
     cache_stale_ttl: int = 7 * 24 * 3600  # keep stale data for restarts / outages
+    # Pre-book dates for Renaissance come from the movie pages, beyond the
+    # branch page's ten-day strip.  Refreshed in the background, not per request.
+    prebook_dates_ttl: int = 3 * 3600  # how often we re-scan movie pages
+    prebook_dates_max_days: int = 120  # horizon for bookable Coming Soon dates
 
     # ------------------------------------------------------------------ polling
     poll_open_with_seats: int = 100
@@ -196,6 +200,8 @@ class Settings:
             cache_coming_soon_ttl=_env_int("CACHE_COMING_SOON_TTL", 3600),
             cache_movie_details_ttl=_env_int("CACHE_MOVIE_DETAILS_TTL", 7 * 24 * 3600),
             cache_stale_ttl=_env_int("CACHE_STALE_TTL", 7 * 24 * 3600),
+            prebook_dates_ttl=_env_int("PREBOOK_DATES_TTL", 3 * 3600),
+            prebook_dates_max_days=_env_int("PREBOOK_DATES_MAX_DAYS", 120),
             poll_open_with_seats=_env_int("POLL_OPEN_WITH_SEATS", 100),
             poll_waiting_for_open=_env_int("POLL_WAITING_FOR_OPEN", 60),
             poll_sold_out=_env_int("POLL_SOLD_OUT", 120),

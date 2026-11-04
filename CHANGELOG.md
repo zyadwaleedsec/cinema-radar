@@ -11,6 +11,18 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-04
+
+### Added
+
+- **Renaissance pre-book dates**: Coming Soon titles that are already bookable
+  (for example `Avengers: Doomsday` and `Dune: Part Three` in December) now
+  appear in the date picker. The branch page only exposes a ten-day strip, so
+  the provider scans the coming-soon movie pages for their bookable dates and
+  merges them into the branch list.
+- `PREBOOK_DATES_TTL` (default 3 h) and `PREBOOK_DATES_MAX_DAYS` (default 120)
+  control how often the scan runs and how far ahead it looks.
+
 ## [2.2.0] - 2026-11-04
 
 ### Added
@@ -245,7 +257,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.0...v2.0.1

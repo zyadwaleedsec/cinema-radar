@@ -203,6 +203,10 @@ def coming_soon_key(provider: str) -> str:
     return f"{provider}:{_PARSER_VERSION}:comingsoon"
 
 
+def prebook_dates_key(provider: str) -> str:
+    return f"{provider}:{_PARSER_VERSION}:prebook"
+
+
 def movie_details_key(provider: str, slug: str) -> str:
     return f"{provider}:{_PARSER_VERSION}:movie:{slug}"
 

@@ -393,6 +393,11 @@ class DiscoveryJob:
             # with no baseline.
             self._next_coming_soon[provider.name] = 0.0
             return state
+        if hasattr(provider, "refresh_prebook_dates"):
+            try:
+                await provider.refresh_prebook_dates()
+            except Exception:
+                logger.exception("Discovery could not refresh pre-book dates")
         if baseline:
             state = _UpcomingState(
                 movies={
