@@ -21,6 +21,7 @@ from models import (
 from models import (
     format_label as _format_label,
 )
+from ui.theme import DIVIDER, progress
 from version import __version__
 
 CODE = "ar"
@@ -153,8 +154,8 @@ BTN_DELETE_MY_DATA = "🗑️ حذف بياناتي"
 BTN_COPY_PHONE = "📋 نسخ الرقم"
 BTN_MANAGE_WATCH = "⚙️ إدارة المراقبة"
 BTN_LANGUAGE = "🌐 اللغة"
-BTN_ARABIC = "العربية"
-BTN_ENGLISH = "English"
+BTN_ARABIC = "🇪🇬 العربية"
+BTN_ENGLISH = "🇺🇸 English"
 
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
@@ -192,6 +193,7 @@ def dashboard(
     who = f" يا {esc(name)}" if name else ""
     lines = [
         "🎬 <b>سينما رادار</b>",
+        DIVIDER,
         f"أهلاً بيك{who} 👋",
         "",
     ]
@@ -208,12 +210,12 @@ def dashboard(
 
 
 def version_line() -> str:
-    return f"<i>الإصدار v{esc(__version__)}</i>"
+    return f"<i>🎬 Cinema Radar · v{esc(__version__)}</i>"
 
 
 def language_screen() -> str:
     return (
-        "🌐 <b>اختار لغتك</b> · <b>Choose your language</b>\n\n"
+        f"🌐 <b>اختار لغتك</b> · <b>Choose your language</b>\n{DIVIDER}\n\n"
         "تقدر تغيّرها في أي وقت من الإعدادات.\n"
         "You can change it anytime from Settings."
     )
@@ -237,13 +239,13 @@ def dashboard_next(movie: str, branch: str, date: str, showtime: str, scope: str
 
 
 def step_header(step: int, total: int, path: str) -> str:
-    return f"<i>الخطوة {step} من {total}</i> · {esc(path)}"
+    return f"{progress(step, total)} · {esc(path)}\n{DIVIDER}"
 
 
 def page_label(page: int, pages: int) -> str:
     if pages <= 1:
         return ""
-    return f"<i>صفحة {page + 1} من {pages}</i>"
+    return f"صفحة {page + 1} / {pages}"
 
 
 # ------------------------------------------------------------------ onboarding
@@ -251,6 +253,7 @@ def onboard_intro(name: str = "") -> str:
     who = f" يا {esc(name)}" if name else ""
     return (
         "🎬 <b>سينما رادار</b>\n"
+        f"{DIVIDER}\n"
         f"أهلاً بيك{who} 👋\n\n"
         "بتابع حفلات (فوكس) في مصر،\n"
         "وأبعتلك أول ما الحجز يفتح\n"
@@ -282,12 +285,12 @@ def onboard_safety() -> str:
 
 
 def onboard_progress(step: int) -> str:
-    return f"<i>الخطوة {step + 1} من 3</i>"
+    return f"<i>{progress(step + 1, 3)}</i>"
 
 
 def help_text() -> str:
     return (
-        "🎬 <b>إزاي تستخدم سينما رادار؟</b>\n\n"
+        f"🎬 <b>إزاي تستخدم سينما رادار؟</b>\n{DIVIDER}\n\n"
         "<b>1 · ضيف مراقبة</b>\n"
         "اضغط <b>➕ ضيف مراقبة</b>، وبعدها اختار:\n"
         "• الفرع\n"
@@ -327,7 +330,7 @@ def help_text() -> str:
 
 def privacy_text() -> str:
     return (
-        "🔐 <b>الخصوصية باختصار</b>\n\n"
+        f"🔐 <b>الخصوصية باختصار</b>\n{DIVIDER}\n\n"
         "البوت بيعرفك برقم تليجرام بس،\n"
         "ومش بيطلب منك اسمك ولا إيميلك.\n\n"
         "<b>اللي بيتحفظ</b>\n"
@@ -347,7 +350,8 @@ def privacy_text() -> str:
         "<b>حذف البيانات</b>\n"
         "/delete_me بيمسح كل حاجة محفوظة في قاعدة بيانات البوت.\n"
         "الرسائل والصور اللي اتبعتت على تليجرام\n"
-        "بتفضل في المحادثات."
+        "بتفضل في المحادثات.\n\n"
+        f"{version_line()}"
     )
 
 
@@ -398,7 +402,7 @@ def search_results(query: str, count: int, total: int) -> str:
 
 
 def search_no_results(query: str, suggestions: list[str] | None = None) -> str:
-    lines = [f"🔎 مفيش فيلم قريب من «<b>{esc(query)}</b>» في اليوم ده."]
+    lines = [f"🍿 <b>مفيش نتيجة</b>\n\nمفيش فيلم قريب من «<b>{esc(query)}</b>» في اليوم ده."]
     if suggestions:
         lines += ["", "قصدك واحدة من دول؟ اضغط عليها 👇"]
     else:
@@ -419,6 +423,7 @@ def choose_showtime(movie: str, date: str, extra: str = "") -> str:
         "",
         "🟢 متاح — ينفع تحجز دلوقتي",
         "🔴 الحجز مكتمل — كله محجوز",
+        "⚪ لسه مفتحش — استنى التنبيه",
         "",
         "لو عايز فورمات معيّن (IMAX، 4DX، VIP…)\nاختار من الأزرار اللي فوق.",
     ]
@@ -441,14 +446,15 @@ def format_not_found() -> str:
 
 def showtime_button(time: str, hall: str, status: str, seats: int | None) -> str:
     if status == AVAILABLE:
-        mark = "متاح"
-        if seats is not None:
-            mark = f"متاح · {seats} كرسي"
+        icon = "🟢"
     elif status == SOLD_OUT:
-        mark = "الحجز مكتمل"
+        icon = "🔴"
     else:
-        mark = "لسه مفتحش"
-    return f"{format_time(time)} · {esc(hall)} · {mark}"
+        icon = "⚪"
+    label = f"{icon} {format_time(time)} · {esc(hall)}"
+    if status == AVAILABLE and seats is not None:
+        label += f" · {seats} كرسي"
+    return label
 
 
 def confirm_watch(
@@ -465,34 +471,43 @@ def confirm_watch(
     return (
         f"{step_header(5, 5, 'تأكيد')}\n\n"
         "<b>تأكيد المراقبة</b>\n\n"
+        f"🎬 {esc(movie)}\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)} ({format_date(date)})\n"
-        f"🎞️ {esc(movie)}\n"
-        f"🎟️ {format_time(time)} — {esc(hall)}\n\n"
+        f"🕐 {format_time(time)} · {esc(hall)}\n\n"
         f"{note}"
     )
 
 
 def no_data() -> str:
     return (
-        "لسه بنجيب البيانات من السينما. جرّب تاني بعد دقيقة 🙏\n"
-        "مش بنعمل طلبات لموقع السينما وانت بتتصفح، عشان نحافظ على البوت شغال."
+        "⏳ <b>لسه بنجيب البيانات</b>\n\n"
+        "السينما مش بترد دلوقتي.\n"
+        "جرّب تاني بعد دقيقة 🙏\n\n"
+        "<i>مش بنعمل طلبات لموقع السينما وانت بتتصفح،\n"
+        "عشان نحافظ على البوت شغال.</i>"
     )
 
 
 def no_dates() -> str:
-    return "مفيش أيام متاحة للفرع ده دلوقتي. جرّب فرع تاني أو استنى شوية."
+    return (
+        "📅 <b>مفيش أيام متاحة</b>\n\n"
+        "الفرع ده لسه ما نزّلش أيام للحجز.\n\n"
+        "جرّب فرع تاني، أو استنى شوية."
+    )
 
 
 def no_movies() -> str:
     return (
-        "الحجز لسه مفتحش لليوم ده. جرّب يوم تاني أو استنى لما ينزل.\n"
-        "لو الحفلات ظهرت، هتلاقيها هنا على طول."
+        "🎬 <b>الحجز لسه مفتحش</b>\n\n"
+        "مفيش أفلام متاحة في اليوم ده دلوقتي.\n\n"
+        "جرّب يوم تاني،\n"
+        "ولو الحفلات ظهرت هتلاقيها هنا على طول."
     )
 
 
 def no_showtimes() -> str:
-    return "الحجز لسه مفتحش للفيلم ده في اليوم ده. جرّب فيلم أو يوم تاني."
+    return "🎟️ <b>مفيش حفلات</b>\n\nالحجز لسه مفتحش للفيلم ده في اليوم ده.\n\nجرّب فيلم أو يوم تاني."
 
 
 IMAX_LINES_AR = {
@@ -548,9 +563,9 @@ def confirm_movie_watch(
     return (
         f"{step_header(5, 5, 'تأكيد')}\n\n"
         "<b>تأكيد مراقبة اليوم كامل</b>\n\n"
+        f"🎬 {esc(movie)}\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)} ({format_date(date)})\n"
-        f"🎞️ {esc(movie)}\n"
         f"{ticket}\n\n"
         f"{note}"
     )
@@ -590,7 +605,7 @@ def confirm_all_dates(branch: str, movie: str, count: int, hall: str | None = No
         f"{step_header(5, 5, 'تأكيد')}\n\n"
         "<b>تأكيد مراقبة كل الأيام</b>\n\n"
         f"🏢 {esc(branch)}\n"
-        f"🎞️ {esc(movie)}\n"
+        f"🎬 {esc(movie)}\n"
         f"📅 كل الأيام المتاحة دلوقتي ({count} يوم){format_text}\n\n"
         "هنراقب كل يوم يفتح فيه الفيلم في الفرع ده، "
         "وكمان أي يوم جديد ينزل للحجز.\n"
@@ -612,7 +627,12 @@ def watch_created_all_dates(branch: str, movie: str, count: int, hall: str | Non
 
 
 def all_dates_unavailable() -> str:
-    return "مفيش أيام متاحة للفرع ده دلوقتي. جرّب يوم معيّن أو استنى لما الحجز يفتح."
+    return (
+        "📅 <b>مفيش أيام متاحة</b>\n\n"
+        "الفرع ده لسه ما نزّلش أيام للحجز.\n\n"
+        "جرّب يوم معيّن،\n"
+        "أو استنى لما الحجز يفتح."
+    )
 
 
 def watch_limit_reached(
@@ -653,7 +673,13 @@ def duplicate_watch() -> str:
 
 # ------------------------------------------------------------------- my watches
 def no_watches() -> str:
-    return "مفيش مراقبات لسه. اضغط <b>ضيف مراقبة جديدة</b> وابدأ 🎬"
+    return (
+        "🍿 <b>مفيش مراقبات لسه</b>\n\n"
+        "ابدأ بمراقبة فيلم واحد،\n"
+        "وأنا هبعتلك أول ما الحجز يفتح\n"
+        "أو كرسي يرجع متاح.\n\n"
+        "اضغط <b>➕ ضيف مراقبة</b> من تحت."
+    )
 
 
 def watches_retention_note(days: int) -> str:
@@ -718,7 +744,7 @@ def watch_row(
     elif scope == "movie":
         ticket = f"🎟️ كل الحفلات{format_text} · {esc(state)}"
     else:
-        ticket = f"🎟️ {format_time(time)} · {esc(hall)} · {esc(state)}"
+        ticket = f"🕐 {format_time(time)} · {esc(hall)} · {esc(state)}"
     lines = [
         f"🎬 <b>{esc(movie)}</b>",
         f"🏢 {esc(branch)} · {relative_date(date)}",
@@ -748,9 +774,9 @@ def watch_detail(
     elif scope == "movie":
         ticket = f"🎟️ كل الحفلات{format_text}"
     else:
-        ticket = f"🎟️ {format_time(time)} · {esc(hall)}"
+        ticket = f"🕐 {format_time(time)} · {esc(hall)}"
     return (
-        "⚙️ <b>إعدادات المراقبة</b>\n\n"
+        f"⚙️ <b>إعدادات المراقبة</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)} · {relative_date(date)}\n"
         f"{ticket}\n\n"
@@ -780,12 +806,12 @@ def watch_reminder(
     elif scope == "movie":
         ticket = f"🎟️ كل الحفلات{format_text}"
     else:
-        ticket = f"🎟️ {format_time(time)} · {esc(hall)}"
+        ticket = f"🕐 {format_time(time)} · {esc(hall)}"
     lines = [
         "⏰ <b>فكّرتك بالمراقبة دي</b>",
         "",
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)} — {relative_date(date)}",
+        f"🏢 {esc(branch)} · {relative_date(date)}",
         ticket,
     ]
     if scope != "movie_all_dates":
@@ -846,7 +872,7 @@ def alert_booking_opened(
 ) -> str:
     seat_text = f"\n🪑 {seats} كرسي متاح" if seats else ""
     return (
-        "🎟️ <b>الحجز فتح</b>\n\n"
+        f"🎟️ <b>الحجز فتح</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)} · {format_time(time)}\n"
@@ -861,7 +887,7 @@ def alert_seats_available(
 ) -> str:
     seat_text = f"{seats} كرسي" if seats else "كرسي"
     return (
-        "🪑 <b>رجعت كراسي</b>\n\n"
+        f"🪑 <b>رجعت كراسي</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)} · {format_time(time)}\n"
@@ -882,7 +908,7 @@ def alert_movie_booking_opened(
     more = " وغيرها" if len(times) > 8 else ""
     seat_text = f"\n🪑 {seats} كرسي متاح" if seats else ""
     return (
-        "🎟️ <b>الحجز فتح لحفلات الفيلم</b>\n\n"
+        f"🎟️ <b>الحجز فتح لحفلات الفيلم</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}\n"
@@ -903,7 +929,7 @@ def alert_movie_seats_available(
     more = " وغيرها" if len(times) > 8 else ""
     seat_text = f"\n🪑 بقى فيه {seats} كرسي" if seats else ""
     return (
-        "🪑 <b>رجعت كراسي في حفلات الفيلم</b>\n\n"
+        f"🪑 <b>رجعت كراسي في حفلات الفيلم</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}\n"
@@ -924,7 +950,7 @@ def alert_new_date(
     more = " وغيرها" if len(times) > 8 else ""
     hall_text = f"\n🎭 {esc(hall)}" if hall else ""
     return (
-        "🎬 <b>الفيلم نزل في يوم جديد</b>\n\n"
+        f"🎬 <b>الفيلم نزل في يوم جديد</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}"
@@ -938,7 +964,7 @@ def alert_new_showtimes(movie: str, branch: str, date: str, times: list[str]) ->
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
     return (
-        "🎬 <b>حفلات جديدة ظهرت</b>\n\n"
+        f"🎬 <b>حفلات جديدة ظهرت</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}\n"
@@ -1005,7 +1031,7 @@ def settings_text(
     hall = hall_type or "كل القاعات"
     watch_quiet = "بتشمل المراقبات ✅" if quiet_watches else "المراقبات شغالة دايماً 🔔"
     return (
-        "⚙️ <b>الإعدادات</b>\n\n"
+        f"⚙️ <b>الإعدادات</b>\n{DIVIDER}\n\n"
         "<b>الإشعارات</b>\n"
         f"• رجوع الكراسي: {'مفعل ✅' if notify_cancellations else 'مقفول ⛔'}\n"
         f"• ساعات الهدوء: من {format_time(f'{quiet_start}:00')} لـ {format_time(f'{quiet_end}:00')}\n"
@@ -1072,7 +1098,7 @@ def event_type_label(kind: str) -> str:
 # -------------------------------------------------------------------- support
 def support_text(limit: int = 10, min_amount: int = 50) -> str:
     return (
-        "💛 <b>ادعم المشروع</b>\n\n"
+        f"💛 <b>ادعم المشروع</b>\n{DIVIDER}\n\n"
         "سينما رادار مجاني للكل،\n"
         "وكل مستخدم عنده <b>مراقبتين</b> مجانًا.\n\n"
         "لو عايز تتابع أكتر، تقدر تدعم المشروع <b>مرة واحدة</b>\n"
@@ -1212,18 +1238,26 @@ def feedback_admin(user_id: int, username: str | None, text: str) -> str:
 
 # ------------------------------------------------------------------ discovery
 def discovery_new_movie(movie: str, branch: str, date: str | None, hall: str | None) -> str:
-    date_text = f" — من يوم {relative_date(date)}" if date else ""
-    hall_text = f" — {esc(hall)}" if hall else ""
-    return (
-        "🎬 <b>فيلم جديد اتفتح له حجز!</b>\n\n"
-        f"<b>{esc(movie)}</b> — {esc(branch)}{date_text}{hall_text}"
-    )
+    lines = [
+        "🎬 <b>فيلم جديد اتفتح له حجز</b>",
+        DIVIDER,
+        "",
+        f"🎬 <b>{esc(movie)}</b>",
+        f"🏢 {esc(branch)}",
+    ]
+    if date:
+        lines.append(f"📅 من يوم {relative_date(date)}")
+    if hall:
+        lines.append(f"🎭 {esc(hall)}")
+    return "\n".join(lines)
 
 
 def discovery_new_date(movie: str, branch: str, date: str) -> str:
     return (
-        "📅 <b>يوم جديد اتفتح حجزه!</b>\n\n"
-        f"<b>{esc(movie)}</b> — {esc(branch)} — من يوم {relative_date(date)}"
+        f"📅 <b>يوم جديد اتفتح حجزه</b>\n{DIVIDER}\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 من يوم {relative_date(date)}"
     )
 
 
@@ -1231,29 +1265,37 @@ def discovery_new_showtimes(movie: str, branch: str, date: str, times: list[str]
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
     return (
-        "🎟️ <b>حفلات جديدة ظهرت!</b>\n\n"
-        f"<b>{esc(movie)}</b> — {esc(branch)} — {relative_date(date)}\n"
-        f"المواعيد: {joined}{more}"
+        f"🎟️ <b>حفلات جديدة ظهرت</b>\n{DIVIDER}\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)}\n"
+        f"🕐 {joined}{more}"
     )
 
 
 def discovery_upcoming_released(
     movie: str, branch: str, date: str | None, hall: str | None = None
 ) -> str:
-    date_text = f" — من {relative_date(date)}" if date else ""
-    hall_text = f" — {esc(hall)}" if hall else ""
-    return (
-        "🍿 <b>الفيلم اللي كنت مستنيه نزل!</b>\n\n"
-        f"<b>{esc(movie)}</b> اتفتح حجزه في {esc(branch)}{date_text}{hall_text}\n\n"
-        "الحق احجز قبل ما يتكمل."
-    )
+    lines = [
+        "🍿 <b>الفيلم اللي كنت مستنيه نزل</b>",
+        DIVIDER,
+        "",
+        f"🎬 <b>{esc(movie)}</b>",
+        f"🏢 {esc(branch)}",
+    ]
+    if date:
+        lines.append(f"📅 من {relative_date(date)}")
+    if hall:
+        lines.append(f"🎭 {esc(hall)}")
+    lines += ["", "الحق احجز قبل ما يتكمل."]
+    return "\n".join(lines)
 
 
 def discovery_digest(branch: str, count: int, lines: list[str]) -> str:
     body = "\n".join(f"• {line}" for line in lines[:6])
     more = f"\nو{count - 6} حاجات كمان" if count > 6 else ""
     return (
-        f"🎬 <b>{count} حاجات جديدة في فرع {esc(branch)}</b>\n\n"
+        f"🎬 <b>{count} حاجات جديدة في فرع {esc(branch)}</b>\n{DIVIDER}\n\n"
         f"{body}{more}\n\n"
         "افتح الحجز أو راقب الفيلم بضغطة."
     )
@@ -1266,7 +1308,7 @@ def discovery_channel(event_text: str) -> str:
 # ---------------------------------------------------------------------- admin
 def admin_text(data: dict[str, object]) -> str:
     return (
-        "🛠️ <b>لوحة الأدمن</b>\n\n"
+        f"🛠️ <b>لوحة الأدمن</b>\n{DIVIDER}\n\n"
         "<b>الناس</b>\n"
         f"• مستخدمين نشطين: <b>{data.get('active_users', 0)}</b>\n"
         f"• داعمين: <b>{data.get('supporters', 0)}</b>\n"
@@ -1283,7 +1325,7 @@ def admin_text(data: dict[str, object]) -> str:
         f"• أحداث النهاردة: <b>{data.get('events_today', 0)}</b>\n"
         f"• بثوث: <b>{data.get('broadcasts_sent', 0)}</b>\n"
         f"• طول الطابور: <b>{data.get('queue_length', 0)}</b>\n\n"
-        f"<i>الإصدار v{esc(__version__)}</i>"
+        f"{version_line()}"
     )
 
 
@@ -1388,7 +1430,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 def admin_status(data: dict[str, object]) -> str:
     return (
-        "📡 <b>حالة الاتصال بـ (فوكس)</b>\n\n"
+        f"📡 <b>حالة الاتصال بـ (فوكس)</b>\n{DIVIDER}\n\n"
         f"• الحالة: <b>{esc(data.get('state', '—'))}</b>\n"
         f"• آخر نجاح: {esc(data.get('last_success', '—'))}\n"
         f"• آخر خطأ: {esc(data.get('last_error', '—'))}\n"

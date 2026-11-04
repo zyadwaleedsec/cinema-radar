@@ -10,7 +10,12 @@ import strings
 from models import CANONICAL_FORMATS
 
 try:  # pragma: no cover - exercised in production
-    from aiogram.types import CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
+    from aiogram.types import (
+        CopyTextButton,
+        DisabledButton,
+        InlineKeyboardButton,
+        InlineKeyboardMarkup,
+    )
 except Exception:  # pragma: no cover - lets core tests run without aiogram
 
     class InlineKeyboardButton:  # type: ignore[no-redef]
@@ -21,12 +26,15 @@ except Exception:  # pragma: no cover - lets core tests run without aiogram
             url: str | None = None,
             style: str | None = None,
             copy_text: Any = None,
+            disabled: Any = None,
+            **kwargs: Any,
         ):
             self.text = text
             self.callback_data = callback_data
             self.url = url
             self.style = style
             self.copy_text = copy_text
+            self.disabled = disabled
 
     class InlineKeyboardMarkup:  # type: ignore[no-redef]
         def __init__(self, inline_keyboard: list[list[Any]]):
@@ -35,6 +43,9 @@ except Exception:  # pragma: no cover - lets core tests run without aiogram
     class CopyTextButton:  # type: ignore[no-redef]
         def __init__(self, text: str):
             self.text = text
+
+    class DisabledButton:  # type: ignore[no-redef]
+        pass
 
 
 def _markup(rows: list[list[Any]]) -> Any:
@@ -48,7 +59,10 @@ def _btn(
     *,
     style: str | None = None,
     copy_text: str | None = None,
+    disabled: bool = False,
 ) -> Any:
+    if disabled:
+        return InlineKeyboardButton(text=text, disabled=DisabledButton())
     if copy_text is not None:
         return InlineKeyboardButton(text=text, copy_text=CopyTextButton(text=copy_text))
     if style is not None:
@@ -72,7 +86,7 @@ def main_menu_keyboard() -> Any:
     return _markup(
         [
             [
-                _btn(strings.BTN_ADD_WATCH, "menu:add", style="success"),
+                _btn(strings.BTN_ADD_WATCH, "menu:add", style="primary"),
                 _btn(strings.BTN_MY_WATCHES, "menu:watches"),
             ],
             [
@@ -94,7 +108,7 @@ def back_home_keyboard() -> Any:
 def onboarding_keyboard(step: int) -> Any:
     rows = []
     if step < 2:
-        rows.append([_btn(strings.BTN_ONBOARD_NEXT, f"ob:{step + 1}")])
+        rows.append([_btn(strings.BTN_ONBOARD_NEXT, f"ob:{step + 1}", style="primary")])
     else:
         rows.append([_btn(strings.BTN_ONBOARD_START, "ob:done", style="success")])
     footer = [_btn(strings.BTN_ONBOARD_SKIP, "ob:done")]
@@ -122,11 +136,21 @@ def retry_keyboard(retry_cb: str, back_cb: str = "menu:home") -> Any:
     return _markup(
         [
             [
-                _btn(strings.BTN_RETRY, retry_cb),
+                _btn(strings.BTN_RETRY, retry_cb, style="primary"),
                 _btn(strings.BTN_BACK, back_cb),
             ]
         ]
     )
+
+
+def _page_row(page: int, pages: int, prev_cb: str, next_cb: str) -> list[Any]:
+    row = []
+    if page > 0:
+        row.append(_btn(strings.BTN_PREV, prev_cb))
+    row.append(_btn(strings.page_label(page, pages), disabled=True))
+    if page + 1 < pages:
+        row.append(_btn(strings.BTN_NEXT, next_cb))
+    return row
 
 
 def paginate(
@@ -144,10 +168,13 @@ def paginate(
         for index, item in enumerate(items[start : start + per_page])
     ]
     nav = []
-    if page > 0:
-        nav.append(_btn(strings.BTN_PREV, f"{prefix}_p:{page - 1}"))
-    if page + 1 < pages:
-        nav.append(_btn(strings.BTN_NEXT, f"{prefix}_p:{page + 1}"))
+    if pages > 1:
+        nav = _page_row(
+            page,
+            pages,
+            f"{prefix}_p:{page - 1}",
+            f"{prefix}_p:{page + 1}",
+        )
     if nav:
         rows.append(nav)
     rows.append([_btn(strings.BTN_HOME, "menu:home")])
@@ -299,18 +326,13 @@ def watches_keyboard(watches: list[dict[str, Any]], page: int = 0) -> Any:
     start = page * WATCH_PAGE_SIZE
     visible = watches[start : start + WATCH_PAGE_SIZE]
     rows = [[_btn(label(w), f"w:cfg:{w['id']}")] for w in visible]
-    nav = []
-    if page > 0:
-        nav.append(_btn(strings.BTN_PREV, f"wp:{page - 1}"))
-    if page + 1 < pages:
-        nav.append(_btn(strings.BTN_NEXT, f"wp:{page + 1}"))
-    if nav:
-        rows.append(nav)
+    if pages > 1:
+        rows.append(_page_row(page, pages, f"wp:{page - 1}", f"wp:{page + 1}"))
     if total:
-        rows.append([_btn(strings.BTN_ADD_WATCH, "menu:add")])
+        rows.append([_btn(strings.BTN_ADD_WATCH, "menu:add", style="primary")])
         rows.append([_btn(strings.BTN_DELETE_ALL, "w:all", style="danger")])
     else:
-        rows.append([_btn(strings.BTN_ADD_WATCH, "menu:add", style="success")])
+        rows.append([_btn(strings.BTN_ADD_WATCH, "menu:add", style="primary")])
     rows.append([_btn(strings.BTN_HOME, "menu:home")])
     return _markup(rows)
 
@@ -359,7 +381,7 @@ def watches_clear_confirm_keyboard() -> Any:
 def watch_created_keyboard(watch_id: int) -> Any:
     return _markup(
         [
-            [_btn(strings.BTN_WATCH_SETTINGS, f"w:cfg:{watch_id}")],
+            [_btn(strings.BTN_WATCH_SETTINGS, f"w:cfg:{watch_id}", style="primary")],
             [_btn(strings.BTN_MY_WATCHES, "menu:watches"), _btn(strings.BTN_HOME, "menu:home")],
         ]
     )
@@ -368,7 +390,7 @@ def watch_created_keyboard(watch_id: int) -> Any:
 def watch_expired_keyboard() -> Any:
     return _markup(
         [
-            [_btn(strings.BTN_ADD_WATCH, "menu:add", style="success")],
+            [_btn(strings.BTN_ADD_WATCH, "menu:add", style="primary")],
             [_btn(strings.BTN_MY_WATCHES, "menu:watches"), _btn(strings.BTN_HOME, "menu:home")],
         ]
     )
@@ -435,6 +457,7 @@ def quiet_keyboard(
             _btn(
                 ("✅ " if quiet_watches else "⛔ ") + strings.BTN_QUIET_WATCHES,
                 "q:watch",
+                style="success" if quiet_watches else None,
             )
         ]
     ]
@@ -444,6 +467,7 @@ def quiet_keyboard(
                 f"{strings.format_time(f'{s}:00')} → {strings.format_time(f'{e}:00')}"
                 + (" ✅" if (s, e) == (current_start, current_end) else ""),
                 f"q:{s}:{e}",
+                style="success" if (s, e) == (current_start, current_end) else None,
             )
         ]
         for s, e in presets
@@ -463,19 +487,16 @@ def quiet_custom_keyboard() -> Any:
 
 
 def branches_filter_keyboard(branches: list[Any], selected: list[str], page: int = 0) -> Any:
+    pages = max(1, (len(branches) + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(0, min(page, pages - 1))
     rows = []
     start = page * PAGE_SIZE
     for index, branch in enumerate(branches[start : start + PAGE_SIZE]):
         branch_id = _field(branch, "id")
         mark = "✅ " if branch_id in selected else ""
         rows.append([_btn(f"{mark}{_field(branch, 'name')}", f"fb:{start + index}")])
-    nav = []
-    if page > 0:
-        nav.append(_btn(strings.BTN_PREV, f"fb_p:{page - 1}"))
-    if start + PAGE_SIZE < len(branches):
-        nav.append(_btn(strings.BTN_NEXT, f"fb_p:{page + 1}"))
-    if nav:
-        rows.append(nav)
+    if pages > 1:
+        rows.append(_page_row(page, pages, f"fb_p:{page - 1}", f"fb_p:{page + 1}"))
     rows.append([_btn(strings.BTN_DONE, "fb:done")])
     rows.append([_btn(strings.BTN_BACK, "menu:settings"), _btn(strings.BTN_HOME, "menu:home")])
     return _markup(rows)

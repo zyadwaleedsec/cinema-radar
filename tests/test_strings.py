@@ -26,9 +26,9 @@ def test_sold_out_and_not_open_have_different_labels():
     not_open = strings.showtime_button("10:45", "MAX", NOT_AVAILABLE, None)
     available = strings.showtime_button("10:45", "MAX", AVAILABLE, 4)
 
-    assert "الحجز مكتمل" in sold_out
-    assert "لسه مفتحش" in not_open
-    assert "متاح" in available
+    assert "🔴" in sold_out
+    assert "⚪" in not_open
+    assert "🟢" in available
 
 
 def test_confirmation_explains_sold_out_watch():

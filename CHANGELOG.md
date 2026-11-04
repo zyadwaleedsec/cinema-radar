@@ -11,6 +11,33 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-04
+
+### Added
+
+- A shared visual system (`ui/theme.py`): a thin divider under titles, a
+  progress bar (`▰▰▱ 2/5`), and one consistent emoji vocabulary across screens.
+- Colored inline buttons: blue `primary` for the main action, green `success`
+  for confirmations, red `danger` for destructive actions.
+- Showtime buttons start with a status icon: `🟢` available, `🔴` sold out,
+  `⚪` not on sale yet.
+- Watch cards are separated by a divider, with one fact per line.
+- Pagination is shown as a non-clickable `page X / Y` button between Previous
+  and Next.
+- The language picker shows `🇪🇬 العربية` and `🇺🇸 English`.
+- Clearer empty states with a large emoji, a short reason and a primary action.
+- A unified footer `🎬 Cinema Radar · vX.Y.Z` on help, privacy, settings and the
+  admin panel.
+
+### Changed
+
+- Every main screen follows the same rhythm: title → divider → short content →
+  action hint, with generous blank lines.
+- Rewrote the add-watch steps, alerts, watch list/settings, discovery messages,
+  support and admin screens around the new visual system.
+- Bumped the version to 2.0.0 because the interface is a visible, coordinated
+  redesign rather than a small copy change.
+
 ## [1.1.6] - 2026-11-04
 
 ### Fixed
@@ -162,7 +189,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.6...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.6...v2.0.0
 [1.1.6]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.3...v1.1.4

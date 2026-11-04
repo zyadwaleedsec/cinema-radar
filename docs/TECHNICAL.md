@@ -57,6 +57,7 @@ cinema-radar/
 ├── utils.py                # small dependency-free shared helpers
 ├── handlers/               # /start, language, watches, settings, support, admin
 ├── ui/                     # screen model, classic + rich renderers, fallback
+│   └── theme.py            # dividers, progress bars and shared visual tokens
 ├── providers/
 │   ├── base.py             # CinemaProvider abstraction + registry
 │   └── vox.py              # VOX Egypt provider and pure HTML parsers
@@ -67,7 +68,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (176 tests)
+├── tests/                  # pytest suite (177 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -443,7 +444,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `176 passed`.
+Expected: `177 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

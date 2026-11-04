@@ -28,13 +28,15 @@ has one button that opens the cinema's own booking page.
 - 🌙 **Quiet hours**, per-watch alert modes, and a clean paged watch list.
 - 🔐 **Privacy first** — `/delete_me` clears the bot's data; no card details, and
   no phone number is ever required.
+- ✨ **Polished screens** — clear dividers, status icons, progress bars and
+  colored primary/confirm/delete actions.
 
 The interface is fully bilingual — **Egyptian Arabic** (default) and **American
 English**. Almost every step is an inline button; you only type a movie name when
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v1.1.6** — see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v2.0.0** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

@@ -40,6 +40,7 @@ from keyboards import (
 from models import Movie, Showtime, TargetKey, format_key
 from scheduler import Scheduler, expected_opening_for
 from timeutil import day_end_iso, expiry_iso, resolve_timezone, today_iso
+from ui.theme import DIVIDER
 from watcher import VALID_MODES
 
 router = Router(name="watches")
@@ -926,13 +927,14 @@ def _watches_view(
         return strings.no_watches(), watches_keyboard([])
     start = page * WATCH_PAGE_SIZE
     visible = watches[start : start + WATCH_PAGE_SIZE]
-    lines = [strings.watches_page_title(len(watches))]
+    lines = [strings.watches_page_title(len(watches)), DIVIDER]
     current_group = None
-    for watch in visible:
+    for index, watch in enumerate(visible):
         group = strings.watches_group(str(watch.get("date") or ""))
+        if index:
+            lines += ["", DIVIDER]
         if group != current_group:
-            lines.append("")
-            lines.append(group)
+            lines += ["", group]
             current_group = group
         lines.append(
             strings.watch_row(
@@ -948,9 +950,6 @@ def _watches_view(
                 watch.get("scope"),
             )
         )
-    page_text = strings.page_label(page, pages)
-    if page_text:
-        lines += ["", page_text]
     lines += ["", strings.watches_retention_note(settings.watch_retention_days)]
     return "\n".join(lines), watches_keyboard(watches, page)
 

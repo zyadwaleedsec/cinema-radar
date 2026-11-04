@@ -179,7 +179,29 @@ def test_main_menu_is_two_columns_with_primary_action():
     rows = keyboards.main_menu_keyboard().inline_keyboard
     assert all(len(row) == 2 for row in rows)
     assert rows[0][0].callback_data == "menu:add"
-    assert rows[0][0].style == "success"
+    assert rows[0][0].style == "primary"
+
+
+def test_visual_system_tokens_render_consistently():
+    from ui.theme import DIVIDER, progress
+
+    assert progress(1, 5) == "▰▱▱▱▱ 1/5"
+    assert progress(4, 5) == "▰▰▰▰▱ 4/5"
+
+    ar = strings.catalog("ar")
+    en = strings.catalog("en")
+    assert DIVIDER in ar.step_header(2, 5, "الفرع")
+    assert DIVIDER in en.step_header(2, 5, "Branch")
+    assert ar.page_label(0, 2) == "صفحة 1 / 2"
+    assert en.page_label(0, 2) == "Page 1 / 2"
+    assert "🎬 Cinema Radar · v" in ar.version_line()
+    assert "🎬 Cinema Radar · v" in en.version_line()
+
+    labels = [
+        button.text for row in keyboards.language_keyboard().inline_keyboard for button in row
+    ]
+    assert "🇪🇬 العربية" in labels
+    assert "🇺🇸 English" in labels
 
 
 def test_add_flow_has_back_on_every_step():
@@ -258,8 +280,14 @@ def test_watch_list_is_grouped_and_paged():
     ]
     from config import Settings
 
-    text, markup = _watches_view(watches, Settings(), page=0)
-    assert "صفحة 1 من 2" in text
+    _text, markup = _watches_view(watches, Settings(), page=0)
+    labels = [button.text for row in markup.inline_keyboard for button in row]
+    assert "صفحة 1 / 2" in labels
+    page_button = next(
+        button for row in markup.inline_keyboard for button in row if button.text == "صفحة 1 / 2"
+    )
+    assert page_button.disabled is not None
+    assert page_button.callback_data is None
     assert "wp:1" in _callbacks(markup)
     text_two, _ = _watches_view(watches, Settings(), page=1)
     assert "Film 7" in text_two

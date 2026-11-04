@@ -98,8 +98,8 @@ def test_unavailable_sessions_are_kept_as_sold_out_with_hall():
 
 def test_sold_out_button_is_not_labelled_as_not_open():
     label = strings.showtime_button("10:45", "MAX", SOLD_OUT, None)
-    assert "الحجز مكتمل" in label
-    assert "لسه مفتحش" not in label
+    assert "🔴" in label
+    assert "⚪" not in label
 
 
 def test_day_without_sessions_says_booking_has_not_opened():
