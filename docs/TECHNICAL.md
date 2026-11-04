@@ -70,7 +70,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (201 tests)
+├── tests/                  # pytest suite (204 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -524,7 +524,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `201 passed`.
+Expected: `204 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

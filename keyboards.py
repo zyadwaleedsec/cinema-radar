@@ -211,13 +211,13 @@ def cinema_keyboard(providers: list[str], current: str | None = None) -> Any:
 def window_keyboard(morning_count: int, evening_count: int) -> Any:
     """Morning / evening choice for the cross-cinema watch flow."""
 
-    return _markup(
-        [
-            [_btn(strings.BTN_MORNING(morning_count), "win:morning")],
-            [_btn(strings.BTN_EVENING(evening_count), "win:evening")],
-            [_btn(strings.BTN_BACK, "ab:date"), _btn(strings.BTN_HOME, "menu:home")],
-        ]
-    )
+    rows = []
+    if morning_count > 0:
+        rows.append([_btn(strings.BTN_MORNING(morning_count), "win:morning")])
+    if evening_count > 0:
+        rows.append([_btn(strings.BTN_EVENING(evening_count), "win:evening")])
+    rows.append([_btn(strings.BTN_BACK, "ab:date"), _btn(strings.BTN_HOME, "menu:home")])
+    return _markup(rows)
 
 
 def branch_keyboard(branches: Iterable[Any], page: int = 0, back_cb: str | None = None) -> Any:

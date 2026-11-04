@@ -413,24 +413,40 @@ def BTN_EVENING(count: int) -> str:
     return f"🌙 Evening shows ({count})"
 
 
-def window_label(window: str) -> str:
-    return "Morning shows (before 5 PM)" if window == "morning" else "Evening shows (from 5 PM)"
+def window_cutoff_text(hour: int) -> str:
+    """Render the morning/evening split hour in 12-hour form."""
+
+    period = "PM" if hour % 24 >= 12 else "AM"
+    value = hour % 12 or 12
+    return f"{value} {period}"
 
 
-def choose_window(movie: str, date: str) -> str:
+def window_label(window: str, morning_end_hour: int = 17) -> str:
+    cutoff = window_cutoff_text(morning_end_hour)
     return (
-        f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}\n\n"
-        "Choose the period to watch across all cinemas:\n"
-        "🌅 <b>Morning</b> — shows before 5 PM\n"
-        "🌙 <b>Evening</b> — shows from 5 PM"
+        f"Morning shows (before {cutoff})"
+        if window == "morning"
+        else f"Evening shows (from {cutoff})"
     )
 
 
-def confirm_window(movie: str, date: str, window: str, branch_count: int) -> str:
+def choose_window(movie: str, date: str, morning_end_hour: int = 17) -> str:
+    cutoff = window_cutoff_text(morning_end_hour)
+    return (
+        f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}\n\n"
+        "Choose the period to watch across all cinemas:\n"
+        f"🌅 <b>Morning</b> — shows before {cutoff}\n"
+        f"🌙 <b>Evening</b> — shows from {cutoff}"
+    )
+
+
+def confirm_window(
+    movie: str, date: str, window: str, branch_count: int, morning_end_hour: int = 17
+) -> str:
     return (
         f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
         f"📅 {relative_date(date)}\n"
-        f"🕐 {window_label(window)}\n"
+        f"🕐 {window_label(window, morning_end_hour)}\n"
         f"🏢 {branch_count} branches\n\n"
         "You'll watch every show in this period across all cinemas, and get a ping "
         "when a new show opens or a seat comes back.\n\n"
@@ -438,11 +454,13 @@ def confirm_window(movie: str, date: str, window: str, branch_count: int) -> str
     )
 
 
-def watch_created_window(movie: str, date: str, window: str, branch_count: int) -> str:
+def watch_created_window(
+    movie: str, date: str, window: str, branch_count: int, morning_end_hour: int = 17
+) -> str:
     return (
         "✅ <b>Watch active</b>\n\n"
         f"🎬 {esc(movie)}\n"
-        f"📅 {relative_date(date)} · 🕐 {window_label(window)}\n"
+        f"📅 {relative_date(date)} · 🕐 {window_label(window, morning_end_hour)}\n"
         f"🏢 All cinemas ({branch_count} branches)\n\n"
         "I'll alert you when a new show opens in this period."
     )

@@ -379,24 +379,36 @@ def BTN_EVENING(count: int) -> str:
     return f"🌙 حفلات مسائية ({count})"
 
 
-def window_label(window: str) -> str:
-    return "حفلات صباحية (قبل 5 مساءً)" if window == "morning" else "حفلات مسائية (من 5 مساءً)"
+def window_cutoff_text(hour: int) -> str:
+    """Render the morning/evening split hour in Egyptian-Arabic 12-hour form."""
+
+    period = "م" if hour % 24 >= 12 else "ص"
+    value = hour % 12 or 12
+    return f"{value} {period}"
 
 
-def choose_window(movie: str, date: str) -> str:
+def window_label(window: str, morning_end_hour: int = 17) -> str:
+    cutoff = window_cutoff_text(morning_end_hour)
+    return f"حفلات صباحية (قبل {cutoff})" if window == "morning" else f"حفلات مسائية (من {cutoff})"
+
+
+def choose_window(movie: str, date: str, morning_end_hour: int = 17) -> str:
+    cutoff = window_cutoff_text(morning_end_hour)
     return (
         f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}\n\n"
         "اختار الفترة اللي عايز تراقبها في كل السينمات:\n"
-        "🌅 <b>صباحي</b> — الحفلات قبل 5 مساءً\n"
-        "🌙 <b>مسائي</b> — الحفلات من 5 مساءً"
+        f"🌅 <b>صباحي</b> — الحفلات قبل {cutoff}\n"
+        f"🌙 <b>مسائي</b> — الحفلات من {cutoff}"
     )
 
 
-def confirm_window(movie: str, date: str, window: str, branch_count: int) -> str:
+def confirm_window(
+    movie: str, date: str, window: str, branch_count: int, morning_end_hour: int = 17
+) -> str:
     return (
         f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
         f"📅 {relative_date(date)}\n"
-        f"🕐 {window_label(window)}\n"
+        f"🕐 {window_label(window, morning_end_hour)}\n"
         f"🏢 {branch_count} فرع\n\n"
         "هتراقب كل الحفلات المتاحة في الفترة دي في كل السينمات، "
         "وهبعتلك أول ما حفلة جديدة تفتح أو كرسي يرجع.\n\n"
@@ -404,11 +416,13 @@ def confirm_window(movie: str, date: str, window: str, branch_count: int) -> str
     )
 
 
-def watch_created_window(movie: str, date: str, window: str, branch_count: int) -> str:
+def watch_created_window(
+    movie: str, date: str, window: str, branch_count: int, morning_end_hour: int = 17
+) -> str:
     return (
         "✅ <b>تم تفعيل المراقبة</b>\n\n"
         f"🎬 {esc(movie)}\n"
-        f"📅 {relative_date(date)} · 🕐 {window_label(window)}\n"
+        f"📅 {relative_date(date)} · 🕐 {window_label(window, morning_end_hour)}\n"
         f"🏢 كل السينمات ({branch_count} فرع)\n\n"
         "هبعتلك تنبيه أول ما يفتح حجز أو يظهر وقت جديد في الفترة دي."
     )

@@ -452,7 +452,7 @@ async def window_chosen(callback: CallbackQuery, state: FSMContext, settings: Se
     )
     await edit(
         callback,
-        strings.confirm_window(movie_name, date, window, branch_count),
+        strings.confirm_window(movie_name, date, window, branch_count, settings.morning_end_hour),
         confirm_window_keyboard(),
     )
 
@@ -517,7 +517,9 @@ async def confirm_window_watch(
     await state.clear()
     await edit(
         callback,
-        strings.watch_created_window(movie_name, date, window, len(entries)),
+        strings.watch_created_window(
+            movie_name, date, window, len(entries), settings.morning_end_hour
+        ),
         watch_created_keyboard(ids[0]),
     )
 
@@ -629,7 +631,9 @@ async def _all_cinemas_date_chosen(
     await state.update_data(date=chosen, movie_name=movie_name, window_branches=grouped)
     await state.set_state(AddWatch.window)
     await edit(
-        callback, strings.choose_window(movie_name, chosen), window_keyboard(morning, evening)
+        callback,
+        strings.choose_window(movie_name, chosen, settings.morning_end_hour),
+        window_keyboard(morning, evening),
     )
 
 
@@ -1333,7 +1337,9 @@ def _watches_view(
             current_group = group
         branch_label = watch["branch_name"]
         if watch.get("time_window"):
-            branch_label += f" · {strings.window_label(watch['time_window'])}"
+            branch_label += (
+                f" · {strings.window_label(watch['time_window'], settings.morning_end_hour)}"
+            )
         lines.append(
             strings.watch_row(
                 branch_label,

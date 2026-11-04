@@ -267,6 +267,7 @@ class Database:
         await self.execute(
             "CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status, created_at)"
         )
+        await self.execute("DROP TABLE IF EXISTS movie_waits")
         await self._migrate_subscription_event_types()
         await self._migrate_subscription_branch_ids()
 

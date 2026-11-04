@@ -11,6 +11,16 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-11-05
+
+### Fixed
+
+- The morning/evening buttons are now hidden when a period has no shows, and
+  the split hour in the copy follows `MORNING_END_HOUR` ("before 5 PM" by
+  default).
+- The leftover `movie_waits` table from the removed `/wait` feature is dropped
+  on startup.
+
 ## [2.5.0] - 2026-11-05
 
 ### Added
@@ -284,7 +294,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.1...HEAD
+[2.5.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.2.0...v2.3.0

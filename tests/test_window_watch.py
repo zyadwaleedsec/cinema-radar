@@ -124,3 +124,46 @@ async def test_group_respects_watch_limit(db):
                 }
             ],
         )
+
+
+@pytest.mark.asyncio
+async def test_movie_waits_table_is_dropped_on_init(db):
+    await db.execute(
+        "CREATE TABLE IF NOT EXISTS movie_waits "
+        "(id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, title TEXT)"
+    )
+    await db.execute("INSERT INTO movie_waits (user_id, title) VALUES (1, 'test')")
+    await db.init_schema()
+    tables = await db.fetchall(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='movie_waits'"
+    )
+    assert tables == []
+
+
+def test_window_keyboard_hides_zero_counts() -> None:
+    from keyboards import window_keyboard
+
+    callbacks = {
+        button.callback_data for row in window_keyboard(0, 3).inline_keyboard for button in row
+    }
+    assert "win:morning" not in callbacks
+    assert "win:evening" in callbacks
+
+    callbacks = {
+        button.callback_data for row in window_keyboard(2, 0).inline_keyboard for button in row
+    }
+    assert "win:morning" in callbacks
+    assert "win:evening" not in callbacks
+
+
+def test_window_cutoff_text_uses_setting() -> None:
+    from i18n import ar, en
+
+    assert ar.window_cutoff_text(17) == "5 م"
+    assert ar.window_cutoff_text(12) == "12 م"
+    assert ar.window_cutoff_text(0) == "12 ص"
+    assert en.window_cutoff_text(17) == "5 PM"
+    assert en.window_cutoff_text(12) == "12 PM"
+    assert en.window_cutoff_text(0) == "12 AM"
+    assert "5 م" in ar.window_label("morning", 17)
+    assert "5 PM" in en.window_label("evening", 17)
