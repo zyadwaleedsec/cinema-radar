@@ -24,6 +24,7 @@ from contextvars import ContextVar
 from types import ModuleType
 
 from . import ar, en
+from .base import get_provider, set_provider
 
 #: Languages the interface is officially available in.
 SUPPORTED_LANGUAGES: tuple[str, ...] = ("ar", "en")
@@ -98,6 +99,22 @@ def use(lang: object) -> Iterator[ModuleType]:
         yield catalog()
     finally:
         _current.reset(token)
+
+
+@contextmanager
+def use_provider(provider: object) -> Iterator[str]:
+    """Temporarily render the cinema name for ``provider``."""
+
+    previous = get_provider()
+    set_provider(provider)
+    try:
+        yield get_provider()
+    finally:
+        set_provider(previous)
+
+
+def current_provider() -> str:
+    return get_provider()
 
 
 def for_language(lang: object) -> ModuleType:

@@ -64,6 +64,7 @@ async def handle_deep_link(
     cache: Any,
     provider: Any,
     telegram_id: int | None = None,
+    providers: Any = None,
 ) -> bool:
     payload = payload.strip()
     if payload.startswith("w") and payload[1:].isdigit():
@@ -77,7 +78,14 @@ async def handle_deep_link(
         from handlers.watches import start_branch_deeplink
 
         return await start_branch_deeplink(
-            message, state, cache, settings, provider, payload[1:], telegram_id=telegram_id
+            message,
+            state,
+            cache,
+            settings,
+            provider,
+            payload[1:],
+            telegram_id=telegram_id,
+            providers=providers,
         )
     return False
 
@@ -90,13 +98,16 @@ async def start(
     settings: Settings,
     cache: Any = None,
     provider: Any = None,
+    providers: Any = None,
 ) -> None:
     await state.clear()
     user = await db.get_or_create_user(message.from_user.id, watch_limit=settings.free_watch_limit)
     parts = (message.text or "").split(maxsplit=1)
     payload = parts[1].strip() if len(parts) > 1 else ""
     if payload and int(user.get("onboarded") or 0):
-        handled = await handle_deep_link(message, payload, state, db, settings, cache, provider)
+        handled = await handle_deep_link(
+            message, payload, state, db, settings, cache, provider, providers=providers
+        )
         if handled:
             return
     if int(user.get("onboarded") or 0):
@@ -129,6 +140,7 @@ async def onboarding_step(
     settings: Settings,
     cache: Any = None,
     provider: Any = None,
+    providers: Any = None,
 ) -> None:
     step = (callback.data or "").split(":", 1)[1]
     if step == "done":
@@ -150,6 +162,7 @@ async def onboarding_step(
                 cache,
                 provider,
                 telegram_id=callback.from_user.id,
+                providers=providers,
             )
         ):
             await callback.answer()

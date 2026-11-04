@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date as date_cls
 
 from config import settings as _app_settings
-from i18n.base import esc
+from i18n.base import esc, get_provider
 from imax import CERTIFIED_DIGITAL, FULL_70MM, PARTIAL_70MM, PARTIAL_DIGITAL, UNKNOWN
 from models import AVAILABLE, NOT_AVAILABLE, SOLD_OUT
 from models import format_key as _format_key
@@ -24,8 +24,9 @@ NAME = "English"
 RTL = False
 
 
-def cinema_name() -> str:
-    return "Renaissance" if _app_settings.provider == "renaissance" else "VOX"
+def cinema_name(provider: str | None = None) -> str:
+    code = (provider or get_provider() or _app_settings.provider).lower()
+    return "Renaissance" if code == "renaissance" else "VOX"
 
 
 STATUS_LABELS_EN = {
@@ -212,7 +213,7 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
 
 ADMIN_COMMANDS: tuple[tuple[str, str], ...] = (
     ("admin", "Admin panel"),
-    ("status", f"({cinema_name()}) connection status"),
+    ("status", "Cinema connection status"),
     ("grant", "Grant a user supporter access"),
     ("revoke", "Revoke supporter access"),
     ("imax", "Set a movie's IMAX status"),
@@ -293,7 +294,7 @@ def onboard_intro(name: str = "") -> str:
         "🎬 <b>Cinema Radar</b>\n"
         f"{DIVIDER}\n"
         f"Welcome{who} 👋\n\n"
-        f"I watch ({cinema_name()}) showtimes in Egypt,\n"
+        "I watch VOX and Renaissance showtimes in Egypt,\n"
         "and message you the moment booking opens\n"
         "or a seat frees up.\n\n"
         "No more refreshing the site yourself."
@@ -317,7 +318,7 @@ def onboard_safety() -> str:
         "• The bot is free and only sends the booking link.\n"
         "• It never books or pays for you.\n"
         "• It never asks for your name, phone or payment details.\n"
-        f"• It is unofficial and not affiliated with ({cinema_name()}).\n\n"
+        "• It is unofficial and not affiliated with any cinema.\n\n"
         "Full details: /privacy\n"
         "Erase your data anytime: /delete_me"
     )
@@ -360,7 +361,7 @@ def help_text() -> str:
         "/privacy — Privacy\n"
         "/delete_me — Delete my data\n"
         "/cancel — Cancel the current step\n\n"
-        f"⚠️ The bot is unofficial and not affiliated with ({cinema_name()} Cinemas).\n"
+        "⚠️ The bot is unofficial and not affiliated with VOX or Renaissance Cinemas.\n"
         "Data may be delayed or wrong,\n"
         "and booking happens on the cinema's own site.\n\n"
         f"{version_line()}"
@@ -395,6 +396,10 @@ def privacy_text() -> str:
 
 
 # ------------------------------------------------------------------ add watch
+def choose_cinema() -> str:
+    return "🎬 <b>Choose a cinema</b>\n\nPick the cinema you want to watch at."
+
+
 def choose_branch() -> str:
     return f"{step_header(1, 5, 'Branch')}\n\n<b>Pick a branch</b> 🏢"
 
@@ -784,6 +789,7 @@ def watch_row(
     mode: str | None = "all",
     snoozed_until: str | None = None,
     scope: str | None = "showtime",
+    provider: str = "vox",
 ) -> str:
     state = STATUS_LABELS_EN.get(status, status)
     if seats is not None:
@@ -798,7 +804,7 @@ def watch_row(
         ticket = f"🕐 {format_time(time)} · {esc(hall)} · {esc(state)}"
     lines = [
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)} · {relative_date(date)}",
+        f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}",
         ticket,
         f"🔔 {watch_mode_label(mode)}",
     ]
@@ -816,6 +822,7 @@ def watch_detail(
     mode: str | None,
     snoozed_until_text: str | None = None,
     scope: str | None = "showtime",
+    provider: str = "vox",
 ) -> str:
     snooze = (
         f"⏰ Snoozed until {esc(snoozed_until_text)}" if snoozed_until_text else "⏰ Not snoozed"
@@ -831,7 +838,7 @@ def watch_detail(
     return (
         f"⚙️ <b>Watch settings</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)} · {relative_date(date)}\n"
+        f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}\n"
         f"{ticket}\n\n"
         f"🔔 Alerts: <b>{watch_mode_label(mode)}</b>\n"
         f"{snooze}\n\n"
@@ -1414,29 +1421,30 @@ def admin_unexpected_error(name: str) -> str:
 
 
 REASON_LABELS_EN = {
-    "http_403": f"({cinema_name()}) rejected the request (403) — protection or block",
-    "http_429": f"({cinema_name()}) rate-limited the request (429)",
-    "http_5xx": f"({cinema_name()}) server returned an error (5xx)",
-    "timeout": f"Timed out connecting to ({cinema_name()})",
+    "http_403": "({cinema}) rejected the request (403) — protection or block",
+    "http_429": "({cinema}) rate-limited the request (429)",
+    "http_5xx": "({cinema}) server returned an error (5xx)",
+    "timeout": "Timed out connecting to ({cinema})",
     "network": "Network / TLS / DNS problem",
-    "parse": f"({cinema_name()}) page changed and the bot can't read it",
-    "empty": f"({cinema_name()}) returned an empty page",
+    "parse": "({cinema}) page changed and the bot can't read it",
+    "empty": "({cinema}) returned an empty page",
     "circuit": "Circuit breaker open after repeated failures",
     "unknown": "Unknown error",
 }
 
 
 def reason_label(reason: str) -> str:
-    return REASON_LABELS_EN.get(reason, REASON_LABELS_EN["unknown"])
+    template = REASON_LABELS_EN.get(reason, REASON_LABELS_EN["unknown"])
+    return template.format(cinema=cinema_name())
 
 
 def format_place(place: str) -> str:
     """Show a technical place key with the localized cinema name."""
 
     if place.startswith("vox"):
-        return f"({cinema_name()})" + place[3:]
+        return f"({cinema_name('vox')})" + place[3:]
     if place.startswith("renaissance"):
-        return f"({cinema_name()})" + place[len("renaissance") :]
+        return f"({cinema_name('renaissance')})" + place[len("renaissance") :]
     return place
 
 
@@ -1476,7 +1484,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
         return ""
     if degraded:
         return (
-            f"\n\n⚠️ <i>({cinema_name()}) is unavailable right now. Last update {minutes} min ago — "
+            f"\n\n⚠️ <i>The cinema is unavailable right now. Last update {minutes} min ago — "
             "data may be stale.</i>"
         )
     if minutes >= 10:
@@ -1486,13 +1494,37 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 def admin_status(data: dict[str, object]) -> str:
     return (
-        f"📡 <b>({cinema_name()}) connection status</b>\n{DIVIDER}\n\n"
+        "📡 <b>Connection status</b>\n{DIVIDER}\n\n"
         f"• State: <b>{esc(data.get('state', '—'))}</b>\n"
         f"• Last success: {esc(data.get('last_success', '—'))}\n"
         f"• Last error: {esc(data.get('last_error', '—'))}\n"
         f"• Circuit breaker: <b>{esc(data.get('breaker', 'closed'))}</b>\n\n"
         f"• Active targets: <b>{data.get('targets', 0)}</b>\n"
         f"• Affected watches: <b>{data.get('affected', 0)}</b>"
+    )
+
+
+def admin_status_multi(data: dict[str, object]) -> str:
+    sections = data.get("sections") or []
+    blocks = [
+        (
+            f"🎬 <b>{esc(section.get('cinema', ''))}</b>\n"
+            f"• Last update: {esc(section.get('last_success', '—'))}\n"
+            f"• Last error: {esc(section.get('last_error', '—'))}\n"
+            f"• Events today: <b>{section.get('events', 0)}</b>"
+        )
+        for section in sections
+    ]
+    footer = (
+        f"• Circuit breaker: <b>{esc(data.get('breaker', 'closed'))}</b>\n"
+        f"• Active targets: <b>{data.get('targets', 0)}</b>\n"
+        f"• Affected watches: <b>{data.get('affected', 0)}</b>"
+    )
+    return (
+        "📡 <b>Connection status</b>\n{DIVIDER}\n\n"
+        + "\n\n".join(blocks)
+        + f"\n\n{DIVIDER}\n"
+        + footer
     )
 
 

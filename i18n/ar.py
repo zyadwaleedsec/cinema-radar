@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import date as date_cls
 
 from config import settings as _app_settings
-from i18n.base import esc
+from i18n.base import esc, get_provider
 from imax import CERTIFIED_DIGITAL, FULL_70MM, PARTIAL_70MM, PARTIAL_DIGITAL, UNKNOWN
 from models import (
     AVAILABLE,
@@ -30,8 +30,9 @@ NAME = "العربية"
 RTL = True
 
 
-def cinema_name() -> str:
-    return "رينيسانس" if _app_settings.provider == "renaissance" else "فوكس"
+def cinema_name(provider: str | None = None) -> str:
+    code = (provider or get_provider() or _app_settings.provider).lower()
+    return "رينيسانس" if code == "renaissance" else "فوكس"
 
 
 def format_time(value: str) -> str:
@@ -179,7 +180,7 @@ PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
 
 ADMIN_COMMANDS: tuple[tuple[str, str], ...] = (
     ("admin", "لوحة الأدمن"),
-    ("status", f"حالة الاتصال بـ ({cinema_name()})"),
+    ("status", "حالة الاتصال بالسينمات"),
     ("grant", "تفعيل دعم مستخدم"),
     ("revoke", "إلغاء دعم مستخدم"),
     ("imax", "ضبط حالة IMAX لفيلم"),
@@ -260,7 +261,7 @@ def onboard_intro(name: str = "") -> str:
         "🎬 <b>سينما رادار</b>\n"
         f"{DIVIDER}\n"
         f"أهلاً بيك{who} 👋\n\n"
-        f"بتابع حفلات ({cinema_name()}) في مصر،\n"
+        f"بتابع حفلات VOX ورينيسانس في مصر،\n"
         "وأبعتلك أول ما الحجز يفتح\n"
         "أو كرسي يرجع متاح.\n\n"
         "من غير ما تفضل تفتح الموقع كل شوية."
@@ -283,7 +284,7 @@ def onboard_safety() -> str:
         "• البوت مجاني، وبس بيبعتلك لينك الحجز.\n"
         "• مش بيحجز ولا بيدفع مكانك.\n"
         "• مش بيطلب اسمك ولا رقمك ولا بيانات دفع.\n"
-        f"• غير رسمي وغير تابع لـ ({cinema_name()}).\n\n"
+        "• غير رسمي وغير تابع لأي سينما.\n\n"
         "التفاصيل الكاملة: /privacy\n"
         "مسح بياناتك في أي وقت: /delete_me"
     )
@@ -326,7 +327,7 @@ def help_text() -> str:
         "/privacy — الخصوصية\n"
         "/delete_me — امسح بياناتي\n"
         "/cancel — إلغاء الخطوة\n\n"
-        f"⚠️ البوت غير رسمي وغير تابع لـ ({cinema_name()} سينما).\n"
+        "⚠️ البوت غير رسمي وغير تابع لـ VOX أو Renaissance Cinemas.\n"
         "البيانات ممكن تتأخر أو تكون غلط،\n"
         "والحجز بيتم على موقع السينما نفسه.\n\n"
         f"{version_line()}"
@@ -361,6 +362,10 @@ def privacy_text() -> str:
 
 
 # ------------------------------------------------------------------ add watch
+def choose_cinema() -> str:
+    return "🎬 <b>اختار السينما</b>\n\nاختار السينما اللي عايز تراقب منها."
+
+
 def choose_branch() -> str:
     return f"{step_header(1, 5, 'الفرع')}\n\n<b>اختار الفرع</b> 🏢"
 
@@ -742,6 +747,7 @@ def watch_row(
     mode: str | None = "all",
     snoozed_until: str | None = None,
     scope: str | None = "showtime",
+    provider: str = "vox",
 ) -> str:
     state = STATUS_LABELS_AR.get(status, status)
     if seats is not None:
@@ -756,7 +762,7 @@ def watch_row(
         ticket = f"🕐 {format_time(time)} · {esc(hall)} · {esc(state)}"
     lines = [
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)} · {relative_date(date)}",
+        f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}",
         ticket,
         f"🔔 {watch_mode_label(mode)}",
     ]
@@ -774,6 +780,7 @@ def watch_detail(
     mode: str | None,
     snoozed_until_text: str | None = None,
     scope: str | None = "showtime",
+    provider: str = "vox",
 ) -> str:
     snooze = f"⏰ متأجل لحد {esc(snoozed_until_text)}" if snoozed_until_text else "⏰ مفيش تأجيل"
     scope = scope or "showtime"
@@ -787,7 +794,7 @@ def watch_detail(
     return (
         f"⚙️ <b>إعدادات المراقبة</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)} · {relative_date(date)}\n"
+        f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}\n"
         f"{ticket}\n\n"
         f"🔔 التنبيهات: <b>{watch_mode_label(mode)}</b>\n"
         f"{snooze}\n\n"
@@ -1369,29 +1376,30 @@ def admin_unexpected_error(name: str) -> str:
 
 
 REASON_LABELS_AR = {
-    "http_403": f"({cinema_name()}) رافض الطلب (403) — حماية أو بلوك",
-    "http_429": f"({cinema_name()}) محدّد الطلبات (429) — rate limit",
-    "http_5xx": f"سيرفر ({cinema_name()}) بيرجع خطأ (5xx)",
-    "timeout": f"انتهت مهلة الاتصال بـ ({cinema_name()})",
+    "http_403": "({cinema}) رافض الطلب (403) — حماية أو بلوك",
+    "http_429": "({cinema}) محدّد الطلبات (429) — rate limit",
+    "http_5xx": "سيرفر ({cinema}) بيرجع خطأ (5xx)",
+    "timeout": "انتهت مهلة الاتصال بـ ({cinema})",
     "network": "مشكلة شبكة / TLS / DNS",
-    "parse": f"صفحة ({cinema_name()}) اتغيرت والبوت مش فاهمها",
-    "empty": f"({cinema_name()}) رجّع صفحة فاضية",
+    "parse": "صفحة ({cinema}) اتغيرت والبوت مش فاهمها",
+    "empty": "({cinema}) رجّع صفحة فاضية",
     "circuit": "قاطع الدائرة مفتوح بعد فشل متكرر",
     "unknown": "خطأ غير معروف",
 }
 
 
 def reason_label(reason: str) -> str:
-    return REASON_LABELS_AR.get(reason, REASON_LABELS_AR["unknown"])
+    template = REASON_LABELS_AR.get(reason, REASON_LABELS_AR["unknown"])
+    return template.format(cinema=cinema_name())
 
 
 def format_place(place: str) -> str:
     """Show a technical place key with the localized cinema name."""
 
     if place.startswith("vox"):
-        return f"({cinema_name()})" + place[3:]
+        return f"({cinema_name('vox')})" + place[3:]
     if place.startswith("renaissance"):
-        return f"({cinema_name()})" + place[len("renaissance") :]
+        return f"({cinema_name('renaissance')})" + place[len("renaissance") :]
     return place
 
 
@@ -1431,7 +1439,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
         return ""
     if degraded:
         return (
-            f"\n\n⚠️ <i>({cinema_name()}) مش متاح دلوقتي. آخر تحديث من {minutes} دقيقة — "
+            f"\n\n⚠️ <i>السينما مش متاحة دلوقتي. آخر تحديث من {minutes} دقيقة — "
             "البيانات ممكن تكون قديمة.</i>"
         )
     if minutes >= 10:
@@ -1441,13 +1449,34 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 def admin_status(data: dict[str, object]) -> str:
     return (
-        f"📡 <b>حالة الاتصال بـ ({cinema_name()})</b>\n{DIVIDER}\n\n"
+        "📡 <b>حالة الاتصال</b>\n{DIVIDER}\n\n"
         f"• الحالة: <b>{esc(data.get('state', '—'))}</b>\n"
         f"• آخر نجاح: {esc(data.get('last_success', '—'))}\n"
         f"• آخر خطأ: {esc(data.get('last_error', '—'))}\n"
         f"• قاطع الدائرة: <b>{esc(data.get('breaker', 'closed'))}</b>\n\n"
         f"• أهداف نشطة: <b>{data.get('targets', 0)}</b>\n"
         f"• مراقبات متأثرة: <b>{data.get('affected', 0)}</b>"
+    )
+
+
+def admin_status_multi(data: dict[str, object]) -> str:
+    sections = data.get("sections") or []
+    blocks = [
+        (
+            f"🎬 <b>{esc(section.get('cinema', ''))}</b>\n"
+            f"• آخر تحديث: {esc(section.get('last_success', '—'))}\n"
+            f"• آخر خطأ: {esc(section.get('last_error', '—'))}\n"
+            f"• أحداث النهارده: <b>{section.get('events', 0)}</b>"
+        )
+        for section in sections
+    ]
+    footer = (
+        f"• قاطع الدائرة: <b>{esc(data.get('breaker', 'closed'))}</b>\n"
+        f"• أهداف نشطة: <b>{data.get('targets', 0)}</b>\n"
+        f"• مراقبات متأثرة: <b>{data.get('affected', 0)}</b>"
+    )
+    return (
+        "📡 <b>حالة الاتصال</b>\n{DIVIDER}\n\n" + "\n\n".join(blocks) + f"\n\n{DIVIDER}\n" + footer
     )
 
 

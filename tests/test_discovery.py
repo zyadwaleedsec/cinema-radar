@@ -71,6 +71,9 @@ class FakeProviders:
     def get(self, name):
         return self.provider
 
+    def names(self):
+        return ("vox",)
+
 
 class FakeBroadcaster:
     def __init__(self) -> None:

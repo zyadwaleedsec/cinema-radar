@@ -36,23 +36,41 @@ async def admin_dashboard(message: Message, stats, settings: Settings) -> None:
 
 
 @router.message(Command("status"))
-async def upstream_status(message: Message, http, scheduler, settings: Settings) -> None:
+async def upstream_status(
+    message: Message,
+    http,
+    scheduler,
+    settings: Settings,
+    providers=None,
+    discovery=None,
+) -> None:
     if not _admin(message, settings):
         await message.answer(strings.admin_only())
         return
-    last = (
-        datetime.fromtimestamp(http.last_success_wall).strftime("%Y-%m-%d %H:%M")
-        if http.last_success_wall
-        else "—"
+    names = (
+        list(providers.names())
+        if providers is not None and hasattr(providers, "names")
+        else [settings.provider]
     )
-    await message.answer(
-        strings.admin_status(
+    sections = []
+    for name in names:
+        last_run = discovery.provider_last_run.get(name) if discovery is not None else None
+        last_error = discovery.provider_last_error.get(name) if discovery is not None else None
+        events = discovery.provider_events.get(name, 0) if discovery is not None else 0
+        sections.append(
             {
-                "state": "عطل" if http.incident_open else "متصل",
-                "last_success": last,
-                "last_error": strings.reason_label(http.last_error or "")
-                if http.last_error
-                else "—",
+                "cinema": strings.cinema_name(name),
+                "last_success": (
+                    datetime.fromtimestamp(last_run).strftime("%Y-%m-%d %H:%M") if last_run else "—"
+                ),
+                "last_error": str(last_error) if last_error else "—",
+                "events": events,
+            }
+        )
+    await message.answer(
+        strings.admin_status_multi(
+            {
+                "sections": sections,
                 "breaker": http.circuit_state,
                 "targets": len(scheduler),
                 "affected": http.affected_hint,

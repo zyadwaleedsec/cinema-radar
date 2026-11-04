@@ -13,6 +13,13 @@ class UpstreamFormatError(RuntimeError):
     """The provider returned a page we could not understand."""
 
 
+#: Human-readable brand names, shown in the cinema picker and watch badges.
+PROVIDER_DISPLAY = {
+    "vox": "VOX",
+    "renaissance": "Renaissance",
+}
+
+
 class CinemaProvider(ABC):
     name: str = "base"
 

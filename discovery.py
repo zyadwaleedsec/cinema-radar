@@ -316,44 +316,53 @@ class DiscoveryJob:
         self._rng = rng or random.Random()
         self._on_admin_message = on_admin_message
         self._next_allowed: dict[str, float] = {}
-        self._next_coming_soon = 0.0
+        self._next_coming_soon: dict[str, float] = {}
         self.last_run: dict[str, float] = {}
         self.events_today = 0
         self.last_error: str | None = None
+        self.provider_last_run: dict[str, float] = {}
+        self.provider_last_error: dict[str, str] = {}
+        self.provider_events: dict[str, int] = {}
 
     async def run_once(
         self, now: float | None = None, branch_ids: Iterable[str] | None = None
     ) -> int:
         now = self._clock() if now is None else now
-        provider = self.providers.get(self.settings.provider)
-        try:
-            branches = await provider.get_branches()
-        except Exception as exc:
-            self.last_error = f"{type(exc).__name__}: {exc}"
-            logger.exception("Discovery could not list branches")
-            with i18n.use(i18n.admin_language()):
-                alert = strings.admin_discovery_branches_failed(exc)
-            await self._admin(alert)
-            return 0
-        upcoming = await self._upcoming_state(provider, now)
         wanted = set(branch_ids) if branch_ids is not None else None
         queued = 0
-        for branch in branches:
-            if wanted is not None and branch.id not in wanted:
-                continue
-            if not self._due(branch.id, now):
-                continue
-            self._mark_run(branch.id, now)
+        for provider_name in self.providers.names():
+            provider = self.providers.get(provider_name)
+            self.provider_last_run[provider_name] = now
             try:
-                queued += await self._process_branch(branch, provider, now, upcoming)
+                branches = await provider.get_branches()
             except Exception as exc:
                 self.last_error = f"{type(exc).__name__}: {exc}"
-                logger.exception("Discovery failed for %s", branch.id)
+                self.provider_last_error[provider_name] = self.last_error
+                logger.exception("Discovery could not list branches for %s", provider_name)
                 with i18n.use(i18n.admin_language()):
-                    alert = strings.admin_discovery_branch_failed(branch.name, exc)
+                    alert = strings.admin_discovery_branches_failed(exc)
                 await self._admin(alert)
-        if upcoming is not None:
-            await self._save_upcoming(upcoming, now)
+                continue
+            self.provider_last_error.pop(provider_name, None)
+            upcoming = await self._upcoming_state(provider, now)
+            for branch in branches:
+                if wanted is not None and branch.id not in wanted:
+                    continue
+                if not self._due(branch.id, now):
+                    continue
+                self._mark_run(branch.id, now)
+                try:
+                    queued += await self._process_branch(branch, provider, now, upcoming)
+                except Exception as exc:
+                    self.last_error = f"{type(exc).__name__}: {exc}"
+                    self.provider_last_error[provider_name] = self.last_error
+                    logger.exception("Discovery failed for %s", branch.id)
+                    with i18n.use(i18n.admin_language()):
+                        alert = strings.admin_discovery_branch_failed(branch.name, exc)
+                    await self._admin(alert)
+            self.provider_events[provider_name] = self.provider_events.get(provider_name, 0)
+            if upcoming is not None:
+                await self._save_upcoming(upcoming, now, provider)
         return queued
 
     def _due(self, branch_id: str, now: float) -> bool:
@@ -369,11 +378,12 @@ class DiscoveryJob:
     async def _upcoming_state(self, provider: Any, now: float) -> _UpcomingState | None:
         if not hasattr(provider, "get_coming_soon"):
             return None
-        row = await self.db.get_known_state(COMING_SOON_STATE)
+        state_key = f"{COMING_SOON_STATE}:{provider.name}"
+        row = await self.db.get_known_state(state_key)
         state = _UpcomingState.from_payload(json.loads(row["payload"])) if row is not None else None
-        if state is not None and now < self._next_coming_soon:
+        if state is not None and now < self._next_coming_soon.get(provider.name, 0.0):
             return state
-        self._next_coming_soon = now + self.settings.coming_soon_interval
+        self._next_coming_soon[provider.name] = now + self.settings.coming_soon_interval
         baseline = state is None
         try:
             movies = await provider.get_coming_soon(force_refresh=True)
@@ -381,7 +391,7 @@ class DiscoveryJob:
             logger.exception("Discovery could not fetch Coming Soon")
             # Retry on the next discovery pass instead of waiting a full hour
             # with no baseline.
-            self._next_coming_soon = 0.0
+            self._next_coming_soon[provider.name] = 0.0
             return state
         if baseline:
             state = _UpcomingState(
@@ -406,8 +416,9 @@ class DiscoveryJob:
                     payload[field] = value
         return state
 
-    async def _save_upcoming(self, state: _UpcomingState, now: float) -> None:
-        await self.db.set_known_state(COMING_SOON_STATE, json.dumps(state.to_payload()), now)
+    async def _save_upcoming(self, state: _UpcomingState, now: float, provider: Any) -> None:
+        state_key = f"{COMING_SOON_STATE}:{provider.name}"
+        await self.db.set_known_state(state_key, json.dumps(state.to_payload()), now)
 
     async def _enrich(self, provider: Any, events: list[DiscoveryEvent]) -> list[DiscoveryEvent]:
         if not events or not hasattr(provider, "get_movie_details"):
@@ -449,10 +460,10 @@ class DiscoveryJob:
             for movie in overview.movies:
                 if movie.id in upcoming.movies or movie.slug in upcoming.movies:
                     upcoming_ids.add(movie.id)
-        row = await self.db.get_known_state(branch.id)
+        row = await self.db.get_known_state(state_key := f"{provider.name}:{branch.id}")
         if row is None:
             current.flap = {}
-            await self._save_state(branch.id, current, now)
+            await self._save_state(state_key, current, now)
             logger.info("Discovery baseline stored for %s", branch.name)
             return 0
 
@@ -469,7 +480,7 @@ class DiscoveryJob:
         release_events = upcoming_release_events(overview, upcoming)
         events = diff_events + release_events
         if not events:
-            await self._save_state(branch.id, next_state, now)
+            await self._save_state(state_key, next_state, now)
             return 0
 
         # Confirm with a second read.  By default this re-reads the provider
@@ -487,7 +498,7 @@ class DiscoveryJob:
                 )
         except Exception:
             logger.warning("Discovery confirmation failed for %s", branch.id)
-            await self._save_state(branch.id, next_state, now)
+            await self._save_state(state_key, next_state, now)
             return 0
 
         confirmed_state = build_state(confirmed_overview)
@@ -530,7 +541,10 @@ class DiscoveryJob:
         if published and self.broadcaster is not None:
             await self.broadcaster.enqueue_events(published)
         self.events_today += len(published)
-        await self._save_state(branch.id, final_state, now)
+        self.provider_events[provider.name] = self.provider_events.get(provider.name, 0) + len(
+            published
+        )
+        await self._save_state(state_key, final_state, now)
         logger.info(
             "Discovery %s: %s events, %s published, %s dropped",
             branch.name,

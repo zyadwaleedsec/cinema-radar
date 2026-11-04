@@ -23,7 +23,8 @@ has one button that opens the cinema's own booking page.
 - 🎯 **Watch one showtime, a whole movie/day, or every open day at a branch.**
 - 🎭 **Filter by format** — IMAX, 4DX, VIP, MAX, DBOX, 3D and whatever the
   provider lists.
-- 🏢 **Two cinemas** — VOX or Renaissance, selected with `PROVIDER` in `.env`.
+- 🏢 **Two cinemas** — VOX and Renaissance run together; pick one in-app, or
+  limit to a single cinema with `PROVIDERS` in `.env`.
 - 🔔 **Instant alerts** when booking opens, seats come back, or new showtimes appear.
 - 🆕 **Optional release alerts** for new movies, new dates and Coming Soon titles.
 - 🔎 **Search in Arabic or English**, typos included (سبايدر مان → Spider-Man).
@@ -39,7 +40,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v2.1.0** — see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v2.2.0** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -78,7 +79,8 @@ Open `.env` and set these values:
 | `BOT_TOKEN` | the token from @BotFather (required) |
 | `ADMIN_ID` | your numeric Telegram id (from @userinfobot) |
 | `DONATION_PHONE` | optional; the Vodafone Cash / InstaPay number users see |
-| `PROVIDER` | `vox` (default) or `renaissance` |
+| `PROVIDERS` | comma-separated cinemas, default `vox,renaissance` |
+| `PROVIDER` | fallback brand for single-cinema mode |
 
 Without `ADMIN_ID`, admin commands and admin alerts stay disabled; without
 `DONATION_PHONE`, the manual donation flow is hidden.

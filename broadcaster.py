@@ -127,12 +127,13 @@ class Broadcaster:
     def _filter_events(
         self, sub: dict[str, Any], events: list[DiscoveryEvent]
     ) -> list[DiscoveryEvent]:
-        branch_ids = json_list(sub.get("branch_ids"))
+        branch_ids = set(json_list(sub.get("branch_ids")))
         event_types = json_list(sub.get("event_types"))
         hall = format_key(sub.get("hall_type")) if sub.get("hall_type") else "*"
         result = []
         for event in events:
-            if branch_ids and event.branch.id not in branch_ids:
+            candidates = {event.branch.id, f"{event.branch.provider}:{event.branch.id}"}
+            if branch_ids and not (branch_ids & candidates):
                 continue
             if event_types and event.kind not in event_types:
                 continue
@@ -190,6 +191,7 @@ class Broadcaster:
             first.date or today_iso(self.settings.timezone),
             first.movie.id,
             first.movie.name,
+            first.branch.provider,
         )
         keyboard = discovery_keyboard(
             token=token,

@@ -21,6 +21,7 @@ from keyboards import (
     WATCH_PAGE_SIZE,
     back_home_keyboard,
     branch_keyboard,
+    cinema_keyboard,
     confirm_keyboard,
     date_keyboard,
     movie_info_keyboard,
@@ -47,6 +48,7 @@ router = Router(name="watches")
 
 
 class AddWatch(StatesGroup):
+    cinema = State()
     branch = State()
     date = State()
     movie = State()
@@ -68,10 +70,40 @@ async def _ack(callback: CallbackQuery) -> None:
 async def _branches(cache: Any, settings: Settings, provider: Any) -> list[dict[str, Any]]:
     # Read through the provider: it serves the cache first and only fetches
     # when the cache is empty/stale, so the menu still opens after a restart.
+    provider_name = getattr(provider, "name", None) or settings.provider
     branches = [b.__dict__ for b in await provider.get_branches()]
     if not branches:
-        branches = await _cached(cache, branches_key(settings.provider), settings.cache_static_ttl)
+        branches = await _cached(cache, branches_key(provider_name), settings.cache_static_ttl)
     return branches
+
+
+def _provider_names(providers: Any, provider: Any) -> list[str]:
+    if providers is not None and hasattr(providers, "names"):
+        return list(providers.names())
+    return [getattr(provider, "name", None) or "vox"]
+
+
+def _selected_provider(providers: Any, provider: Any, data: dict[str, Any]) -> Any:
+    name = data.get("provider_name")
+    if name and providers is not None and hasattr(providers, "get"):
+        try:
+            return providers.get(name)
+        except Exception:
+            pass
+    return provider
+
+
+def _parse_branch_suffix(
+    suffix: str, providers: Any, provider: Any, settings: Settings
+) -> tuple[str, str]:
+    """Split ``?start=b<provider>_<branch>``; legacy ``b<branch>`` defaults to VOX."""
+
+    known = _provider_names(providers, provider)
+    for name in known:
+        prefix = f"{name}_"
+        if suffix.startswith(prefix):
+            return name, suffix[len(prefix) :]
+    return getattr(provider, "name", None) or settings.provider, suffix
 
 
 def _has_imax(showtimes: list[Showtime]) -> bool:
@@ -153,14 +185,23 @@ async def add_start(
     cache: Any,
     settings: Settings,
     provider: Any,
+    providers: Any = None,
 ) -> None:
     await _ack(callback)
-    await edit(callback, strings.loading_branches(), back_home_keyboard())
-    branches = await _begin_add(state, cache, settings, provider)
-    if not branches:
-        await edit(callback, strings.no_data(), retry_keyboard("menu:add"))
+    if len(_provider_names(providers, provider)) <= 1:
+        await edit(callback, strings.loading_branches(), back_home_keyboard())
+        branches = await _begin_add(state, cache, settings, provider)
+        if not branches:
+            await edit(callback, strings.no_data(), retry_keyboard("menu:add"))
+            return
+        await edit(callback, strings.choose_branch(), branch_keyboard(branches))
         return
-    await edit(callback, strings.choose_branch(), branch_keyboard(branches))
+    await state.clear()
+    await state.set_state(AddWatch.cinema)
+    await state.update_data(search_first=False, pending_query="")
+    await edit(
+        callback, strings.choose_cinema(), cinema_keyboard(_provider_names(providers, provider))
+    )
 
 
 @router.message(Command("search"))
@@ -170,17 +211,26 @@ async def search_cmd(
     cache: Any,
     settings: Settings,
     provider: Any,
+    providers: Any = None,
 ) -> None:
     parts = (message.text or "").split(maxsplit=1)
     query = search.clean_query(parts[1]) if len(parts) > 1 else ""
-    branches = await _begin_add(state, cache, settings, provider, search_first=True)
-    if not branches:
-        await message.answer(strings.no_data(), reply_markup=retry_keyboard("menu:search"))
+    if len(_provider_names(providers, provider)) <= 1:
+        branches = await _begin_add(state, cache, settings, provider, search_first=True)
+        if not branches:
+            await message.answer(strings.no_data(), reply_markup=retry_keyboard("menu:search"))
+            return
+        if query:
+            await state.update_data(pending_query=query)
+        await message.answer(
+            strings.search_choose_branch(query), reply_markup=branch_keyboard(branches)
+        )
         return
-    if query:
-        await state.update_data(pending_query=query)
+    await state.clear()
+    await state.set_state(AddWatch.cinema)
+    await state.update_data(search_first=True, pending_query=query)
     await message.answer(
-        strings.search_choose_branch(query), reply_markup=branch_keyboard(branches)
+        strings.choose_cinema(), reply_markup=cinema_keyboard(_provider_names(providers, provider))
     )
 
 
@@ -191,12 +241,21 @@ async def add_cmd(
     cache: Any,
     settings: Settings,
     provider: Any,
+    providers: Any = None,
 ) -> None:
-    branches = await _begin_add(state, cache, settings, provider)
-    if not branches:
-        await send(message, strings.no_data(), retry_keyboard("menu:add"))
+    if len(_provider_names(providers, provider)) <= 1:
+        branches = await _begin_add(state, cache, settings, provider)
+        if not branches:
+            await send(message, strings.no_data(), retry_keyboard("menu:add"))
+            return
+        await send(message, strings.choose_branch(), branch_keyboard(branches))
         return
-    await send(message, strings.choose_branch(), branch_keyboard(branches))
+    await state.clear()
+    await state.set_state(AddWatch.cinema)
+    await state.update_data(search_first=False, pending_query="")
+    await send(
+        message, strings.choose_cinema(), cinema_keyboard(_provider_names(providers, provider))
+    )
 
 
 @router.callback_query(F.data == "menu:search")
@@ -206,14 +265,52 @@ async def search_menu(
     cache: Any,
     settings: Settings,
     provider: Any,
+    providers: Any = None,
 ) -> None:
     await _ack(callback)
-    await edit(callback, strings.loading_branches(), back_home_keyboard())
-    branches = await _begin_add(state, cache, settings, provider, search_first=True)
-    if not branches:
-        await edit(callback, strings.no_data(), retry_keyboard("menu:search"))
+    if len(_provider_names(providers, provider)) <= 1:
+        await edit(callback, strings.loading_branches(), back_home_keyboard())
+        branches = await _begin_add(state, cache, settings, provider, search_first=True)
+        if not branches:
+            await edit(callback, strings.no_data(), retry_keyboard("menu:search"))
+            return
+        await edit(callback, strings.search_choose_branch(), branch_keyboard(branches))
         return
-    await edit(callback, strings.search_choose_branch(), branch_keyboard(branches))
+    await state.clear()
+    await state.set_state(AddWatch.cinema)
+    await state.update_data(search_first=True, pending_query="")
+    await edit(
+        callback, strings.choose_cinema(), cinema_keyboard(_provider_names(providers, provider))
+    )
+
+
+@router.callback_query(AddWatch.cinema, F.data.startswith("pr:"))
+async def cinema_chosen(
+    callback: CallbackQuery,
+    state: FSMContext,
+    cache: Any,
+    settings: Settings,
+    provider: Any,
+    providers: Any = None,
+) -> None:
+    name = split_cb(callback.data, 2)[1]
+    if name not in _provider_names(providers, provider):
+        await answer(callback, strings.error_expired(), alert=True)
+        return
+    selected = _selected_provider(providers, provider, {"provider_name": name})
+    await _ack(callback)
+    await edit(callback, strings.loading_branches(), back_home_keyboard())
+    data = await state.get_data()
+    search_first = data.get("search_first", False)
+    pending_query = data.get("pending_query", "")
+    branches = await _branches(cache, settings, selected)
+    if not branches:
+        await edit(callback, strings.no_data(), retry_keyboard("menu:add"))
+        return
+    await state.update_data(provider_name=name, branches=branches)
+    await state.set_state(AddWatch.branch)
+    text = strings.search_choose_branch(pending_query) if search_first else strings.choose_branch()
+    await edit(callback, text, branch_keyboard(branches, back_cb="ab:cinema"))
 
 
 @router.callback_query(AddWatch.branch, F.data.startswith("br_p:"))
@@ -237,19 +334,22 @@ async def branch_chosen(
     cache: Any,
     settings: Settings,
     provider: Any,
+    providers: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
+    provider = _selected_provider(providers, provider, data)
     branches = data.get("branches", [])
     index = int_part(callback.data, 1, 2) or 0
     if not (0 <= index < len(branches)):
         await answer(callback, strings.error_expired(), alert=True)
         return
     branch = branches[index]
+    provider_name = getattr(provider, "name", None) or settings.provider
     dates = await provider.get_dates(branch["id"])
     if not dates:
         dates = await _cached(
-            cache, dates_key(settings.provider, branch["id"]), settings.cache_listings_ttl
+            cache, dates_key(provider_name, branch["id"]), settings.cache_listings_ttl
         )
     if not dates:
         await edit(callback, strings.no_dates(), retry_keyboard(f"br:{index}"))
@@ -280,9 +380,11 @@ async def date_chosen(
     cache: Any,
     settings: Settings,
     provider: Any,
+    providers: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
+    provider = _selected_provider(providers, provider, data)
     dates = data.get("dates", [])
     branch = data.get("branch", {})
     index = int_part(callback.data, 1, 2) or 0
@@ -290,6 +392,7 @@ async def date_chosen(
         await answer(callback, strings.error_expired(), alert=True)
         return
     chosen = dates[index]
+    provider_name = getattr(provider, "name", None) or settings.provider
     # The day the user picked may never have been fetched before (discovery
     # only reads the default day).  Fetch it once, on demand, through the
     # shared rate-limited client, then cache it like any other page.
@@ -297,7 +400,7 @@ async def date_chosen(
     if not movies:
         movies = await _cached(
             cache,
-            movies_key(settings.provider, branch["id"], chosen),
+            movies_key(provider_name, branch["id"], chosen),
             settings.cache_listings_ttl,
         )
     if not movies:
@@ -388,7 +491,12 @@ async def show_all_movies(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.callback_query(F.data.startswith("ab:"))
-async def add_back(callback: CallbackQuery, state: FSMContext) -> None:
+async def add_back(
+    callback: CallbackQuery,
+    state: FSMContext,
+    provider: Any = None,
+    providers: Any = None,
+) -> None:
     """Move one step back without making a new upstream request."""
 
     await answer(callback)
@@ -400,6 +508,14 @@ async def add_back(callback: CallbackQuery, state: FSMContext) -> None:
     dates = data.get("dates", [])
     movies = data.get("movies", [])
     movie = data.get("movie", {})
+    if target == "cinema":
+        await state.set_state(AddWatch.cinema)
+        await edit(
+            callback,
+            strings.choose_cinema(),
+            cinema_keyboard(_provider_names(providers, provider)),
+        )
+        return
     if target == "branch" and branches:
         await state.set_state(AddWatch.branch)
         text = (
@@ -407,7 +523,8 @@ async def add_back(callback: CallbackQuery, state: FSMContext) -> None:
             if data.get("search_first")
             else strings.choose_branch()
         )
-        await edit(callback, text, branch_keyboard(branches))
+        back_cb = "ab:cinema" if data.get("provider_name") else None
+        await edit(callback, text, branch_keyboard(branches, back_cb=back_cb))
         return
     if target == "date" and branch and dates:
         await state.set_state(AddWatch.date)
@@ -530,9 +647,11 @@ async def movie_chosen(
     provider: Any,
     db: Database,
     imax: Any = None,
+    providers: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
+    provider = _selected_provider(providers, provider, data)
     view = data.get("movie_view")
     movies = view if view is not None else data.get("movies", [])
     branch = data.get("branch", {})
@@ -542,11 +661,12 @@ async def movie_chosen(
         await answer(callback, strings.error_expired(), alert=True)
         return
     movie = movies[index]
+    provider_name = getattr(provider, "name", None) or settings.provider
     showtimes = list(await provider.get_showtimes(branch["id"], date, movie_id=movie["id"]))
     if not showtimes:
         raw = await _cached(
             cache,
-            showtimes_key(settings.provider, branch["id"], date),
+            showtimes_key(provider_name, branch["id"], date),
             settings.cache_showtimes_ttl,
         )
         fallback = [Showtime.from_dict(item) for item in (raw or [])]
@@ -560,7 +680,7 @@ async def movie_chosen(
         )
         return
     movie = dict(movie)
-    status = await _imax_status(db, imax, movie, showtimes)
+    status = await _imax_status(db, imax, movie, showtimes) if provider_name == "vox" else None
     if status:
         movie["imax_status"] = status
     await state.update_data(
@@ -637,9 +757,12 @@ async def show_movie_info(
     provider: Any,
     db: Database,
     imax: Any = None,
+    providers: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
+    provider = _selected_provider(providers, provider, data)
+    provider_name = getattr(provider, "name", None) or "vox"
     movie_data = data.get("movie", {})
     movie = Movie(**{name: movie_data.get(name) for name in Movie.__dataclass_fields__})
     details = movie
@@ -651,7 +774,7 @@ async def show_movie_info(
     facts = strings.movie_facts(details.duration_minutes, details.rating, details.language)
     showtimes = [Showtime.from_dict(item) for item in data.get("showtimes", [])]
     status = movie_data.get("imax_status")
-    if not status:
+    if not status and provider_name == "vox":
         status = await _imax_status(db, imax, movie_data, showtimes)
     text = strings.movie_info(
         details.name,
@@ -950,6 +1073,7 @@ def _watches_view(
                 watch.get("alert_mode"),
                 watch.get("snoozed_until"),
                 watch.get("scope"),
+                watch.get("provider"),
             )
         )
     lines += ["", strings.watches_retention_note(settings.watch_retention_days)]
@@ -1028,6 +1152,7 @@ async def _render_watch_detail(
             watch.get("alert_mode"),
             _snooze_clock(watch.get("snoozed_until"), settings),
             watch.get("scope"),
+            watch.get("provider"),
         ),
         watch_detail_keyboard(watch),
     )
@@ -1232,6 +1357,7 @@ async def send_watch_detail_message(
             watch.get("alert_mode"),
             _snooze_clock(watch.get("snoozed_until"), settings),
             watch.get("scope"),
+            watch.get("provider"),
         ),
         watch_detail_keyboard(watch),
     )
@@ -1243,25 +1369,31 @@ async def start_branch_deeplink(
     cache: Any,
     settings: Settings,
     provider: Any,
-    branch_id: str,
+    suffix: str,
     telegram_id: int | None = None,
+    providers: Any = None,
 ) -> bool:
-    """Jump straight to the date step of ``?start=b<branch>``."""
+    """Jump straight to the date step of ``?start=b<provider>_<branch>``.
 
-    branches = await _begin_add(state, cache, settings, provider)
+    Legacy links carry a bare ``?start=b<branch>`` and default to VOX.
+    """
+
+    provider_name, branch_id = _parse_branch_suffix(suffix, providers, provider, settings)
+    selected = _selected_provider(providers, provider, {"provider_name": provider_name})
+    branches = await _branches(cache, settings, selected)
     branch = next((item for item in branches if str(item.get("id")) == branch_id), None)
     if branch is None:
         return False
-    dates = await provider.get_dates(branch["id"])
+    dates = await selected.get_dates(branch["id"])
     if not dates:
         dates = await _cached(
-            cache, dates_key(settings.provider, branch["id"]), settings.cache_listings_ttl
+            cache, dates_key(provider_name, branch["id"]), settings.cache_listings_ttl
         )
     if not dates:
         await state.clear()
         await send(message, strings.no_dates(), back_home_keyboard())
         return True
-    await state.update_data(branch=branch, dates=dates)
+    await state.update_data(branch=branch, dates=dates, provider_name=provider_name)
     await state.set_state(AddWatch.date)
     await send(
         message,

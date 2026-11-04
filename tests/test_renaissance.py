@@ -252,8 +252,8 @@ def test_cinema_name_switches_to_renaissance():
     try:
         assert ar.cinema_name() == "رينيسانس"
         assert en.cinema_name() == "Renaissance"
-        assert "(رينيسانس)" in ar.onboard_intro("Zyad")
-        assert "(Renaissance)" in en.onboard_intro("Zyad")
+        assert ar.cinema_name("renaissance") == "رينيسانس"
+        assert en.cinema_name("renaissance") == "Renaissance"
         assert ar.format_place("renaissance / madinty") == "(رينيسانس) / madinty"
         assert en.format_place("renaissance / madinty") == "(Renaissance) / madinty"
     finally:

@@ -27,6 +27,7 @@ async def watch_from_discovery(
     cache,
     scheduler: Scheduler,
     provider: Any,
+    providers: Any = None,
 ) -> None:
     token = (callback.data or "").split(":", 1)[1]
     await loading(callback)
@@ -34,15 +35,20 @@ async def watch_from_discovery(
     if not action or int(action.get("user_id") or 0) != callback.from_user.id:
         await answer(callback, strings.error_generic(), alert=True)
         return
+    selected = provider
+    if providers is not None and hasattr(providers, "get"):
+        with contextlib.suppress(Exception):
+            selected = providers.get(action.get("provider") or settings.provider)
+    provider_name = getattr(selected, "name", None) or action.get("provider") or settings.provider
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     showtimes = list(
-        await provider.get_showtimes(
+        await selected.get_showtimes(
             action["branch_id"], action["date"], movie_id=action["movie_id"]
         )
     )
     if not showtimes:
         raw = await cache.get_json(
-            showtimes_key(settings.provider, action["branch_id"], action["date"]),
+            showtimes_key(provider_name, action["branch_id"], action["date"]),
             ttl=settings.cache_showtimes_ttl,
         )
         fallback = [Showtime.from_dict(item) for item in (raw or [])]
@@ -55,19 +61,19 @@ async def watch_from_discovery(
     # so the 7-day detail cache is keyed the same way as normal watches.
     movie = Movie(action["movie_id"], action["movie_name"], action["movie_id"])
     try:
-        listing = await provider.get_movies(action["branch_id"], action["date"])
+        listing = await selected.get_movies(action["branch_id"], action["date"])
     except Exception:
         listing = []
     match = next((m for m in listing if m.id == action["movie_id"]), None)
     if match is not None:
         movie = match
-    if hasattr(provider, "get_movie_details"):
+    if hasattr(selected, "get_movie_details"):
         with contextlib.suppress(Exception):
-            movie = await provider.get_movie_details(movie)
+            movie = await selected.get_movie_details(movie)
     try:
         await db.add_watch(
             user_id=int(user["id"]),
-            provider=settings.provider,
+            provider=provider_name,
             branch_id=action["branch_id"],
             branch_name=action["branch_name"],
             date=action["date"],
@@ -98,7 +104,7 @@ async def watch_from_discovery(
         await answer(callback, strings.duplicate_watch(), alert=True)
         return
     target = TargetKey(
-        provider=settings.provider,
+        provider=provider_name,
         branch_id=action["branch_id"],
         date=action["date"],
         movie_id=action["movie_id"],

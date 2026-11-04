@@ -50,6 +50,13 @@ def _env_choice(name: str, default: str, allowed: set[str]) -> str:
     return value if value in allowed else default
 
 
+def _parse_providers(raw: str) -> tuple[str, ...]:
+    """Parse the comma-separated ``PROVIDERS`` list; both cinemas by default."""
+
+    values = tuple(item.strip().lower() for item in raw.split(",") if item.strip())
+    return values or ("vox", "renaissance")
+
+
 @dataclass(frozen=True)
 class Settings:
     # ------------------------------------------------------------------ secrets
@@ -64,6 +71,7 @@ class Settings:
     log_level: str = "INFO"
     timezone: str = "Africa/Cairo"
     provider: str = "vox"
+    providers: tuple[str, ...] = ("vox", "renaissance")
     # auto: rich messages with automatic classic fallback; rich: always try;
     # classic: HTML + inline keyboards only.
     ui_renderer: str = "auto"
@@ -168,6 +176,7 @@ class Settings:
             log_level=_env("LOG_LEVEL", "INFO").upper(),
             timezone=_env("TIMEZONE", "Africa/Cairo"),
             provider=_env("PROVIDER", "vox").lower(),
+            providers=_parse_providers(_env("PROVIDERS", "")),
             ui_renderer=_env_choice("UI_RENDERER", "auto", {"auto", "rich", "classic"}),
             http_base_url=_env("VOX_BASE_URL", "https://egy.voxcinemas.com"),
             renaissance_base_url=_env("RENAISSANCE_BASE_URL", "https://rnscinemas.com"),

@@ -158,6 +158,9 @@ class Notifier:
     async def send_watch_alert(self, watch: dict[str, Any], event: Any) -> None:
         with i18n.use(watch.get("lang")):
             text, keyboard = self._watch_alert_payload(watch, event)
+            brand = strings.cinema_name(watch.get("provider")) if watch.get("provider") else ""
+            if brand:
+                text = f"🎬 ({brand})\n{text}"
         try:
             await self.sender.send(
                 int(watch["telegram_id"]), text, keyboard, photo_url=watch.get("poster_url")
@@ -242,6 +245,9 @@ class Notifier:
     async def send_watch_reminder(self, watch: dict[str, Any]) -> None:
         with i18n.use(watch.get("lang")):
             text = self._watch_reminder_text(watch)
+            brand = strings.cinema_name(watch.get("provider")) if watch.get("provider") else ""
+            if brand:
+                text = f"🎬 ({brand})\n{text}"
             keyboard = watch_alert_keyboard(
                 int(watch["id"]),
                 watch.get("booking_url"),

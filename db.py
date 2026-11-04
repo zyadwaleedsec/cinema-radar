@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS discovery_actions (
     date TEXT NOT NULL,
     movie_id TEXT NOT NULL,
     movie_name TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'vox',
     created_at TEXT NOT NULL
 );
 """
@@ -251,6 +252,7 @@ class Database:
             "CREATE INDEX IF NOT EXISTS idx_watches_expiry ON watches(active, expires_at)"
         )
         await self._ensure_column("discovery_actions", "user_id", "INTEGER")
+        await self._ensure_column("discovery_actions", "provider", "TEXT NOT NULL DEFAULT 'vox'")
         await self._ensure_column("donations", "approved_at", "TEXT")
         await self._ensure_column("donations", "approved_by", "INTEGER")
         await self._ensure_column("donations", "below_minimum", "INTEGER NOT NULL DEFAULT 0")
@@ -262,6 +264,7 @@ class Database:
             "CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status, created_at)"
         )
         await self._migrate_subscription_event_types()
+        await self._migrate_subscription_branch_ids()
 
     async def _migrate_subscription_event_types(self) -> None:
         """Add the Coming Soon release event to rows holding the old default.
@@ -284,6 +287,34 @@ class Database:
                 "UPDATE subscriptions SET event_types = ? WHERE id = ?",
                 (json.dumps(types, ensure_ascii=False), row["id"]),
             )
+
+    async def _migrate_subscription_branch_ids(self) -> None:
+        """Prefix legacy branch filters with ``vox:`` once.
+
+        Before multi-cinema support the branch filter stored plain branch ids
+        (all of which belonged to VOX).  New rows store ``provider:branch``
+        keys; upgrade existing rows in place behind a one-time marker.
+        """
+
+        if await self.get_meta("branch_ids_v2") == "done":
+            return
+        rows = await self.fetchall("SELECT id, branch_ids FROM subscriptions")
+        for row in rows:
+            try:
+                ids = json.loads(row["branch_ids"] or "[]")
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(ids, list):
+                continue
+            migrated = [
+                item if (isinstance(item, str) and ":" in item) else f"vox:{item}" for item in ids
+            ]
+            if migrated != ids:
+                await self.execute(
+                    "UPDATE subscriptions SET branch_ids = ? WHERE id = ?",
+                    (json.dumps(migrated, ensure_ascii=False), row["id"]),
+                )
+        await self.set_meta("branch_ids_v2", "done")
 
     async def _ensure_column(self, table: str, column: str, ddl: str) -> bool:
         columns = await self.fetchall(f"PRAGMA table_info({table})")
@@ -1094,16 +1125,27 @@ class Database:
         date: str,
         movie_id: str,
         movie_name: str,
+        provider: str = "vox",
     ) -> None:
         cutoff = (datetime.now(UTC) - timedelta(days=7)).isoformat(timespec="seconds")
         await self.execute("DELETE FROM discovery_actions WHERE created_at < ?", (cutoff,))
         await self.execute(
             """
             INSERT OR REPLACE INTO discovery_actions
-                (token, user_id, branch_id, branch_name, date, movie_id, movie_name, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (token, user_id, branch_id, branch_name, date, movie_id, movie_name, provider, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (token, user_id, branch_id, branch_name, date, movie_id, movie_name, utc_now_iso()),
+            (
+                token,
+                user_id,
+                branch_id,
+                branch_name,
+                date,
+                movie_id,
+                movie_name,
+                provider,
+                utc_now_iso(),
+            ),
         )
 
     async def get_discovery_action(self, token: str) -> dict[str, Any] | None:

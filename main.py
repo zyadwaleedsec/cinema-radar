@@ -102,18 +102,23 @@ async def run() -> None:
     notifier = Notifier(sender, db, settings)
     http = HttpClient(settings, cache, on_admin_message=notifier.send_admin)
     imax = None
-    if settings.provider == "vox":
+    if "vox" in settings.providers:
         try:
             imax = load_default_service(cache)
         except Exception:
             logger.exception("IMAX snapshot could not be loaded; the indicator is disabled")
             imax = None
-    provider = (
-        RenaissanceProvider(http, cache, settings)
-        if settings.provider == "renaissance"
-        else VoxProvider(http, cache, settings)
-    )
-    providers = ProviderRegistry([provider])
+
+    def _provider(name: str) -> Any:
+        return (
+            RenaissanceProvider(http, cache, settings)
+            if name == "renaissance"
+            else VoxProvider(http, cache, settings)
+        )
+
+    provider_objs = [_provider(name) for name in settings.providers]
+    provider = provider_objs[0]
+    providers = ProviderRegistry(provider_objs)
     scheduler = Scheduler(settings, time.time)
     broadcaster = Broadcaster(settings, db, sender)
     stats = StatsService(
@@ -166,6 +171,7 @@ async def run() -> None:
     dp["feedback"] = feedback
     dp["stats"] = stats
     dp["provider"] = provider
+    dp["providers"] = providers
     dp["discovery"] = discovery
     dp["imax"] = imax
     dp["http"] = http

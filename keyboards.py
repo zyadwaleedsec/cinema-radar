@@ -8,6 +8,7 @@ from typing import Any
 import i18n
 import strings
 from models import CANONICAL_FORMATS
+from providers.base import PROVIDER_DISPLAY
 
 try:  # pragma: no cover - exercised in production
     from aiogram.types import (
@@ -190,9 +191,27 @@ def _with_back(rows: list[list[Any]], back_cb: str) -> list[list[Any]]:
     return rows
 
 
-def branch_keyboard(branches: Iterable[Any], page: int = 0) -> Any:
+def cinema_keyboard(providers: list[str], current: str | None = None) -> Any:
+    """The cinema picker shown at the start of the add/search flow."""
+
+    rows = [
+        [
+            _btn(
+                ("✅ " if current == name else "") + f"🎬 {PROVIDER_DISPLAY.get(name, name)}",
+                f"pr:{name}",
+            )
+        ]
+        for name in providers
+    ]
+    rows.append([_btn(strings.BTN_HOME, "menu:home")])
+    return _markup(rows)
+
+
+def branch_keyboard(branches: Iterable[Any], page: int = 0, back_cb: str | None = None) -> Any:
     items = list(branches)
     rows, _ = paginate(items, page, "br", lambda b: str(_field(b, "name")))
+    if back_cb is not None:
+        rows = _with_back(rows, back_cb)
     return _markup(rows)
 
 
@@ -492,9 +511,13 @@ def branches_filter_keyboard(branches: list[Any], selected: list[str], page: int
     rows = []
     start = page * PAGE_SIZE
     for index, branch in enumerate(branches[start : start + PAGE_SIZE]):
-        branch_id = _field(branch, "id")
-        mark = "✅ " if branch_id in selected else ""
-        rows.append([_btn(f"{mark}{_field(branch, 'name')}", f"fb:{start + index}")])
+        provider = _field(branch, "provider") or "vox"
+        key = f"{provider}:{_field(branch, 'id')}"
+        mark = "✅ " if key in selected else ""
+        label = _field(branch, "name")
+        if label and provider in PROVIDER_DISPLAY:
+            label = f"{PROVIDER_DISPLAY[provider]} · {label}"
+        rows.append([_btn(f"{mark}{label}", f"fb:{start + index}")])
     if pages > 1:
         rows.append(_page_row(page, pages, f"fb_p:{page - 1}", f"fb_p:{page + 1}"))
     rows.append([_btn(strings.BTN_DONE, "fb:done")])

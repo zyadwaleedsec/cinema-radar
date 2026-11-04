@@ -7,6 +7,21 @@ Only formatting utilities live here.  Anything a user reads belongs in
 from __future__ import annotations
 
 import html
+from contextvars import ContextVar
+
+#: The cinema provider whose name is rendered by ``cinema_name()``.  An empty
+#: value means "use the configured default".
+_provider: ContextVar[str] = ContextVar("cinema_radar_provider", default="")
+
+
+def get_provider() -> str:
+    return _provider.get()
+
+
+def set_provider(name: object) -> str:
+    value = str(name or "").strip().lower()
+    _provider.set(value)
+    return value
 
 
 def esc(value: object) -> str:

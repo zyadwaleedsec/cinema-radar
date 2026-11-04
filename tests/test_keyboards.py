@@ -49,7 +49,7 @@ def test_movie_keyboard_accepts_models():
 
 def test_branches_filter_keyboard_marks_selected_dict():
     branches = [{"id": "a", "name": "فرع أ"}]
-    assert _texts(branches_filter_keyboard(branches, ["a"]))[0].startswith("✅")
+    assert _texts(branches_filter_keyboard(branches, ["vox:a"]))[0].startswith("✅")
 
 
 def test_showtime_keyboard_accepts_dicts_and_models():

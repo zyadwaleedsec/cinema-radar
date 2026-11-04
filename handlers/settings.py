@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import re
 from typing import Any
 
@@ -240,8 +241,27 @@ async def branches_menu(
     settings: Settings,
     cache: Any,
     state: FSMContext,
+    provider: Any,
+    providers: Any = None,
 ) -> None:
-    branches = await cache.get_json(branches_key(settings.provider), ttl=settings.cache_static_ttl)
+    names = (
+        list(providers.names())
+        if providers is not None and hasattr(providers, "names")
+        else [getattr(provider, "name", None) or settings.provider]
+    )
+    branches: list[dict[str, Any]] = []
+    for name in names:
+        provider_obj = (
+            providers.get(name) if providers is not None and hasattr(providers, "get") else provider
+        )
+        items = await cache.get_json(branches_key(name), ttl=settings.cache_static_ttl)
+        if not items:
+            with contextlib.suppress(Exception):
+                items = [b.__dict__ for b in await provider_obj.get_branches()]
+        for item in items or []:
+            item = dict(item)
+            item.setdefault("provider", name)
+            branches.append(item)
     if not branches:
         await edit(callback, strings.no_data())
         await answer(callback)
@@ -284,11 +304,14 @@ async def toggle_branch(callback: CallbackQuery, state: FSMContext) -> None:
     if not (0 <= index < len(branches)):
         await answer(callback, strings.error_generic(), alert=True)
         return
-    branch_id = branches[index]["id"]
-    if branch_id in selected:
-        selected.remove(branch_id)
+    branch = branches[index]
+    branch_id = branch["id"]
+    provider = branch.get("provider") or "vox"
+    key = f"{provider}:{branch_id}"
+    if key in selected:
+        selected.remove(key)
     else:
-        selected.append(branch_id)
+        selected.append(key)
     await state.update_data(selected_branches=selected)
     await edit(
         callback,

@@ -11,6 +11,29 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-04
+
+### Added
+
+- **Multi-cinema support**: VOX and Renaissance run together in one bot. A
+  cinema picker (`🎬`) opens before the add/search flow whenever more than one
+  provider is enabled, and branch filters are scoped per cinema.
+- `PROVIDERS=vox,renaissance` (comma-separated) chooses the enabled cinemas;
+  both are on by default. `PROVIDER` is kept for backward-compat as the
+  fallback brand in single-cinema mode.
+- Discovery now runs per provider (branches, Coming Soon and state are keyed
+  per cinema), and `/status` shows one section per enabled cinema plus the
+  shared circuit breaker.
+- Alerts, reminders and watch cards carry the cinema name (`(فوكس)` /
+  `(VOX)`, `(رينيسانس)` / `(Renaissance)`), including seats-back alerts that
+  are status-based for Renaissance.
+
+### Changed
+
+- Deep links now accept `?start=b<provider>_<branch>`; legacy `?start=b<branch>`
+  links still work and default to VOX.
+- Existing branch filters are migrated once from plain ids to `vox:<id>` keys.
+
 ## [2.1.0] - 2026-11-04
 
 ### Added
@@ -222,7 +245,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.6...v2.0.0

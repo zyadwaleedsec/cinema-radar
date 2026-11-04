@@ -70,7 +70,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (186 tests)
+├── tests/                  # pytest suite (191 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -240,10 +240,20 @@ silently hammering the site.
 
 ## Renaissance Cinemas provider
 
-Set `PROVIDER=renaissance` to run the same bot against
+Both cinemas run together by default (`PROVIDERS=vox,renaissance`). Set
+`PROVIDERS=renaissance` to run the same bot against only
 [`rnscinemas.com`](https://rnscinemas.com). The provider lives in
 `providers/renaissance.py` and implements the same `CinemaProvider` contract,
 so the watcher, scheduler, cache, alerts and discovery need no changes.
+
+### Multi-cinema
+
+`ProviderRegistry` holds one `CinemaProvider` per enabled cinema. The add and
+search flows show a cinema picker (`🎬`) first when more than one cinema is
+enabled, then the existing branch → date → movie → showtime steps. Branch ids
+are unique across the shipped providers, so branch filters, discovery state and
+deep links are keyed `provider:<branch>`. Legacy `?start=b<branch>` deep links
+and pre-migration branch filters default to VOX.
 
 ### Pages used
 
@@ -345,7 +355,8 @@ from `.env`. Secrets are only read from the environment.
 | `UI_RENDERER` | `auto` | `auto` = rich with classic fallback, `rich`, or `classic` |
 | `DB_PATH` | `cinemaradar.sqlite3` | SQLite file |
 | `TIMEZONE` | `Africa/Cairo` | Quiet hours, daily caps, stats |
-| `PROVIDER` | `vox` | `vox` or `renaissance` |
+| `PROVIDERS` | `vox,renaissance` | Comma-separated enabled cinemas |
+| `PROVIDER` | `vox` | Fallback brand for single-cinema mode |
 | `VOX_BASE_URL` | `https://egy.voxcinemas.com` | VOX provider base URL |
 | `RENAISSANCE_BASE_URL` | `https://rnscinemas.com` | Renaissance provider base URL |
 | `HTTP_IMPERSONATE` | empty | e.g. `chrome124` (needs `curl_cffi`) |
@@ -497,7 +508,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `186 passed`.
+Expected: `191 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.
@@ -619,7 +630,7 @@ The design intentionally keeps request volume very low (one global request per
 second, max two connections, jittered per-target intervals, conditional
 requests, caching, circuit breaker). Do not raise these limits to scrape
 aggressively. If a cinema asks you to stop, or changes its terms,
-**disable or remove the provider** (`PROVIDER` / `providers/vox.py` or
+**disable or remove the provider** (`PROVIDERS` / `providers/vox.py` or
 `providers/renaissance.py`) and keep the rest of the bot running with another
 provider.
 
