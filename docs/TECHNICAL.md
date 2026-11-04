@@ -67,7 +67,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (169 tests)
+├── tests/                  # pytest suite (170 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -108,7 +108,8 @@ catalog. The full rule set lives in `i18n/__init__.py`; the important parts are:
   the picker exactly once.
 - `LanguageMiddleware` runs before the rate limiter. It loads the user row, and
   for an unchosen user it shows the bilingual picker instead of running the
-  handler. The admin is exempt and defaults to Arabic.
+  handler. The operator sees the picker on `/start` as well; only the hidden
+  admin commands and donation decisions bypass it, defaulting to Arabic.
 - A deep link that arrives with the picker (`?start=b…`, `?start=w…`) is parked in
   `deeplinks.py` (in memory, 10 minutes) and resumed after the choice.
 - `strings.py` is a facade: `strings.dashboard(...)` resolves the active catalog
@@ -435,7 +436,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `169 passed`.
+Expected: `170 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

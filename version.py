@@ -12,7 +12,7 @@ more than one place: everything reads ``__version__`` from here.
 
 from __future__ import annotations
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 #: Displayed in ``/help``, the settings screen and the admin panel.
 VERSION = __version__

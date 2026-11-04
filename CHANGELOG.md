@@ -11,6 +11,16 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-04
+
+### Fixed
+
+- The operator account now sees the first-run language picker on `/start` too.
+  Previously the admin bypassed the gate entirely, so testing with the admin
+  account made it look like the picker never appeared.
+- Hidden admin commands (`/admin`, `/status`, `/grant`, `/revoke`, `/imax`) and
+  donation decisions still work before the admin picks a language.
+
 ## [1.1.1] - 2026-11-04
 
 ### Changed
@@ -79,7 +89,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/zyadwaleedsec/cinema-radar/releases/tag/v1.0.0

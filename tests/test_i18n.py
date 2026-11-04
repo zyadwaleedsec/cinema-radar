@@ -210,8 +210,29 @@ async def test_deep_link_payload_is_only_parked_until_language_is_chosen(db, tes
 
 
 @pytest.mark.asyncio
-async def test_admin_skips_the_gate_and_uses_arabic(db, test_settings):
-    event = _message(test_settings.admin_id)
+async def test_admin_sees_the_picker_on_start(db, test_settings):
+    event = _message(test_settings.admin_id, "/start")
+    called = False
+    answers: list[str] = []
+
+    async def handler(event, data):
+        nonlocal called
+        called = True
+
+    async def fake_answer(self, text, **kwargs):
+        answers.append(text)
+
+    gate = LanguageMiddleware(db, test_settings)
+    with patch.object(Message, "answer", fake_answer):
+        await gate(handler, event, {"event_from_user": event.from_user})
+
+    assert called is False
+    assert answers and "Choose your language" in answers[0]
+
+
+@pytest.mark.asyncio
+async def test_admin_keeps_hidden_commands_before_choosing(db, test_settings):
+    event = _message(test_settings.admin_id, "/status")
     called = False
 
     async def handler(event, data):

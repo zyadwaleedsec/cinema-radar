@@ -32,7 +32,7 @@ The interface is fully bilingual — **Egyptian Arabic** (default) and **America
 English** — and uses 100% inline buttons, no typing needed. You choose the
 language before anything else, and Settings (`/language`) changes it later.
 
-Current release: **v1.1.1** — see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v1.1.2** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

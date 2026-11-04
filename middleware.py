@@ -74,8 +74,9 @@ class LanguageMiddleware(BaseMiddleware):
     Runs before the rate limiter so even the "slow down" message is localized.
     A user with ``users.lang IS NULL`` (everyone on first run, including people
     who onboarded before English existed) only sees the bilingual picker until
-    they tap a language.  The admin is exempt and defaults to Arabic so the
-    hidden commands keep working.
+    they tap a language.  The operator sees the same picker on ``/start``; only
+    the hidden admin commands and donation decisions stay available before the
+    choice, defaulting to Arabic.
     """
 
     def __init__(self, db: Database, settings: Settings) -> None:
@@ -97,7 +98,7 @@ class LanguageMiddleware(BaseMiddleware):
         lang = row.get("lang")
         is_admin = bool(self.settings.admin_id) and user.id == self.settings.admin_id
 
-        if not lang and is_admin:
+        if not lang and is_admin and _is_admin_surface(event):
             lang = i18n.DEFAULT_LANGUAGE
 
         if not lang and not _is_language_choice(event):
@@ -116,6 +117,21 @@ class LanguageMiddleware(BaseMiddleware):
 
 def _is_language_choice(event: TelegramObject) -> bool:
     return isinstance(event, CallbackQuery) and (event.data or "").startswith("lang:set:")
+
+
+# Surfaces that must keep working for the operator before a language is stored.
+# ``/start`` deliberately stays out so the admin sees the same first-run flow
+# as everyone else.
+_ADMIN_COMMANDS = {"/admin", "/status", "/grant", "/revoke", "/imax"}
+
+
+def _is_admin_surface(event: TelegramObject) -> bool:
+    if isinstance(event, Message):
+        head = (event.text or "").strip().split(maxsplit=1)[0].split("@", 1)[0].lower()
+        return head in _ADMIN_COMMANDS
+    if isinstance(event, CallbackQuery):
+        return (event.data or "").startswith("dn:")
+    return False
 
 
 def _remember_deeplink(message: Message) -> None:
