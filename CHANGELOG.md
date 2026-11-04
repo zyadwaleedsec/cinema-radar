@@ -11,6 +11,27 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-11-04
+
+### Fixed
+
+- Rich messages (the default renderer) now convert line breaks to `<br>`, so
+  every screen keeps its paragraphs, bullets and spacing instead of collapsing
+  into one dense block.
+
+### Changed
+
+- Rewrote the main screens — dashboard, add-watch steps, alerts, watch settings,
+  help, privacy, support, settings and the admin panel — with one idea per line,
+  blank-line sections and consistent separators.
+- Privacy copy now states exactly what is stored (including donation notes and
+  proof references) and that `/delete_me` clears the bot database, while
+  messages already delivered in Telegram stay in the chat.
+
+### Chore
+
+- Removed the leftover test watch from the local database before launch.
+
 ## [1.1.5] - 2026-11-04
 
 ### Changed
@@ -141,7 +162,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.5...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.6...HEAD
+[1.1.6]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.2...v1.1.3

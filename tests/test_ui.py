@@ -11,7 +11,7 @@ from aiogram.exceptions import TelegramBadRequest
 import keyboards
 import strings
 from handlers.watches import _watches_view
-from ui import Screen, render
+from ui import Screen, render, rich
 
 
 class FakeBot:
@@ -153,6 +153,13 @@ async def test_auto_mode_uses_rich_when_available():
     )
     assert "rich_message" in message.edited[0]
     assert render.rich_supported() is True
+
+
+def test_rich_messages_keep_paragraph_breaks():
+    built = rich.build(Screen(text="one\ntwo\n\nthree"))
+    if built is None:
+        pytest.skip("rich messages are unavailable")
+    assert built.html == "one<br>two<br><br>three"
 
 
 async def test_photo_card_edits_caption_in_place():

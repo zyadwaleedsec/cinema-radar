@@ -26,14 +26,15 @@ has one button that opens the cinema's own booking page.
 - 🔎 **Search in Arabic or English**, typos included (سبايدر مان → Spider-Man).
 - 🎬 **Movie cards** with poster, duration, rating, language, synopsis and trailer.
 - 🌙 **Quiet hours**, per-watch alert modes, and a clean paged watch list.
-- 🔐 **Privacy first** — `/delete_me` removes everything; no cards, no phone numbers.
+- 🔐 **Privacy first** — `/delete_me` clears the bot's data; no card details, and
+  no phone number is ever required.
 
 The interface is fully bilingual — **Egyptian Arabic** (default) and **American
 English**. Almost every step is an inline button; you only type a movie name when
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v1.1.5** — see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v1.1.6** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -133,12 +134,17 @@ commands never appear in the public menu.
 
 ## Privacy
 
-Cinema Radar stores only what it needs to send your alerts: your Telegram id,
-your language and watch preferences, your watches, optional discovery filters,
-your supporter flag and any donation proof you send. It never stores card
-numbers, bank details, phone numbers or seat maps, and it never logs in to VOX.
+Cinema Radar stores what it needs to run: your Telegram id, language and
+preferences, your watches, optional discovery filters, your supporter flag, and
+any donation proof or feedback you send. It never asks for card or bank details,
+never requires a phone number, and never logs in to VOX.
 
-`/privacy` explains everything inside the bot; `/delete_me` erases it all.
+Anything you type yourself in a donation note or feedback — including a phone
+number or email — is stored exactly as you wrote it. `/delete_me` deletes every
+row the bot stored; messages and photos already delivered in Telegram remain in
+the chat.
+
+`/privacy` explains this inside the bot; `/delete_me` erases the bot's data.
 
 ---
 

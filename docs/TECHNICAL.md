@@ -67,7 +67,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (175 tests)
+├── tests/                  # pytest suite (176 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -443,7 +443,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `175 passed`.
+Expected: `176 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.
@@ -462,6 +462,10 @@ Configuration lives in [`pyproject.toml`](../pyproject.toml). `ruff` and
 ## UI QA checklist
 
 Run these once per release on a real Telegram client:
+
+Both renderers share the same HTML. The rich renderer is real HTML, so
+`ui/rich.py` converts newlines to `<br>`; without that every paragraph would
+collapse into a single line.
 
 - [ ] Arabic renders right-to-left; no clipped words at 320 px width.
 - [ ] English screens contain no Arabic text and no left-over RTL punctuation.
@@ -523,12 +527,16 @@ if you rely on alerts overnight.
 - Secrets live only in `.env`; `.env` is git-ignored.
 - SQL is parameterized; callback data and user input are validated.
 - Telegram errors are handled without leaking tracebacks to users.
-- Stored data is minimal: `telegram_id`, watches, subscription filters,
-  supporter flag, donations, and feedback text (with username only inside
-  feedback rows).
+- Stored data is minimal: `telegram_id`, language, watches, subscription
+  filters, supporter flag, donations (method, amount, note, proof reference),
+  and feedback text (with username only inside feedback rows).
 - `/delete_me` deletes the user row, watches, subscriptions, feedback, donations
-  and proof references; only anonymous counters (no personal data) remain.
-- No card numbers, bank details, phone numbers or seat-map data are stored.
+  and proof references from the bot's database; messages and photos already
+  delivered in Telegram remain in the chat. Only anonymous counters (no
+  personal data) remain.
+- Card numbers, bank details and seat maps are never requested or stored.
+  Free-text donation notes and feedback are stored as written, so a phone number
+  or email typed there is stored with that message.
 - The bot never logs in to VOX, never books, never pays, and never handles
   tickets.
 

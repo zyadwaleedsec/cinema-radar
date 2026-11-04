@@ -200,9 +200,9 @@ def dashboard(
     else:
         lines.append("مفيش مراقبات نشطة لسه — ابدأ بضغطة من تحت.")
     if next_watch:
-        lines.append(f"⏭️ أقرب مراقبة: {next_watch}")
+        lines += ["", "⏭️ <b>أقرب مراقبة</b>", next_watch]
     if limit:
-        lines.append(f"<i>حدك الحالي {limit} مراقبة.</i>")
+        lines += ["", f"<i>حدك الحالي {limit} مراقبة.</i>"]
     lines += ["", "اختار من تحت 👇"]
     return "\n".join(lines)
 
@@ -233,11 +233,11 @@ def dashboard_next(movie: str, branch: str, date: str, showtime: str, scope: str
         detail = format_time(showtime)
     else:
         detail = "كل الحفلات"
-    return f"<b>{esc(movie)}</b> — {esc(branch)} — {when} · {esc(detail)}"
+    return f"<b>{esc(movie)}</b>\n{esc(branch)} · {when} · {esc(detail)}"
 
 
 def step_header(step: int, total: int, path: str) -> str:
-    return f"<i>{step}/{total} · {esc(path)}</i>"
+    return f"<i>الخطوة {step} من {total}</i> · {esc(path)}"
 
 
 def page_label(page: int, pages: int) -> str:
@@ -287,76 +287,99 @@ def onboard_progress(step: int) -> str:
 
 def help_text() -> str:
     return (
-        "<b>إزاي تستخدم سينما رادار؟</b>\n\n"
-        "1. اضغط <b>➕ ضيف مراقبة</b>.\n"
-        "2. اختار الفرع، اليوم، الفيلم، والحفلة — أو راقب كل حفلات اليوم/كل الأيام، "
-        "واختار الفورمات لو عايز (IMAX، 4DX، VIP…).\n"
-        "3. أول ما الحجز يفتح أو ترجع كراسي هتوصلك رسالة فيها لينك الحجز.\n\n"
-        "من جوه التنبيه تقدر تفتح الحجز، تشيل المراقبة، أو تأجلها ساعة. "
-        "ومن <b>🎟️ مراقباتي</b> تظبط نوع التنبيه: كل حاجة، كراسي رجعت، أو فتح الحجز بس.\n\n"
-        "مش لاقي الفيلم؟ اضغط <b>🔎 دوّر بالاسم</b> واكتب جزء من الاسم "
-        "بالعربي أو الإنجليزي — البوت بيفهم الأخطاء الإملائية كمان.\n\n"
+        "🎬 <b>إزاي تستخدم سينما رادار؟</b>\n\n"
+        "<b>1 · ضيف مراقبة</b>\n"
+        "اضغط <b>➕ ضيف مراقبة</b>، وبعدها اختار:\n"
+        "• الفرع\n"
+        "• اليوم\n"
+        "• الفيلم\n"
+        "• الحفلة\n\n"
+        "أو راقب كل حفلات اليوم، أو كل الأيام المتاحة.\n"
+        "وتقدر تحدد فورمات معيّن زي IMAX أو 4DX أو VIP.\n\n"
+        "<b>2 · استنى التنبيه</b>\n"
+        "أول ما الحجز يفتح أو كرسي يرجع،\n"
+        "هتوصلك رسالة فيها لينك الحجز.\n\n"
+        "<b>3 · تحكم في التنبيهات</b>\n"
+        "من <b>🎟️ مراقباتي</b> تقدر:\n"
+        "• تختار نوع التنبيه\n"
+        "• تأجل التنبيه ساعة\n"
+        "• تشيل المراقبة\n\n"
+        "<b>مش لاقي فيلم؟</b>\n"
+        "اضغط <b>🔎 دوّر بالاسم</b> واكتب جزء من الاسم\n"
+        "بالعربي أو الإنجليزي.\n"
+        "البوت بيفهم الأخطاء الإملائية كمان.\n\n"
         "<b>أوامر مفيدة</b>\n"
-        "/start القائمة الرئيسية\n"
-        "/add ضيف مراقبة جديدة\n"
-        "/search دوّر على فيلم بالاسم\n"
-        "/watches مراقباتي\n"
-        "/settings الإعدادات\n"
-        "/help المساعدة\n"
-        "/privacy إيه البيانات اللي بنحفظها\n"
-        "/delete_me مسح بياناتك\n"
-        "/cancel إلغاء أي خطوة\n\n"
-        "⚠️ البوت غير رسمي وغير تابع لـ (فوكس سينما). البيانات ممكن تتأخر "
-        "أو تكون غلط، والحجز بيتم على موقع السينما نفسه.\n\n"
+        "/start — القائمة الرئيسية\n"
+        "/add — ضيف مراقبة\n"
+        "/search — دوّر على فيلم\n"
+        "/watches — مراقباتي\n"
+        "/settings — الإعدادات\n"
+        "/help — المساعدة\n"
+        "/privacy — الخصوصية\n"
+        "/delete_me — امسح بياناتي\n"
+        "/cancel — إلغاء الخطوة\n\n"
+        "⚠️ البوت غير رسمي وغير تابع لـ (فوكس سينما).\n"
+        "البيانات ممكن تتأخر أو تكون غلط،\n"
+        "والحجز بيتم على موقع السينما نفسه.\n\n"
         f"{version_line()}"
     )
 
 
 def privacy_text() -> str:
     return (
-        "<b>الخصوصية باختصار — واطمن</b>\n\n"
-        "مش محتاج تديني اسمك ولا رقم تليفونك ولا إيميلك. البوت بيعرفك "
-        "برقم تليجرام بس، وده اللي بيخليني أقدر أبعتلك التنبيه.\n\n"
-        "<b>اللي بحفظه:</b>\n"
-        "• المراقبات اللي إنت اختارتها (الفرع، اليوم، الفيلم، الحفلة).\n"
-        "• إعداداتك البسيطة، وإنك دعمت المشروع ولا لأ.\n"
-        "• لو بعت فيدباك، النص واسم المستخدم عشان أقدر أرد عليك.\n\n"
-        "<b>اللي مش بحفظه أبدًا:</b>\n"
-        "• أرقام كروت أو أي بيانات بنكية.\n"
-        "• رقم تليفونك أو إيميلك.\n"
-        "• محادثاتك مع أي حد تاني.\n\n"
-        "صور إثبات التحويل بتوصل للأدمن بس، وبتتشال مع بياناتك لو استخدمت /delete_me. "
-        "ومفيش حد بيشوف بياناتك غيرك — مش ببيعها ولا بشاركها مع أي طرف.\n\n"
-        "ولو حبيت تبدأ من الأول، /delete_me بيمسح كل حاجة عنك في ثانية."
+        "🔐 <b>الخصوصية باختصار</b>\n\n"
+        "البوت بيعرفك برقم تليجرام بس،\n"
+        "ومش بيطلب منك اسمك ولا إيميلك.\n\n"
+        "<b>اللي بيتحفظ</b>\n"
+        "• لغتك وإعداداتك.\n"
+        "• مراقباتك: الفرع، اليوم، الفيلم، الحفلة.\n"
+        "• لو دعمت المشروع:\n"
+        "  طريقة التحويل، المبلغ، وأي ملاحظة أو صورة إثبات.\n"
+        "• لو بعت فيدباك: النص واسم المستخدم لو موجود.\n\n"
+        "<b>اللي مش بنطلبه منك</b>\n"
+        "• بيانات كروت أو بنوك.\n"
+        "• رقم تليفون أو إيميل.\n\n"
+        "لو كتبت حاجة منهم بنفسك في ملاحظة تبرع أو فيدباك،\n"
+        "هتتحفظ زي ما كتبتها.\n\n"
+        "<b>مين بيشوفها؟</b>\n"
+        "الأدمن بس، عشان يرد على الفيدباك ويراجع إثبات التحويل.\n"
+        "مش بنبيع بياناتك ولا بنشاركها مع أي طرف تالت.\n\n"
+        "<b>حذف البيانات</b>\n"
+        "/delete_me بيمسح كل حاجة محفوظة في قاعدة بيانات البوت.\n"
+        "الرسائل والصور اللي اتبعتت على تليجرام\n"
+        "بتفضل في المحادثات."
     )
 
 
 # ------------------------------------------------------------------ add watch
 def choose_branch() -> str:
-    return f"{step_header(1, 5, 'الفرع')}\nاختار الفرع 🏢"
+    return f"{step_header(1, 5, 'الفرع')}\n\n<b>اختار الفرع</b> 🏢"
 
 
 def choose_date(branch: str) -> str:
-    return f"{step_header(2, 5, branch)}\nاختار اليوم 📅"
+    return f"{step_header(2, 5, branch)}\n\n<b>اختار اليوم</b> 📅"
 
 
 def choose_movie(branch: str, date: str) -> str:
     path = f"{branch} › {relative_date(date)}"
-    return f"{step_header(3, 5, path)}\nاختار الفيلم 🎞️\nمش لاقيه؟ اضغط <b>🔎 دوّر بالاسم</b>."
+    return (
+        f"{step_header(3, 5, path)}\n\n<b>اختار الفيلم</b> 🎞️\nمش لاقيه؟ اضغط <b>🔎 دوّر بالاسم</b>."
+    )
 
 
 def search_choose_branch(query: str = "") -> str:
-    head = f"{step_header(2, 5, 'بحث')}\n"
+    head = f"{step_header(2, 5, 'بحث')}\n\n"
     if query:
-        return f"{head}هندور على «<b>{esc(query)}</b>» 🔎\nاختار الفرع الأول:"
-    return f"{head}بحث عن فيلم 🔎\nاختار الفرع الأول:"
+        return f"{head}هندور على «<b>{esc(query)}</b>» 🔎\n\nاختار الفرع الأول:"
+    return f"{head}<b>بحث عن فيلم</b> 🔎\n\nاختار الفرع الأول:"
 
 
 def search_prompt(branch: str, date: str) -> str:
     path = f"{branch} › {relative_date(date)}"
     return (
         f"{step_header(3, 5, path)}\n\n"
-        "اكتب اسم الفيلم بالعربي أو الإنجليزي 🔎\n"
+        "<b>اكتب اسم الفيلم</b> 🔎\n"
+        "بالعربي أو الإنجليزي.\n"
         "مش مشكلة لو فيه غلطة إملائية — جرّب جزء من الاسم بس."
     )
 
@@ -367,31 +390,38 @@ def search_too_short() -> str:
 
 def search_results(query: str, count: int, total: int) -> str:
     return (
-        f"نتائج البحث عن «<b>{esc(query)}</b>» — "
-        f"<b>{count}</b> من {total} فيلم\n"
+        f"🔎 <b>نتائج البحث</b>\n\n"
+        f"«<b>{esc(query)}</b>»\n"
+        f"<b>{count}</b> من {total} فيلم\n\n"
         "اختار الفيلم اللي عايزه:"
     )
 
 
 def search_no_results(query: str, suggestions: list[str] | None = None) -> str:
-    lines = [f"مفيش فيلم قريب من «<b>{esc(query)}</b>» في اليوم ده."]
+    lines = [f"🔎 مفيش فيلم قريب من «<b>{esc(query)}</b>» في اليوم ده."]
     if suggestions:
-        lines.append("قصدك واحدة من دول؟ اضغط عليها 👇")
+        lines += ["", "قصدك واحدة من دول؟ اضغط عليها 👇"]
     else:
-        lines.append("جرّب جزء من الاسم، أو اكتبه بالإنجليزي، أو شوف كل الأفلام.")
+        lines += [
+            "",
+            "جرّب جزء من الاسم،\nأو اكتبه بالإنجليزي،\nأو شوف كل الأفلام.",
+        ]
     return "\n".join(lines)
 
 
 def choose_showtime(movie: str, date: str, extra: str = "") -> str:
     path = f"{relative_date(date)} › {movie}"
-    lines = [
-        step_header(4, 5, path),
-        "اختار الحفلة اللي عايز تراقبها 🎟️",
-        "«متاح» = ينفع تحجز دلوقتي، «الحجز مكتمل» = كله محجوز.",
-        "لو عايز فورمات معيّن (IMAX، 4DX، VIP…) اختار من الأزرار اللي فوق.",
-    ]
+    lines = [step_header(4, 5, path), ""]
     if extra:
-        lines.insert(1, extra)
+        lines += [extra, ""]
+    lines += [
+        "<b>اختار الحفلة اللي عايز تراقبها</b> 🎟️",
+        "",
+        "🟢 متاح — ينفع تحجز دلوقتي",
+        "🔴 الحجز مكتمل — كله محجوز",
+        "",
+        "لو عايز فورمات معيّن (IMAX، 4DX، VIP…)\nاختار من الأزرار اللي فوق.",
+    ]
     return "\n".join(lines)
 
 
@@ -529,25 +559,28 @@ def confirm_movie_watch(
 def watch_created_movie(
     branch: str, date: str, movie: str, count: int, hall: str | None = None
 ) -> str:
-    format_text = f" — {esc(hall)}" if hall else ""
+    format_text = f"\n🎭 {esc(hall)}" if hall else ""
     return (
-        "تمام ✅\n"
-        f"بنراقب <b>{esc(movie)}</b> — {relative_date(date)} — "
-        f"<b>{count}</b> حفلة{format_text} — {esc(branch)}.\n"
-        "أول ما أي حجز يفتح أو كراسي ترجع هتوصلك رسالة.\n\n"
-        "من <b>⚙️ إعدادات التنبيه</b> تقدر تختار: كل حاجة، كراسي رجعت، "
-        "أو فتح الحجز بس."
+        "✅ <b>تمت إضافة المراقبة</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)}{format_text}\n"
+        f"🎟️ كل الحفلات ({count} حفلة)\n\n"
+        "أول ما أي حجز يفتح أو كراسي ترجع،\n"
+        "هتوصلك رسالة.\n\n"
+        "تظبط نوع التنبيه من <b>⚙️ إعدادات التنبيه</b>."
     )
 
 
 def watch_created(branch: str, date: str, movie: str, time: str, hall: str) -> str:
     return (
-        "تمام ✅\n"
-        f"بنراقب <b>{esc(movie)}</b> — {relative_date(date)} — "
-        f"{format_time(time)} — {esc(hall)} — {esc(branch)}.\n"
-        "أول ما يحصل جديد هتوصلك رسالة.\n\n"
-        "من <b>⚙️ إعدادات التنبيه</b> تقدر تختار: كل حاجة، كراسي رجعت، "
-        "أو فتح الحجز بس."
+        "✅ <b>تمت إضافة المراقبة</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)} · {format_time(time)}\n"
+        f"🎭 {esc(hall)}\n\n"
+        "أول ما يحصل جديد، هتوصلك رسالة.\n\n"
+        "تظبط نوع التنبيه من <b>⚙️ إعدادات التنبيه</b>."
     )
 
 
@@ -566,13 +599,15 @@ def confirm_all_dates(branch: str, movie: str, count: int, hall: str | None = No
 
 
 def watch_created_all_dates(branch: str, movie: str, count: int, hall: str | None = None) -> str:
-    format_text = f" — {esc(hall)}" if hall else ""
+    format_text = f"\n🎭 {esc(hall)}" if hall else ""
     return (
-        "تمام ✅\n"
-        f"بنراقب <b>{esc(movie)}</b> في <b>{esc(branch)}</b>{format_text} — "
-        f"كل الأيام المتاحة ({count} يوم دلوقتي).\n"
-        "أي يوم جديد ينزل أو كراسي ترجع، هتوصلك رسالة.\n\n"
-        "من <b>⚙️ إعدادات التنبيه</b> تقدر تختار نوع التنبيه."
+        "✅ <b>تمت إضافة المراقبة</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}{format_text}\n"
+        f"📅 كل الأيام المتاحة ({count} يوم)\n\n"
+        "أي يوم جديد ينزل أو كراسي ترجع،\n"
+        "هتوصلك رسالة.\n\n"
+        "تظبط نوع التنبيه من <b>⚙️ إعدادات التنبيه</b>."
     )
 
 
@@ -588,13 +623,17 @@ def watch_limit_reached(
 ) -> str:
     if is_supporter:
         return (
-            f"وصلت للحد الأقصى ({limit} مراقبة).\n\n"
-            "امسح مراقبة قديمة من <b>مراقباتي</b> عشان تضيف واحدة جديدة."
+            "⚠️ <b>وصلت للحد الأقصى</b>\n\n"
+            f"عندك <b>{limit}</b> مراقبة.\n\n"
+            "امسح مراقبة قديمة من <b>مراقباتي</b>\n"
+            "عشان تضيف واحدة جديدة."
         )
     return (
-        f"وصلت للحد المجاني ({limit} مراقبة).\n\n"
-        f"لو عايز توصل لـ <b>{supporter_limit} مراقبات</b>، تقدر تدعم المشروع "
-        f"<b>مرة واحدة</b> بحد أدنى {min_amount} جنيه من <b>ادعم المشروع</b> 💛\n"
+        "⚠️ <b>وصلت للحد المجاني</b>\n\n"
+        f"عندك <b>{limit}</b> مراقبة، وهو الحد المجاني.\n\n"
+        f"لو عايز توصل لـ <b>{supporter_limit} مراقبات</b>،\n"
+        "تقدر تدعم المشروع <b>مرة واحدة</b>\n"
+        f"بحد أدنى <b>{min_amount} جنيه</b> من <b>ادعم المشروع</b> 💛\n\n"
         "أو امسح مراقبة قديمة من <b>مراقباتي</b>."
     )
 
@@ -647,7 +686,7 @@ def confirm_remove_watch(movie: str, when: str) -> str:
 
 def watches_page_title(count: int) -> str:
     label = "مراقبة" if count == 1 else "مراقبات"
-    return f"<b>🎟️ مراقباتي</b> — {count} {label} نشطة"
+    return f"🎟️ <b>مراقباتي</b> · {count} {label} نشطة"
 
 
 def watch_mode_label(mode: str | None) -> str:
@@ -682,7 +721,7 @@ def watch_row(
         ticket = f"🎟️ {format_time(time)} · {esc(hall)} · {esc(state)}"
     lines = [
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)} — {relative_date(date)}",
+        f"🏢 {esc(branch)} · {relative_date(date)}",
         ticket,
         f"🔔 {watch_mode_label(mode)}",
     ]
@@ -711,9 +750,9 @@ def watch_detail(
     else:
         ticket = f"🎟️ {format_time(time)} · {esc(hall)}"
     return (
-        "<b>إعدادات المراقبة ⚙️</b>\n\n"
+        "⚙️ <b>إعدادات المراقبة</b>\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)} — {relative_date(date)}\n"
+        f"🏢 {esc(branch)} · {relative_date(date)}\n"
         f"{ticket}\n\n"
         f"🔔 التنبيهات: <b>{watch_mode_label(mode)}</b>\n"
         f"{snooze}\n\n"
@@ -805,13 +844,15 @@ def watch_expired_row(movie: str, branch: str, date: str, showtime: str) -> str:
 def alert_booking_opened(
     movie: str, hall: str, time: str, branch: str, seats: int | None, date: str
 ) -> str:
-    seat_text = f" · {seats} كرسي متاح" if seats else ""
+    seat_text = f"\n🪑 {seats} كرسي متاح" if seats else ""
     return (
-        "🎟️ <b>فيه حجز اتفتح!</b>\n\n"
-        f"فيلم <b>{esc(movie)}</b>\n"
-        f"{esc(hall)} — {format_time(time)} — {esc(branch)} — {relative_date(date)}"
+        "🎟️ <b>الحجز فتح</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)} · {format_time(time)}\n"
+        f"🎭 {esc(hall)}"
         f"{seat_text}\n\n"
-        "الحق احجز قبل ما يتكمل!"
+        "الحق احجز قبل ما يتكمل."
     )
 
 
@@ -820,10 +861,12 @@ def alert_seats_available(
 ) -> str:
     seat_text = f"{seats} كرسي" if seats else "كرسي"
     return (
-        "🪑 <b>رجعت كراسي!</b>\n\n"
-        f"فيلم <b>{esc(movie)}</b>\n"
-        f"{esc(hall)} — {format_time(time)} — {esc(branch)} — {relative_date(date)}\n"
-        f"بقى فيه {seat_text} متاح دلوقتي.\n\n"
+        "🪑 <b>رجعت كراسي</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)} · {format_time(time)}\n"
+        f"🎭 {esc(hall)}\n\n"
+        f"بقى فيه <b>{seat_text}</b> متاح دلوقتي.\n\n"
         "الحق احجز 🏃"
     )
 
@@ -837,12 +880,15 @@ def alert_movie_booking_opened(
 ) -> str:
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
-    seat_text = f" · {seats} كرسي متاح" if seats else ""
+    seat_text = f"\n🪑 {seats} كرسي متاح" if seats else ""
     return (
-        "🎟️ <b>الحجز اتفتح لحفلات الفيلم!</b>\n\n"
-        f"فيلم <b>{esc(movie)}</b> — {esc(branch)} — {relative_date(date)}\n"
-        f"الحفلات: {joined}{more}{seat_text}\n\n"
-        "الحق احجز قبل ما يتكمل!"
+        "🎟️ <b>الحجز فتح لحفلات الفيلم</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)}\n"
+        f"🕐 {joined}{more}"
+        f"{seat_text}\n\n"
+        "الحق احجز قبل ما يتكمل."
     )
 
 
@@ -855,11 +901,14 @@ def alert_movie_seats_available(
 ) -> str:
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
-    seat_text = f" · بقى فيه {seats} كرسي" if seats else ""
+    seat_text = f"\n🪑 بقى فيه {seats} كرسي" if seats else ""
     return (
-        "🪑 <b>رجعت كراسي في حفلات الفيلم!</b>\n\n"
-        f"فيلم <b>{esc(movie)}</b> — {esc(branch)} — {relative_date(date)}\n"
-        f"الحفلات: {joined}{more}{seat_text}\n\n"
+        "🪑 <b>رجعت كراسي في حفلات الفيلم</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)}\n"
+        f"🕐 {joined}{more}"
+        f"{seat_text}\n\n"
         "الحق احجز 🏃"
     )
 
@@ -873,11 +922,14 @@ def alert_new_date(
 ) -> str:
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
-    hall_text = f" — {esc(hall)}" if hall else ""
+    hall_text = f"\n🎭 {esc(hall)}" if hall else ""
     return (
-        "🎬 <b>الفيلم نزل في يوم جديد!</b>\n\n"
-        f"فيلم <b>{esc(movie)}</b> — {esc(branch)} — {relative_date(date)}{hall_text}\n"
-        f"المواعيد: {joined}{more}\n\n"
+        "🎬 <b>الفيلم نزل في يوم جديد</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)}"
+        f"{hall_text}\n"
+        f"🕐 {joined}{more}\n\n"
         "افتح صفحة الحجز وشوف المتاح."
     )
 
@@ -886,9 +938,11 @@ def alert_new_showtimes(movie: str, branch: str, date: str, times: list[str]) ->
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
     return (
-        "🎬 <b>حفلات جديدة ظهرت!</b>\n\n"
-        f"فيلم <b>{esc(movie)}</b> — {esc(branch)} — {relative_date(date)}\n"
-        f"المواعيد: {joined}{more}\n\n"
+        "🎬 <b>حفلات جديدة ظهرت</b>\n\n"
+        f"🎬 <b>{esc(movie)}</b>\n"
+        f"🏢 {esc(branch)}\n"
+        f"📅 {relative_date(date)}\n"
+        f"🕐 {joined}{more}\n\n"
         "افتح صفحة الحجز وشوف المتاح."
     )
 
@@ -951,17 +1005,18 @@ def settings_text(
     hall = hall_type or "كل القاعات"
     watch_quiet = "بتشمل المراقبات ✅" if quiet_watches else "المراقبات شغالة دايماً 🔔"
     return (
-        "<b>⚙️ الإعدادات</b>\n\n"
+        "⚙️ <b>الإعدادات</b>\n\n"
         "<b>الإشعارات</b>\n"
         f"• رجوع الكراسي: {'مفعل ✅' if notify_cancellations else 'مقفول ⛔'}\n"
-        f"• ساعات الهدوء: {format_time(f'{quiet_start}:00')} ← {format_time(f'{quiet_end}:00')} ({watch_quiet})\n"
+        f"• ساعات الهدوء: من {format_time(f'{quiet_start}:00')} لـ {format_time(f'{quiet_end}:00')}\n"
+        f"  <i>{watch_quiet}</i>\n"
         f"• أفلام وحجوزات جديدة: {'مفعلة ✅' if discovery_enabled else 'مقفولة ⛔'}\n\n"
         "<b>فلاتر التنبيهات الجديدة</b>\n"
         f"• الفروع: {esc(branches)}\n"
         f"• الأنواع: {esc(types)}\n"
         f"• القاعة: {esc(hall)}\n"
-        f"• اللغة: {'العربية' if (language or 'ar') == 'ar' else 'English'}"
-        f"\n\n{version_line()}"
+        f"• اللغة: {'العربية' if (language or 'ar') == 'ar' else 'English'}\n\n"
+        f"{version_line()}"
     )
 
 
@@ -1017,11 +1072,15 @@ def event_type_label(kind: str) -> str:
 # -------------------------------------------------------------------- support
 def support_text(limit: int = 10, min_amount: int = 50) -> str:
     return (
-        "سينما رادار مجاني للكل، وكل مستخدم عنده <b>مراقبتين</b> مجانًا 💛\n\n"
-        "لو عايز تتابع أكتر، تقدر تدعم المشروع <b>مرة واحدة</b> "
-        f"بحد أدنى <b>{min_amount} جنيه</b> — وحدك يبقى <b>{limit} مراقبات</b> "
-        "على طول، مش اشتراك شهري.\n\n"
-        "التحويل فودافون كاش أو إنستاباي، وبعدها تبعت صورة الإثبات. "
+        "💛 <b>ادعم المشروع</b>\n\n"
+        "سينما رادار مجاني للكل،\n"
+        "وكل مستخدم عنده <b>مراقبتين</b> مجانًا.\n\n"
+        "لو عايز تتابع أكتر، تقدر تدعم المشروع <b>مرة واحدة</b>\n"
+        f"بحد أدنى <b>{min_amount} جنيه</b>،\n"
+        f"وحدك يبقى <b>{limit} مراقبات</b> على طول.\n"
+        "مش اشتراك شهري.\n\n"
+        "التحويل فودافون كاش أو إنستاباي،\n"
+        "وبعدها تبعت صورة الإثبات.\n"
         "الأدمن بيراجع الإثبات ويوافق.\n\n"
         "اختار طريقة الدعم:"
     )
@@ -1030,20 +1089,24 @@ def support_text(limit: int = 10, min_amount: int = 50) -> str:
 def support_manual_text(method: str, phone: str, min_amount: int = 50) -> str:
     name = "فودافون كاش" if method == "vodafone_cash" else "إنستاباي"
     return (
-        f"<b>دعم عن طريق {name}</b>\n\n"
-        f"حوّل على الرقم ده:\n<code>{esc(phone)}</code>\n\n"
-        f"الحد الأدنى <b>{min_amount} جنيه</b> — مرة واحدة مش اشتراك.\n"
-        "بعد التحويل اضغط <b>حوّلت ✅</b> وابعت صورة التحويل أو رقم العملية. "
-        "الأدمن هيراجع الإثبات، ولو اتقبل حدك هيبقى 10 مراقبات.\n\n"
+        f"💛 <b>دعم عن طريق {name}</b>\n\n"
+        "حوّل على الرقم ده:\n"
+        f"<code>{esc(phone)}</code>\n\n"
+        f"الحد الأدنى <b>{min_amount} جنيه</b> — مرة واحدة، مش اشتراك.\n\n"
+        "بعد التحويل اضغط <b>حوّلت ✅</b>،\n"
+        "وابعت صورة التحويل أو رقم العملية.\n"
+        "الأدمن هيراجع الإثبات،\n"
+        "ولو اتقبل حدك هيبقى <b>10 مراقبات</b>.\n\n"
         "⚠️ التحويل مش بيتفعل تلقائيًا."
     )
 
 
 def support_ask_amount(min_amount: int = 50) -> str:
     return (
-        "المبلغ اللي حوّلته كام؟ 💰\n"
-        f"الحد الأدنى {min_amount} جنيه.\n"
-        "اختار المبلغ أو اكتبه بالأرقام (مثال: 75)."
+        "💰 <b>المبلغ اللي حوّلته كام؟</b>\n\n"
+        f"الحد الأدنى <b>{min_amount} جنيه</b>.\n"
+        "اختار المبلغ من تحت،\n"
+        "أو اكتبه بالأرقام (مثال: 75)."
     )
 
 
@@ -1203,21 +1266,24 @@ def discovery_channel(event_text: str) -> str:
 # ---------------------------------------------------------------------- admin
 def admin_text(data: dict[str, object]) -> str:
     return (
-        "<b>لوحة الأدمن 🛠️</b>\n\n"
-        f"مستخدمين نشطين: <b>{data.get('active_users', 0)}</b>\n"
-        f"مراقبات نشطة: <b>{data.get('active_watches', 0)}</b>\n"
-        f"داعمين: <b>{data.get('supporters', 0)}</b>\n"
-        f"طلبات/دقيقة: <b>{data.get('requests_per_minute', 0):.1f}</b>\n"
-        f"نسبة الكاش: <b>{data.get('cache_hit_ratio', 0):.0%}</b>\n"
-        f"أهداف نشطة: <b>{data.get('active_targets', 0)}</b>\n"
-        f"معامل التباطؤ: <b>{data.get('slowdown_factor', 1):.2f}</b>\n"
-        f"قاطع الدائرة: <b>{esc(data.get('circuit_state', 'closed'))}</b>\n"
-        f"آخر طلب: <b>{esc(data.get('last_poll_status', '—'))}</b>\n"
-        f"آخر اكتشاف: <b>{esc(data.get('discovery_last_run', '—'))}</b>\n"
-        f"أحداث النهاردة: <b>{data.get('events_today', 0)}</b>\n"
-        f"بثوث: <b>{data.get('broadcasts_sent', 0)}</b>\n"
-        f"طول الطابور: <b>{data.get('queue_length', 0)}</b>\n"
-        f"الإصدار: <b>v{esc(__version__)}</b>"
+        "🛠️ <b>لوحة الأدمن</b>\n\n"
+        "<b>الناس</b>\n"
+        f"• مستخدمين نشطين: <b>{data.get('active_users', 0)}</b>\n"
+        f"• داعمين: <b>{data.get('supporters', 0)}</b>\n"
+        f"• مراقبات نشطة: <b>{data.get('active_watches', 0)}</b>\n\n"
+        "<b>الشبكة</b>\n"
+        f"• طلبات/دقيقة: <b>{data.get('requests_per_minute', 0):.1f}</b>\n"
+        f"• نسبة الكاش: <b>{data.get('cache_hit_ratio', 0):.0%}</b>\n"
+        f"• أهداف نشطة: <b>{data.get('active_targets', 0)}</b>\n"
+        f"• معامل التباطؤ: <b>{data.get('slowdown_factor', 1):.2f}</b>\n"
+        f"• قاطع الدائرة: <b>{esc(data.get('circuit_state', 'closed'))}</b>\n"
+        f"• آخر طلب: <b>{esc(data.get('last_poll_status', '—'))}</b>\n\n"
+        "<b>الاكتشاف والبث</b>\n"
+        f"• آخر اكتشاف: <b>{esc(data.get('discovery_last_run', '—'))}</b>\n"
+        f"• أحداث النهاردة: <b>{data.get('events_today', 0)}</b>\n"
+        f"• بثوث: <b>{data.get('broadcasts_sent', 0)}</b>\n"
+        f"• طول الطابور: <b>{data.get('queue_length', 0)}</b>\n\n"
+        f"<i>الإصدار v{esc(__version__)}</i>"
     )
 
 
@@ -1322,13 +1388,13 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 def admin_status(data: dict[str, object]) -> str:
     return (
-        "<b>حالة الاتصال بـ (فوكس)</b>\n\n"
-        f"الحالة: <b>{esc(data.get('state', '—'))}</b>\n"
-        f"آخر نجاح: {esc(data.get('last_success', '—'))}\n"
-        f"آخر خطأ: {esc(data.get('last_error', '—'))}\n"
-        f"قاطع الدائرة: <b>{esc(data.get('breaker', 'closed'))}</b>\n"
-        f"أهداف نشطة: <b>{data.get('targets', 0)}</b>\n"
-        f"مراقبات متأثرة: <b>{data.get('affected', 0)}</b>"
+        "📡 <b>حالة الاتصال بـ (فوكس)</b>\n\n"
+        f"• الحالة: <b>{esc(data.get('state', '—'))}</b>\n"
+        f"• آخر نجاح: {esc(data.get('last_success', '—'))}\n"
+        f"• آخر خطأ: {esc(data.get('last_error', '—'))}\n"
+        f"• قاطع الدائرة: <b>{esc(data.get('breaker', 'closed'))}</b>\n\n"
+        f"• أهداف نشطة: <b>{data.get('targets', 0)}</b>\n"
+        f"• مراقبات متأثرة: <b>{data.get('affected', 0)}</b>"
     )
 
 
