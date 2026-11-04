@@ -67,7 +67,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (170 tests)
+├── tests/                  # pytest suite (172 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── pyproject.toml          # ruff lint/format configuration
@@ -413,6 +413,13 @@ Edit `.env`:
 - `UI_RENDERER` — `auto` (default), `rich` or `classic`
 - `HTTP_IMPERSONATE=chrome124` — recommended for VOX
 
+Before the first run, check the bot in [@BotFather](https://t.me/BotFather):
+
+- **Bot Settings → Threaded Mode → off.** Leaving it on can group replies
+  unexpectedly in private chats.
+- Group privacy can stay at its default; Cinema Radar only needs private chats.
+- Do not add commands by hand: they are registered at startup in both languages.
+
 Run the VOX smoke test first:
 
 ```bash
@@ -436,7 +443,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `170 passed`.
+Expected: `172 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

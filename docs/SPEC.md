@@ -235,8 +235,8 @@ Inline keyboards only, minimal typing, three short onboarding screens on first
 Donations are voluntary and never required to use the core features. The bot
 stores no card or bank data.
 
-- The Support menu explains in simple Egyptian Arabic that the bot is free, that
-  running it has costs, and that donations are optional.
+- The Support menu explains, in the user's chosen language, that the bot is free,
+  that running it has costs, and that donations are optional.
 - Methods: Vodafone Cash and InstaPay only. The number comes from
   `DONATION_PHONE` and is shown in an easy-to-copy format.
 - Flow: the user taps "حوّلت ✅", sends a screenshot or the transfer reference,
@@ -263,7 +263,8 @@ stores no card or bank data.
   bookings, never handles tickets or card data.
 - Minimum data: `telegram_id`, watches, subscriptions, supporter flag,
   donations, and feedback. A username is stored only inside feedback rows.
-- `/privacy` explains exactly what is stored and why in Egyptian Arabic.
+- `/privacy` explains exactly what is stored and why, in the user's chosen
+  language.
 - `/delete_me`: after a confirmation button, permanently delete the user's row,
   watches, subscriptions, feedback, donations and proof references; only
   anonymous counters remain.

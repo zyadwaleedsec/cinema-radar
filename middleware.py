@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -21,8 +22,6 @@ class RateLimitMiddleware(BaseMiddleware):
     """Max N bot actions per user per minute, with a polite refusal."""
 
     def __init__(self, settings: Settings, clock: Callable[[], float] | None = None) -> None:
-        import time
-
         self.settings = settings
         self._clock = clock or time.monotonic
         self._hits: dict[int, deque[float]] = defaultdict(deque)
@@ -104,7 +103,12 @@ class LanguageMiddleware(BaseMiddleware):
         if not lang and not _is_language_choice(event):
             if isinstance(event, Message):
                 _remember_deeplink(event)
-            await _show_language_picker(event, getattr(user, "language_code", None))
+            # The gate runs before the rate limiter, so a language-less account
+            # could otherwise make the bot answer every message with a picker.
+            now = time.monotonic()
+            if not _picker_recent(user.id, now):
+                await _show_language_picker(event, getattr(user, "language_code", None))
+                _mark_picker(user.id, now)
             return None
 
         # The picker callback runs in the new language; its handler sets the
@@ -117,6 +121,28 @@ class LanguageMiddleware(BaseMiddleware):
 
 def _is_language_choice(event: TelegramObject) -> bool:
     return isinstance(event, CallbackQuery) and (event.data or "").startswith("lang:set:")
+
+
+#: At most one picker every 30 seconds per language-less account.  Without it
+#: the gate (which runs before the rate limiter) would answer every message.
+_PICKER_COOLDOWN_SECONDS = 30.0
+_PICKER_MEMORY = 5000
+_picker_sent: dict[int, float] = {}
+
+
+def _picker_recent(user_id: int, now: float) -> bool:
+    last = _picker_sent.get(user_id)
+    return last is not None and now - last < _PICKER_COOLDOWN_SECONDS
+
+
+def _mark_picker(user_id: int, now: float) -> None:
+    if len(_picker_sent) >= _PICKER_MEMORY:
+        cutoff = now - _PICKER_COOLDOWN_SECONDS
+        for key in [key for key, sent in _picker_sent.items() if sent < cutoff]:
+            _picker_sent.pop(key, None)
+        if len(_picker_sent) >= _PICKER_MEMORY:
+            _picker_sent.clear()
+    _picker_sent[user_id] = now
 
 
 # Surfaces that must keep working for the operator before a language is stored.

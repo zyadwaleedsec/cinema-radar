@@ -11,6 +11,30 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-04
+
+### Fixed
+
+- A deep link (`?start=w…` / `?start=b…`) is no longer lost when a user has
+  chosen a language but has not finished onboarding. It is parked and resumed
+  when onboarding completes.
+- The language picker is throttled to one message every 30 seconds per
+  language-less account, closing the only path around the rate limiter.
+
+### Changed
+
+- `/start` and the Home button now greet the user by name, like the onboarding
+  and the language picker.
+
+### Docs
+
+- Documented the required BotFather setup (Threaded Mode off) and corrected the
+  README claim that every step is button-only.
+- `DONATION_PHONE` is now documented as optional: leaving it empty hides the
+  manual donation flow.
+- Corrected stale references to the catalog module and to Arabic-only privacy
+  and support copy.
+
 ## [1.1.2] - 2026-11-04
 
 ### Fixed
@@ -89,7 +113,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v1.0.0...v1.1.0

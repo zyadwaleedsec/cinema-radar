@@ -13,6 +13,7 @@ from aiogram.types import Chat, Message, User
 
 import deeplinks
 import i18n
+import middleware
 import strings
 import version
 from middleware import LanguageMiddleware
@@ -36,6 +37,13 @@ def _message(user_id: int, text: str = "/start", language_code: str = "en") -> M
         ),
         text=text,
     )
+
+
+@pytest.fixture(autouse=True)
+def _reset_picker_cooldown():
+    middleware._picker_sent.clear()
+    yield
+    middleware._picker_sent.clear()
 
 
 # --------------------------------------------------------------------- catalogs
@@ -210,6 +218,31 @@ async def test_deep_link_payload_is_only_parked_until_language_is_chosen(db, tes
 
 
 @pytest.mark.asyncio
+async def test_deep_link_is_parked_when_language_is_set_but_onboarding_is_not(db, test_settings):
+    from handlers import common
+
+    deeplinks.clear()
+    event = _message(8, "/start w42")
+    await db.get_or_create_user(8, watch_limit=test_settings.free_watch_limit)
+    await db.set_user_language(8, "en")
+
+    class FakeState:
+        async def clear(self):
+            pass
+
+    sent: list[str] = []
+
+    async def fake_send(message, text, keyboard=None, photo_url=None):
+        sent.append(text)
+
+    with patch.object(common, "send", fake_send):
+        await common.start(event, FakeState(), db, test_settings)
+
+    assert sent
+    assert deeplinks.take(8) == "w42"
+
+
+@pytest.mark.asyncio
 async def test_admin_sees_the_picker_on_start(db, test_settings):
     event = _message(test_settings.admin_id, "/start")
     called = False
@@ -244,6 +277,25 @@ async def test_admin_keeps_hidden_commands_before_choosing(db, test_settings):
 
     assert called is True
     assert i18n.get_language() == "ar"
+
+
+@pytest.mark.asyncio
+async def test_language_picker_is_throttled_for_language_less_accounts(db, test_settings):
+    event = _message(9)
+    answers: list[str] = []
+
+    async def handler(event, data):
+        pass
+
+    async def fake_answer(self, text, **kwargs):
+        answers.append(text)
+
+    gate = LanguageMiddleware(db, test_settings)
+    with patch.object(Message, "answer", fake_answer):
+        await gate(handler, event, {"event_from_user": event.from_user})
+        await gate(handler, event, {"event_from_user": event.from_user})
+
+    assert len(answers) == 1
 
 
 @pytest.mark.asyncio

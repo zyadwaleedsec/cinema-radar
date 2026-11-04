@@ -29,10 +29,11 @@ has one button that opens the cinema's own booking page.
 - 🔐 **Privacy first** — `/delete_me` removes everything; no cards, no phone numbers.
 
 The interface is fully bilingual — **Egyptian Arabic** (default) and **American
-English** — and uses 100% inline buttons, no typing needed. You choose the
-language before anything else, and Settings (`/language`) changes it later.
+English**. Almost every step is an inline button; you only type a movie name when
+searching or a custom quiet-hours range. You choose the language before anything
+else, and Settings (`/language`) changes it later.
 
-Current release: **v1.1.2** — see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v1.1.3** — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -64,13 +65,16 @@ pip install -r requirements-dev.txt
 cp .env.example .env             # Windows: copy .env.example .env
 ```
 
-Open `.env` and fill three values:
+Open `.env` and set these values:
 
 | Key | What to put |
 | --- | --- |
-| `BOT_TOKEN` | the token from @BotFather |
+| `BOT_TOKEN` | the token from @BotFather (required) |
 | `ADMIN_ID` | your numeric Telegram id (from @userinfobot) |
-| `DONATION_PHONE` | the Vodafone Cash / InstaPay number users should see |
+| `DONATION_PHONE` | optional; the Vodafone Cash / InstaPay number users see |
+
+Without `ADMIN_ID`, admin commands and admin alerts stay disabled; without
+`DONATION_PHONE`, the manual donation flow is hidden.
 
 Then run:
 
@@ -80,6 +84,16 @@ python -m main
 
 That's it. The bot uses long polling, so you do not need a domain, webhook, open
 port or TLS certificate.
+
+### BotFather settings
+
+Before the first run, open [@BotFather](https://t.me/BotFather) → your bot:
+
+- **Bot Settings → Threaded Mode → off.** Leaving it on can group replies in
+  unexpected ways in private chats.
+- Leave group privacy as it is — the bot only needs private chats.
+- Do not add commands manually: they are registered automatically at startup,
+  in both Arabic and English.
 
 > Want it to keep running after you close the laptop? See the deployment notes in
 > [`docs/TECHNICAL.md`](docs/TECHNICAL.md#deployment-on-a-local-laptop).

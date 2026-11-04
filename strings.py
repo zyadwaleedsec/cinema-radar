@@ -4,7 +4,7 @@ Historically this module held every Arabic string.  It is now a facade over
 :mod:`i18n.ar` and :mod:`i18n.en` so existing code keeps using
 ``strings.something(...)`` while the active catalog follows the user's choice.
 
-The language is set per update by :class:`i18n.LanguageMiddleware`; background
+The language is set per update by :class:`middleware.LanguageMiddleware`; background
 senders use ``with i18n.use(lang):``.  See :mod:`i18n` for the details.
 """
 

@@ -100,8 +100,16 @@ async def start(
         if handled:
             return
     if int(user.get("onboarded") or 0):
-        await send(message, await dashboard_text(db, user, settings), main_menu_keyboard())
+        await send(
+            message,
+            await dashboard_text(db, user, settings, _telegram_name(message)),
+            main_menu_keyboard(),
+        )
         return
+    if payload:
+        # The gate parks links for users without a language; this covers the
+        # gap where a language was already chosen but onboarding is unfinished.
+        deeplinks.remember(message.from_user.id, payload)
     await send(
         message,
         f"{strings.onboard_progress(0)}\n\n{strings.onboard_intro(_telegram_name(message))}",
@@ -202,7 +210,11 @@ async def menu_home(
 ) -> None:
     await state.clear()
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
-    await edit(callback, await dashboard_text(db, user, settings), main_menu_keyboard())
+    await edit(
+        callback,
+        await dashboard_text(db, user, settings, _telegram_name_callback(callback)),
+        main_menu_keyboard(),
+    )
     await callback.answer()
 
 
