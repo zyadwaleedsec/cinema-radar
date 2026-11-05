@@ -30,7 +30,6 @@ logs/
 # Development-only files
 tests/
 docs/
-scripts/
 assets/
 README.md
 CHANGELOG.md

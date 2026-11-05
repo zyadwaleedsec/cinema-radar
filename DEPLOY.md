@@ -220,6 +220,21 @@ fly sftp get /data/backup.sqlite3 .\cinemaradar-backup.sqlite3
 | `409 Conflict: terminated by other getUpdates request` | two machines or two machines running the bot | `fly scale count 1`, and stop any local instance |
 | `Process appears to have been OOM killed!` | 256 MB is not enough for Python + lxml + the cache | set `memory = "512mb"` (or `1gb`) in `[[vm]]`, then `fly deploy` |
 | VOX requests time out (`فوكس واقعة`, `ReadTimeout`) | `HTTP_IMPERSONATE` is unset, so plain httpx is used | keep `HTTP_IMPERSONATE = "chrome124"` in `[env]` of `fly.toml` |
+
+### Check upstream access from the machine
+
+```powershell
+fly ssh console -a cinema-radar-eg -C "python -m scripts.probe"
+```
+
+It prints the proxy/impersonation env, DNS resolution, then calls VOX and
+Renaissance with plain `httpx` and with `curl_cffi` Chrome impersonation:
+
+- `200` with `httpx` → the network is fine.
+- `200` only with `curl_cffi` → TLS fingerprinting; keep `HTTP_IMPERSONATE`.
+- `403`/timeout in both, while it works from an Egyptian connection → the site
+  blocks foreign/datacenter IPs. Use an Egyptian proxy
+  (`fly secrets set HTTPS_PROXY=...`) or host the bot in Egypt.
 | `database is locked` | bot running twice on the same SQLite file | keep one machine, never share one volume between machines |
 | Machine restarts in a loop | bad token / missing secret | `fly logs`, then re-check `fly secrets list` |
 | `instance refused connection ... :8080` | leftover `[http_service]` from the web launcher | remove it (already removed here) |
