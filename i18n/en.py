@@ -236,6 +236,9 @@ BTN_LANGUAGE = "🌐 Language"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
 BTN_ALL_CINEMAS = "🌍 All cinemas"
+BTN_CONSENT_ACCEPT = "✅ I agree, start"
+BTN_CONSENT_DECLINE = "❌ I don't agree"
+BTN_CONSENT_REVIEW = "🔐 Review consent again"
 
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
@@ -432,7 +435,53 @@ def privacy_text() -> str:
         "/delete_me removes everything stored in the bot's database.\n"
         "Messages and photos already sent in Telegram\n"
         "remain in the chats.\n\n"
+        "<b>Images</b>\n"
+        f"{tmdb_attribution()}\n\n"
+        "<b>Contact</b>\n"
+        "zyad.waleed.sec@gmail.com\n\n"
         f"{version_line()}"
+    )
+
+
+def tmdb_attribution() -> str:
+    return (
+        "Movie posters are provided by TMDB. "
+        "This product uses the TMDB API but is not endorsed or certified by TMDB."
+    )
+
+
+def consent_text() -> str:
+    return (
+        f"🔐 <b>Consent to store your data</b>\n{DIVIDER}\n\n"
+        "Before we start, we need your explicit consent.\n"
+        "If you decline, nothing about you is stored.\n\n"
+        "<b>What is stored</b>\n"
+        "• Your Telegram ID — no name or email.\n"
+        "• Your language and alert settings.\n"
+        "• The watches you add:\n"
+        "  cinema, branch, date, movie and showtime.\n"
+        "• If you send feedback: the text and username, if present.\n"
+        "• If you support the project: the transfer method and amount,\n"
+        "  plus any note or proof image you send.\n\n"
+        "<b>Why</b>\n"
+        "To send booking and seat alerts,\n"
+        "reply to feedback and verify support.\n\n"
+        "<b>What we never ask for</b>\n"
+        "Card or banking details, or your phone number or email.\n\n"
+        "<b>Retention and control</b>\n"
+        "Data is kept while your account is active.\n"
+        "You can erase everything anytime with /delete_me,\n"
+        "and read the full details with /privacy.\n\n"
+        f"<b>Contact:</b> zyad.waleed.sec@gmail.com\n\n"
+        f"{tmdb_attribution()}"
+    )
+
+
+def consent_declined() -> str:
+    return (
+        "Understood — nothing was stored ✅\n\n"
+        "Without consent we cannot send you alerts.\n"
+        "If you change your mind, use the button below."
     )
 
 

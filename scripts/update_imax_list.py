@@ -83,9 +83,9 @@ def parse(html: str) -> list[dict[str, object]]:
 
 
 def main() -> None:
-    headers = {
-        "User-Agent": ("CinemaRadar/1.0 (https://github.com/; contact via Telegram bot) httpx/0.28")
-    }
+    from config import DEFAULT_USER_AGENT
+
+    headers = {"User-Agent": DEFAULT_USER_AGENT}
     response = httpx.get(URL, headers=headers, timeout=30.0, follow_redirects=True)
     response.raise_for_status()
     entries = parse(response.text)

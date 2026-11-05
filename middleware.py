@@ -10,12 +10,13 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
+import consent
 import deeplinks
 import i18n
 import strings
 from config import Settings
 from db import Database
-from keyboards import language_keyboard
+from keyboards import consent_keyboard, language_keyboard
 
 
 class RateLimitMiddleware(BaseMiddleware):
@@ -92,10 +93,14 @@ class LanguageMiddleware(BaseMiddleware):
         if user is None:
             return await handler(event, data)
 
-        row = await self.db.get_or_create_user(user.id, watch_limit=self.settings.free_watch_limit)
-        data["user_row"] = row
-        lang = row.get("lang")
+        # Never create a row here: the user only gets persisted after tapping
+        # "I agree" on the consent screen.  Until then the chosen language lives
+        # in memory (``consent.pending_language``).
+        row = await self.db.get_user(user.id)
         is_admin = bool(self.settings.admin_id) and user.id == self.settings.admin_id
+        lang = (row.get("lang") if row else None) or consent.pending_language(user.id)
+        if not lang and _is_language_choice(event):
+            lang = _language_from_callback(event)
 
         if not lang and is_admin and _is_admin_surface(event):
             lang = i18n.DEFAULT_LANGUAGE
@@ -116,11 +121,34 @@ class LanguageMiddleware(BaseMiddleware):
         if lang:
             i18n.set_language(lang)
         data["lang"] = i18n.get_language()
+        data["user_row"] = row
+
+        if not consent.has_consent(row) and not _is_consent_surface(event):
+            await _show_consent(event)
+            return None
         return await handler(event, data)
 
 
 def _is_language_choice(event: TelegramObject) -> bool:
     return isinstance(event, CallbackQuery) and (event.data or "").startswith("lang:set:")
+
+
+def _language_from_callback(event: TelegramObject) -> str | None:
+    if not isinstance(event, CallbackQuery):
+        return None
+    parts = (event.data or "").split(":")
+    return i18n.normalize(parts[2]) if len(parts) > 2 else None
+
+
+def _is_consent_surface(event: TelegramObject) -> bool:
+    """Surfaces allowed while consent is still missing."""
+
+    if isinstance(event, CallbackQuery):
+        return (event.data or "").startswith("consent:") or _is_language_choice(event)
+    if isinstance(event, Message):
+        head = (event.text or "").strip().split(maxsplit=1)[0].split("@", 1)[0].lower()
+        return head in {"/privacy", "/language"}
+    return False
 
 
 #: At most one picker every 30 seconds per language-less account.  Without it
@@ -167,6 +195,23 @@ def _remember_deeplink(message: Message) -> None:
     parts = text.split(maxsplit=1)
     if len(parts) > 1:
         deeplinks.remember(message.from_user.id, parts[1])
+
+
+async def _show_consent(event: TelegramObject) -> None:
+    text = strings.consent_text()
+    keyboard = consent_keyboard()
+    if isinstance(event, CallbackQuery):
+        from handlers.utils import answer
+
+        await answer(event)
+        if event.message is not None:
+            try:
+                await event.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+            except Exception:
+                await event.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+        return
+    if isinstance(event, Message):
+        await event.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
 
 async def _show_language_picker(event: TelegramObject, language_code: str | None = None) -> None:

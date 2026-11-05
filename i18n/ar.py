@@ -236,6 +236,9 @@ BTN_LANGUAGE = "🌐 اللغة"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
 BTN_ALL_CINEMAS = "🌍 كل السينمات"
+BTN_CONSENT_ACCEPT = "✅ موافق، ابدأ"
+BTN_CONSENT_DECLINE = "❌ مش موافق"
+BTN_CONSENT_REVIEW = "🔐 راجع الموافقة تاني"
 
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
@@ -431,7 +434,50 @@ def privacy_text() -> str:
         "/delete_me بيمسح كل حاجة محفوظة في قاعدة بيانات البوت.\n"
         "الرسائل والصور اللي اتبعتت على تليجرام\n"
         "بتفضل في المحادثات.\n\n"
+        "<b>الصور</b>\n"
+        f"{tmdb_attribution()}\n\n"
+        "<b>التواصل</b>\n"
+        "zyad.waleed.sec@gmail.com\n\n"
         f"{version_line()}"
+    )
+
+
+def tmdb_attribution() -> str:
+    return "بوسترات الأفلام من TMDB. البوت بيستخدم TMDB API لكنه غير معتمد من TMDB."
+
+
+def consent_text() -> str:
+    return (
+        f"🔐 <b>الموافقة على حفظ البيانات</b>\n{DIVIDER}\n\n"
+        "قبل ما نبدأ، محتاجين موافقتك الصريحة.\n"
+        "لو مش موافق، مش هنحفظ أي حاجة عنك.\n\n"
+        "<b>إيه اللي بيتحفظ؟</b>\n"
+        "• رقم تليجرام بتاعك — من غير اسم أو إيميل.\n"
+        "• لغتك وإعدادات التنبيهات.\n"
+        "• المراقبات اللي بتضيفها:\n"
+        "  السينما، الفرع، اليوم، الفيلم، الحفلة.\n"
+        "• لو بعت فيدباك: النص واسم المستخدم لو موجود.\n"
+        "• لو دعمت المشروع: طريقة التحويل والمبلغ\n"
+        "  وأي ملاحظة أو صورة إثبات تبعتها.\n\n"
+        "<b>ليه؟</b>\n"
+        "عشان نبعتلك تنبيهات الحجز والكراسي\n"
+        "ونرد على الفيدباك ونتحقق من الدعم.\n\n"
+        "<b>مش بنطلبه منك</b>\n"
+        "بيانات كروت أو بنوك، ولا رقم تليفون أو إيميل.\n\n"
+        "<b>المدة والتحكم</b>\n"
+        "بنحتفظ بالبيانات طول ما حسابك شغال.\n"
+        "تقدر تمسح كل حاجة في أي وقت بـ /delete_me.\n"
+        "وتقدر تقرأ التفاصيل الكاملة بـ /privacy.\n\n"
+        f"<b>التواصل:</b> zyad.waleed.sec@gmail.com\n\n"
+        f"{tmdb_attribution()}"
+    )
+
+
+def consent_declined() -> str:
+    return (
+        "تمام، مفيش أي حاجة اتحفظت ✅\n\n"
+        "مش هنقدر نبعتلك تنبيهات من غير الموافقة.\n"
+        "لو غيرت رأيك، اضغط الزرار تحت."
     )
 
 

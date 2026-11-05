@@ -9,10 +9,11 @@
 
 ## Goal
 
-Cinema Radar is a Telegram bot that monitors VOX Cinemas and Renaissance
-Cinemas showtimes and tells users when booking opens or when a sold-out session
-frees up seats. It also announces new movies, newly opened dates and new
-showtimes to users who opt in.
+Cinema Radar is a **public** Telegram bot that monitors VOX Cinemas and
+Renaissance Cinemas showtimes and tells users when booking opens or when a
+sold-out session frees up seats. Anyone with the link can use it; there is no
+invitation or allowlist. It also announces new movies, newly opened dates and
+new showtimes to users who opt in.
 
 Users pick a branch, date, movie, showtime and optional screening format. The
 bot watches that target and sends an alert with a button that opens the cinema's
@@ -47,9 +48,12 @@ unchanged when another cinema is added.
 - `providers/renaissance.py`: Renaissance implementation. It reads the public
   branch/day/movie pages; online booking is available/disabled, and no seat
   counts are exposed.
-- `http_client.py`: one persistent httpx client (keep-alive, gzip, realistic
-  User-Agent, optional curl_cffi TLS fingerprint) wrapped with the global rate
-  limiter, adaptive backoff and circuit breaker.
+- `http_client.py`: one persistent httpx client (keep-alive, gzip, a transparent
+  User-Agent naming the bot and a contact email, optional curl_cffi TLS
+  fingerprint) wrapped with the global rate limiter, adaptive backoff and circuit
+  breaker.
+- `tmdb.py` / `posters.py`: optional TMDB title lookup and cached, official
+  poster URLs. Cinema-scraped image URLs are never stored or sent.
 - `cache.py`: memory + SQLite cache so a restart does not trigger a request
   burst.
 - `scheduler.py`: per-target priority-queue scheduler.

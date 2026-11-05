@@ -31,11 +31,13 @@ from http_client import HttpClient
 from imax import load_default_service
 from middleware import LanguageMiddleware, RateLimitMiddleware
 from notifier import Notifier, TelegramSender
+from posters import TmdbPosterService
 from providers import ProviderRegistry, RenaissanceProvider, VoxProvider
 from scheduler import Scheduler
 from stats import StatsService
 from support import SupportService
 from timeutil import local_now
+from tmdb import TmdbClient
 from ui.render import set_freshness_state
 from version import __version__
 from watcher import Watcher
@@ -101,6 +103,12 @@ async def run() -> None:
     sender = TelegramSender(bot, settings)
     notifier = Notifier(sender, db, settings)
     http = HttpClient(settings, cache, on_admin_message=notifier.send_admin)
+    tmdb = TmdbClient(
+        settings.tmdb_read_token,
+        timeout=settings.tmdb_timeout,
+        user_agent=settings.http_user_agent,
+    )
+    posters = TmdbPosterService(tmdb, cache, ttl=settings.cache_poster_ttl)
     imax = None
     if "vox" in settings.providers:
         try:
@@ -111,9 +119,9 @@ async def run() -> None:
 
     def _provider(name: str) -> Any:
         return (
-            RenaissanceProvider(http, cache, settings)
+            RenaissanceProvider(http, cache, settings, posters=posters)
             if name == "renaissance"
-            else VoxProvider(http, cache, settings)
+            else VoxProvider(http, cache, settings, posters=posters)
         )
 
     provider_objs = [_provider(name) for name in settings.providers]

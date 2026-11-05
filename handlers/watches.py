@@ -958,6 +958,13 @@ async def movie_chosen(
         )
         return
     movie = dict(movie)
+    if hasattr(provider, "get_movie_poster"):
+        try:
+            poster_movie = Movie(**{name: movie.get(name) for name in Movie.__dataclass_fields__})
+            poster = await provider.get_movie_poster(poster_movie)
+        except Exception:
+            poster = None
+        movie["poster_url"] = poster
     status = await _imax_status(db, imax, movie, showtimes) if provider_name == "vox" else None
     if status:
         movie["imax_status"] = status
@@ -1415,7 +1422,7 @@ async def confirm_add(
         callback,
         text,
         watch_created_keyboard(watch_id),
-        photo_url=movie.get("poster_url"),
+        photo_url=details.get("poster_url"),
     )
 
 

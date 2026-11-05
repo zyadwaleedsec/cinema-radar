@@ -11,7 +11,18 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
+from version import __version__
+
 load_dotenv()
+
+#: Public contact address used wherever an upstream service asks who we are.
+BOT_CONTACT_EMAIL = "zyad.waleed.sec@gmail.com"
+
+#: A transparent, stable UA.  Upstream operators can identify the bot and reach
+#: the maintainer instead of blocking an anonymous browser string.
+DEFAULT_USER_AGENT = (
+    f"CinemaRadarBot/{__version__} (+https://t.me/RadarElCinemaBot; contact: {BOT_CONTACT_EMAIL})"
+)
 
 
 def _env(name: str, default: str = "") -> str:
@@ -79,10 +90,7 @@ class Settings:
     # ------------------------------------------------------------------ upstream
     http_base_url: str = "https://egy.voxcinemas.com"
     renaissance_base_url: str = "https://rnscinemas.com"
-    http_user_agent: str = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    )
+    http_user_agent: str = DEFAULT_USER_AGENT
     # VOX resets plain TLS clients.  When curl_cffi is installed and this is set
     # (for example "chrome124"), requests are sent with a Chrome TLS fingerprint.
     http_impersonate: str = ""
@@ -96,7 +104,8 @@ class Settings:
     cache_listings_ttl: int = 12 * 60  # movies / dates
     cache_showtimes_ttl: int = 150  # default; watcher passes its own TTL
     cache_coming_soon_ttl: int = 3600  # /movies/comingsoon listing
-    cache_movie_details_ttl: int = 7 * 24 * 3600  # poster / duration / rating / language
+    cache_movie_details_ttl: int = 7 * 24 * 3600  # duration / rating / language
+    cache_poster_ttl: int = 30 * 24 * 3600  # TMDB poster lookup
     cache_stale_ttl: int = 7 * 24 * 3600  # keep stale data for restarts / outages
     # Pre-book dates for Renaissance come from the movie pages, beyond the
     # branch page's ten-day strip.  Refreshed in the background, not per request.
@@ -187,11 +196,7 @@ class Settings:
             ui_renderer=_env_choice("UI_RENDERER", "auto", {"auto", "rich", "classic"}),
             http_base_url=_env("VOX_BASE_URL", "https://egy.voxcinemas.com"),
             renaissance_base_url=_env("RENAISSANCE_BASE_URL", "https://rnscinemas.com"),
-            http_user_agent=_env(
-                "HTTP_USER_AGENT",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            ),
+            http_user_agent=_env("HTTP_USER_AGENT", DEFAULT_USER_AGENT),
             http_impersonate=_env("HTTP_IMPERSONATE"),
             global_rate_limit=_env_float("GLOBAL_RATE_LIMIT", 1.0),
             max_connections=_env_int("MAX_CONNECTIONS", 2),
@@ -202,6 +207,7 @@ class Settings:
             cache_showtimes_ttl=_env_int("CACHE_SHOWTIMES_TTL", 150),
             cache_coming_soon_ttl=_env_int("CACHE_COMING_SOON_TTL", 3600),
             cache_movie_details_ttl=_env_int("CACHE_MOVIE_DETAILS_TTL", 7 * 24 * 3600),
+            cache_poster_ttl=_env_int("CACHE_POSTER_TTL", 30 * 24 * 3600),
             cache_stale_ttl=_env_int("CACHE_STALE_TTL", 7 * 24 * 3600),
             prebook_dates_ttl=_env_int("PREBOOK_DATES_TTL", 3 * 3600),
             prebook_dates_max_days=_env_int("PREBOOK_DATES_MAX_DAYS", 120),

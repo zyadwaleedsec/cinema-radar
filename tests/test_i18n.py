@@ -204,6 +204,7 @@ async def test_deep_link_payload_is_only_parked_until_language_is_chosen(db, tes
         await gate(handler, event, {"event_from_user": event.from_user})
 
     await db.set_user_language(6, "en")
+    await db.record_user_consent(6, "en", test_settings.free_watch_limit, 1)
     seen: dict[str, object] = {}
 
     async def chosen(event, data):
@@ -266,6 +267,7 @@ async def test_admin_sees_the_picker_on_start(db, test_settings):
 @pytest.mark.asyncio
 async def test_admin_keeps_hidden_commands_before_choosing(db, test_settings):
     event = _message(test_settings.admin_id, "/status")
+    await db.record_user_consent(test_settings.admin_id, "", test_settings.free_watch_limit, 1)
     called = False
 
     async def handler(event, data):
@@ -304,6 +306,7 @@ async def test_picker_always_leads_to_onboarding_even_for_existing_users(db, tes
 
     await db.get_or_create_user(7)
     await db.mark_user_onboarded(7)
+    await db.record_user_consent(7, "ar", test_settings.free_watch_limit, 1)
 
     class FakeState:
         async def clear(self):

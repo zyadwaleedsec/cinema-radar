@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
     quiet_watches INTEGER NOT NULL DEFAULT 1,
     onboarded INTEGER NOT NULL DEFAULT 0,
     lang TEXT,
+    consent_at TEXT,
+    consent_version INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
 );
 
@@ -215,6 +217,8 @@ class Database:
         # database, so upgrade older installs in place.
         await self._ensure_column("users", "quiet_watches", "INTEGER NOT NULL DEFAULT 1")
         await self._ensure_column("users", "lang", "TEXT")
+        await self._ensure_column("users", "consent_at", "TEXT")
+        await self._ensure_column("users", "consent_version", "INTEGER NOT NULL DEFAULT 0")
         onboarded_added = await self._ensure_column(
             "users", "onboarded", "INTEGER NOT NULL DEFAULT 0"
         )
@@ -270,6 +274,14 @@ class Database:
             "CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status, created_at)"
         )
         await self.execute("DROP TABLE IF EXISTS movie_waits")
+        # Artwork scraped from a cinema site is no longer used; existing watches
+        # keep working and simply render text-only until a TMDB poster is known.
+        await self.execute(
+            "UPDATE watches SET poster_url = NULL "
+            "WHERE poster_url LIKE '%voxcinemas.com%' "
+            "OR poster_url LIKE '%rnscinemas.com%' "
+            "OR poster_url LIKE '%rnscinemas.net%'"
+        )
         await self._migrate_subscription_event_types()
         await self._migrate_subscription_branch_ids()
 
@@ -402,6 +414,30 @@ class Database:
         """Persist the interface language chosen in onboarding or settings."""
 
         await self.execute("UPDATE users SET lang = ? WHERE telegram_id = ?", (lang, telegram_id))
+
+    async def record_user_consent(
+        self,
+        telegram_id: int,
+        lang: str,
+        watch_limit: int,
+        version: int,
+    ) -> dict[str, Any]:
+        """Create or update the user only after explicit, informed consent."""
+
+        await self.execute(
+            """
+            INSERT INTO users (telegram_id, watch_limit, lang, consent_at, consent_version, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(telegram_id) DO UPDATE SET
+                lang = excluded.lang,
+                consent_at = excluded.consent_at,
+                consent_version = excluded.consent_version
+            """,
+            (telegram_id, watch_limit, lang, utc_now_iso(), int(version), utc_now_iso()),
+        )
+        user = await self.get_user(telegram_id)
+        assert user is not None
+        return user
 
     async def update_user_settings(self, user_id: int, **fields: Any) -> None:
         allowed = {

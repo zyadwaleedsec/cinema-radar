@@ -145,5 +145,9 @@ def load_default_service(cache: Any | None = None) -> ImaxService:
     path = Path(settings.imax_data_path)
     if not path.is_absolute():
         path = Path(__file__).resolve().parent / path
-    tmdb = TmdbClient(settings.tmdb_read_token, timeout=settings.tmdb_timeout)
+    tmdb = TmdbClient(
+        settings.tmdb_read_token,
+        timeout=settings.tmdb_timeout,
+        user_agent=settings.http_user_agent,
+    )
     return ImaxService.from_path(path, tmdb=tmdb, cache=cache)

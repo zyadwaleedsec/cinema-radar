@@ -11,8 +11,10 @@ Pick a branch, date, movie and showtime. Cinema Radar checks it quietly in the
 background and messages you the moment booking opens — or when a sold-out show
 frees up seats.
 
-It is unofficial, free to use, and **never** books or pays for you. Every alert
-has one button that opens the cinema's own booking page.
+It is a **public bot**: anyone with the link can use it, no invitation or
+allowlist is required. It is unofficial, free to use, and **never** books or
+pays for you. Every alert has one button that opens the cinema's own booking
+page.
 
 ---
 
@@ -32,9 +34,11 @@ has one button that opens the cinema's own booking page.
   every show in that period across VOX and Renaissance at once.
 - 🆕 **Optional release alerts** for new movies, new dates and Coming Soon titles.
 - 🔎 **Search in Arabic or English**, typos included (سبايدر مان → Spider-Man).
-- 🎬 **Movie cards** with poster, duration, rating, language, synopsis and trailer.
+- 🎬 **Movie cards** with a TMDB poster, duration, rating, language, synopsis and
+  trailer.
 - 🌙 **Quiet hours**, per-watch alert modes, and a clean paged watch list.
-- 🔐 **Privacy first** — `/delete_me` clears the bot's data; no card details, and
+- 🔐 **Privacy first** — an explicit consent screen appears before anything is
+  stored, `/delete_me` clears the bot's data, no card details are requested and
   no phone number is ever required.
 - ✨ **Polished screens** — clear dividers, status icons, progress bars and
   colored primary/confirm/delete actions.
@@ -44,7 +48,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v2.6.0** - see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v2.7.0** - see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -85,6 +89,7 @@ Open `.env` and set these values:
 | `DONATION_PHONE` | optional; the Vodafone Cash / InstaPay number users see |
 | `PROVIDERS` | comma-separated cinemas, default `vox,renaissance` |
 | `PROVIDER` | fallback brand for single-cinema mode |
+| `TMDB_READ_TOKEN` | optional TMDB API read token; enables posters |
 
 Without `ADMIN_ID`, admin commands and admin alerts stay disabled; without
 `DONATION_PHONE`, the manual donation flow is hidden.
@@ -149,10 +154,12 @@ commands never appear in the public menu.
 
 ## Privacy
 
-Cinema Radar stores what it needs to run: your Telegram id, language and
+Cinema Radar asks for **explicit consent before storing anything**. Once you
+agree, it stores what it needs to run: your Telegram id, language and
 preferences, your watches, optional discovery filters, your supporter flag, and
-any donation proof or feedback you send. It never asks for card or bank details,
-never requires a phone number, and never logs in to the cinema site.
+any donation proof or feedback you send. Declining leaves no row behind. It
+never asks for card or bank details, never requires a phone number, and never
+logs in to the cinema site.
 
 Anything you type yourself in a donation note or feedback — including a phone
 number or email — is stored exactly as you wrote it. `/delete_me` deletes every
@@ -172,3 +179,9 @@ tickets happen entirely on the cinema's site.
 
 The IMAX snapshot in `data/imax_films.json` is derived from Wikipedia and is
 licensed **CC BY-SA 4.0**.
+
+Movie posters are provided by **TMDB**. This product uses the TMDB API but is
+not endorsed or certified by TMDB. Cinema-scraped poster URLs are not stored or
+sent by the bot.
+
+Contact: **zyad.waleed.sec@gmail.com** · Bot: **[@RadarElCinemaBot](https://t.me/RadarElCinemaBot)**.

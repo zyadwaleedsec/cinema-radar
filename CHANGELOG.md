@@ -11,6 +11,30 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-05
+
+### Added
+
+- Explicit first-run consent. Nothing is written to the database until the user
+  taps **I agree**; choosing a language keeps the choice in memory only. The
+  consent screen lists what is stored, why, how long it is kept, how to erase it
+  with `/delete_me`, and the contact address. Declining stores nothing. Bumping
+  `consent.CONSENT_VERSION` asks everyone to consent again.
+- TMDB poster artwork. Cinema-scraped image URLs are no longer stored, cached or
+  sent; movie cards and alerts use TMDB-hosted posters when `TMDB_READ_TOKEN` is
+  configured, and fall back to text-only cards otherwise. TMDB attribution is
+  shown in `/privacy` and the consent screen.
+- The bot is now documented and operated as a public bot for everyone, not a
+  private circle.
+
+### Changed
+
+- Every upstream request now sends a transparent User-Agent:
+  `CinemaRadarBot/<version> (+https://t.me/RadarElCinemaBot; contact:
+  zyad.waleed.sec@gmail.com)`. TMDB requests use the same value.
+- Existing watches with stored VOX or Renaissance poster URLs are cleared on
+  startup; they keep working text-only.
+
 ## [2.6.0] - 2026-11-05
 
 ### Added

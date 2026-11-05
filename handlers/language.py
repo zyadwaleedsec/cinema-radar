@@ -7,12 +7,13 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+import consent
 import i18n
 import strings
 from config import Settings
 from db import Database
 from handlers.utils import answer, edit, send
-from keyboards import language_keyboard, onboarding_keyboard
+from keyboards import consent_keyboard, language_keyboard, onboarding_keyboard
 
 router = Router(name="language")
 
@@ -22,8 +23,8 @@ async def language_cmd(
     message: Message, state: FSMContext, db: Database, settings: Settings
 ) -> None:
     await state.clear()
-    user = await db.get_or_create_user(message.from_user.id, watch_limit=settings.free_watch_limit)
-    source = "s" if user.get("lang") else ""
+    user = await db.get_user(message.from_user.id)
+    source = "s" if user and user.get("lang") else ""
     await send(message, strings.language_screen(), language_keyboard(source))
 
 
@@ -44,11 +45,23 @@ async def language_chosen(
     code = i18n.normalize(parts[2] if len(parts) > 2 else "")
     source = parts[3] if len(parts) > 3 else ""
 
+    user = await db.get_user(callback.from_user.id)
+    if user is None or not consent.has_consent(user):
+        # Nothing may be written before explicit consent: hold the choice in
+        # memory and ask for it now.  Existing pre-consent rows are left as they
+        # are until the user agrees to the current notice.
+        consent.remember_pending_language(callback.from_user.id, code)
+        i18n.set_language(code)
+        if settings.admin_id and callback.from_user.id == settings.admin_id:
+            i18n.set_admin_language(code)
+        await answer(callback, strings.language_saved())
+        await edit(callback, strings.consent_text(), consent_keyboard())
+        return
+
     await db.set_user_language(callback.from_user.id, code)
     i18n.set_language(code)
     if settings.admin_id and callback.from_user.id == settings.admin_id:
         i18n.set_admin_language(code)
-    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
 
     await answer(callback, strings.language_saved())
 

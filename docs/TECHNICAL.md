@@ -47,7 +47,9 @@ cinema-radar/
 ├── broadcaster.py          # grouped fan-out queue, quiet hours, daily cap
 ├── notifier.py             # Telegram sender (global + per-chat limits)
 ├── imax.py                 # local IMAX-film matcher (Wikipedia snapshot)
-├── tmdb.py                 # TMDB title/year normaliser (not an IMAX source)
+├── tmdb.py                 # TMDB title/year lookup + official poster URLs
+├── posters.py              # cached TMDB poster resolution (never scraped URLs)
+├── consent.py              # explicit first-run consent version + pending choice
 ├── support.py              # one-off manual donations and admin approval
 ├── stats.py                # internal metrics for the admin dashboard
 ├── feedback.py             # one feedback per user per hour
@@ -70,7 +72,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (216 tests)
+├── tests/                  # pytest suite (231 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -112,10 +114,17 @@ catalog. The full rule set lives in `i18n/__init__.py`; the important parts are:
 - `users.lang` stores `ar` or `en`. A `NULL` value means **not chosen yet** — the
   bot deliberately does not backfill it, so users who onboarded before v1.1.0 see
   the picker exactly once.
-- `LanguageMiddleware` runs before the rate limiter. It loads the user row, and
-  for an unchosen user it shows the bilingual picker instead of running the
-  handler. The operator sees the picker on `/start` as well; only the hidden
-  admin commands and donation decisions bypass it, defaulting to Arabic.
+- `LanguageMiddleware` runs before the rate limiter. It loads the user row
+  **without creating one**, and for an unchosen user it shows the bilingual
+  picker instead of running the handler. The operator sees the picker on
+  `/start` as well; only the hidden admin commands bypass it, defaulting to
+  Arabic.
+- After the language, a first-time user sees the **consent screen**. Nothing is
+  persisted until they tap **I agree**: the chosen language is kept in memory
+  (`consent.py`). Accepting writes `users.lang`, `consent_at` and
+  `consent_version`; declining leaves no row. Existing rows with a lower
+  `consent_version` see the screen again. `/privacy` and `/language` remain
+  readable while the gate is open.
 - A deep link that arrives with the picker (`?start=b…`, `?start=w…`) is parked in
   `deeplinks.py` (in memory, 10 minutes) and resumed after the choice.
 - `strings.py` is a facade: `strings.dashboard(...)` resolves the active catalog
@@ -385,6 +394,7 @@ from `.env`. Secrets are only read from the environment.
 | `PROVIDER` | `vox` | Fallback brand for single-cinema mode |
 | `VOX_BASE_URL` | `https://egy.voxcinemas.com` | VOX provider base URL |
 | `RENAISSANCE_BASE_URL` | `https://rnscinemas.com` | Renaissance provider base URL |
+| `HTTP_USER_AGENT` | bot name + contact | Transparent UA; keep the contact email in any override |
 | `HTTP_IMPERSONATE` | empty | e.g. `chrome124` (needs `curl_cffi`) |
 | `GLOBAL_RATE_LIMIT` | `1.0` | Upstream requests/second |
 | `MAX_CONNECTIONS` | `2` | Max concurrent upstream connections |
@@ -402,8 +412,9 @@ from `.env`. Secrets are only read from the environment.
 | `WATCH_RETENTION_DAYS` | `3` | Days a closed watch is kept before hard deletion |
 | `MORNING_END_HOUR` | `17` | Split hour: shows before it are "morning", at/after "evening" |
 | `IMAX_DATA_PATH` | `data/imax_films.json` | Local IMAX snapshot path |
-| `TMDB_READ_TOKEN` | empty | Optional TMDB read token (title normalisation only) |
+| `TMDB_READ_TOKEN` | empty | Optional TMDB read token (title normalisation + posters) |
 | `TMDB_TIMEOUT` | `10` | TMDB request timeout (seconds) |
+| `CACHE_POSTER_TTL` | `2592000` | TMDB poster cache TTL (30 days; misses retry after 1 day) |
 | `ALL_DATES_MAX` | `21` | Technical cap on days expanded per all-days watch |
 | `ALL_DATES_REFRESH` | `1200` | Seconds between branch date-list refreshes |
 | `DISCOVERY_INTERVAL` | `480` | Per-branch discovery interval |
@@ -411,7 +422,7 @@ from `.env`. Secrets are only read from the environment.
 | `DISCOVERY_FLAP_WINDOW` | `1800` | Ignore items that flap within this window |
 | `COMING_SOON_INTERVAL` | `3600` | How often `/movies/comingsoon` is refreshed |
 | `CACHE_COMING_SOON_TTL` | `3600` | Coming Soon listing cache TTL |
-| `CACHE_MOVIE_DETAILS_TTL` | `604800` | Poster/duration/rating/language/synopsis/trailer cache (7 days) |
+| `CACHE_MOVIE_DETAILS_TTL` | `604800` | Duration/rating/language/synopsis/trailer cache (7 days) |
 | `PREBOOK_DATES_TTL` | `10800` | How often Renaissance pre-book dates are re-scanned (3 h) |
 | `PREBOOK_DATES_MAX_DAYS` | `120` | Horizon for bookable Coming Soon dates |
 | `FREE_WATCH_LIMIT` | `2` | Free active-watch limit |
@@ -444,11 +455,20 @@ never scrapes Wikipedia at runtime. The snapshot is derived from Wikipedia
 content and is therefore licensed **CC BY-SA 4.0**; keep the `source` and
 `license` fields in the JSON when redistributing it.
 
-TMDB is optional and used **only** to normalise a title/year before matching
-(`TMDB_READ_TOKEN`). It is not the source of truth: TMDB's `imax` keyword marks
-screenings, not films shot with IMAX cameras. If the token is empty, matching is
-name-based and the snapshot still works. Put the token in `.env` only; rotate it
-if it was ever shared in chat.
+TMDB is optional and serves two unrelated jobs behind `TMDB_READ_TOKEN`:
+
+1. **IMAX normalisation** — canonical title/year before matching the snapshot.
+   It is not the source of truth: TMDB's `imax` keyword marks screenings, not
+   films shot with IMAX cameras.
+2. **Official posters** — `posters.py` resolves a cached TMDB image URL for every
+   movie card and alert. Cinema-scraped poster URLs are stripped at the provider
+   boundary, and existing watch rows containing VOX/Renaissance image URLs are
+   cleared on startup. With no token, the bot sends text-only cards.
+
+If the token is empty, IMAX matching is name-based and the snapshot still works.
+Put the token in `.env` only; rotate it if it was ever shared in chat. TMDB
+attribution is shown in `/privacy` and on the consent screen: *This product uses
+the TMDB API but is not endorsed or certified by TMDB.*
 
 To refresh the snapshot:
 
@@ -537,7 +557,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `216 passed`.
+Expected: `231 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.
@@ -564,7 +584,10 @@ collapse into a single line.
 - [ ] Arabic renders right-to-left; no clipped words at 320 px width.
 - [ ] English screens contain no Arabic text and no left-over RTL punctuation.
 - [ ] A brand-new account sees the bilingual language picker **before** any other
-      screen; choosing English opens onboarding in English.
+      screen; choosing English opens the consent screen in English, and no row is
+      created until **I agree**.
+- [ ] Declining consent stores nothing and offers a button to review it again.
+- [ ] `/privacy` and `/language` still work while the consent gate is open.
 - [ ] Switching back to Arabic from Settings re-renders Settings immediately and
       keeps every watch and preference.
 - [ ] `?start=w<id>` and `?start=b<branch>` tapped before choosing a language
@@ -579,6 +602,8 @@ collapse into a single line.
 - [ ] «امسح الكل» and «شيل المراقبة» both ask for confirmation first.
 - [ ] Movie-info and confirmation poster cards are replaced in place, and Back
       from a poster card returns to the previous text screen.
+- [ ] Posters are TMDB images (or text-only when `TMDB_READ_TOKEN` is empty); no
+      VOX/Renaissance image URL appears in alerts or the database.
 - [ ] Deep links `?start=w<id>` and `?start=b<branch>` work for their owner only.
 - [ ] `/start` shows only the public commands; admin commands appear only in the
       admin's private chat.

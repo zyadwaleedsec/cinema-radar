@@ -119,6 +119,19 @@ def onboarding_keyboard(step: int) -> Any:
     return _markup(rows)
 
 
+def consent_keyboard() -> Any:
+    return _markup(
+        [
+            [_btn(strings.BTN_CONSENT_ACCEPT, "consent:yes", style="success")],
+            [_btn(strings.BTN_CONSENT_DECLINE, "consent:no", style="danger")],
+        ]
+    )
+
+
+def consent_declined_keyboard() -> Any:
+    return _markup([[_btn(strings.BTN_CONSENT_REVIEW, "consent:ask", style="primary")]])
+
+
 def language_keyboard(source: str = "") -> Any:
     """Bilingual picker; ``source="s"`` returns to Settings after the change."""
 

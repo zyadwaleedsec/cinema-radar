@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Iterable
+from dataclasses import replace
 from datetime import date as date_cls
 from datetime import datetime, timedelta
 from typing import Any
@@ -129,6 +131,12 @@ def _movie_slug(node: Any) -> str:
     href = str(node.get("href") or "") if node is not None else ""
     match = _MOVIE_IN_HREF.search(href)
     return match.group(1) if match else ""
+
+
+def _without_scraped_posters(movies: Iterable[Movie]) -> list[Movie]:
+    """Drop cinema-hosted artwork; official posters come from TMDB only."""
+
+    return [replace(movie, poster_url=None) for movie in movies]
 
 
 def _poster(node: Any) -> str | None:
@@ -414,11 +422,28 @@ def parse_coming_soon(html: str) -> list[Movie]:
 class RenaissanceProvider(CinemaProvider):
     name = "renaissance"
 
-    def __init__(self, http: HttpClient, cache: Cache, settings: Settings) -> None:
+    def __init__(
+        self,
+        http: HttpClient,
+        cache: Cache,
+        settings: Settings,
+        posters: Any | None = None,
+    ) -> None:
         self.http = http
         self.cache = cache
         self.settings = settings
+        self.posters = posters
         self.base_url = settings.renaissance_base_url.rstrip("/")
+
+    async def get_movie_poster(self, movie: Movie) -> str | None:
+        if self.posters is None:
+            return None
+        return await self.posters.url(movie.name)
+
+    async def _official_poster(self, movie: Movie) -> Movie:
+        """Replace any cinema-scraped artwork with the TMDB poster."""
+
+        return replace(movie, poster_url=await self.get_movie_poster(movie))
 
     # ------------------------------------------------------------------ public
     async def get_branches(self, force_refresh: bool = False) -> list[Branch]:
@@ -535,7 +560,7 @@ class RenaissanceProvider(CinemaProvider):
         if not force_refresh:
             cached = await self.cache.get_json(key, ttl=self.settings.cache_listings_ttl)
             if cached is not None:
-                return [Movie(**item) for item in cached]
+                return _without_scraped_posters([Movie(**item) for item in cached])
         url = f"{self.base_url}/en/cinemas/{_url_part(branch_id)}/{to_rns_date(date)}"
         try:
             html = await self._fetch(
@@ -550,6 +575,7 @@ class RenaissanceProvider(CinemaProvider):
         except Exception:
             logger.exception("Could not parse Renaissance movies for %s %s", branch_id, date)
             movies = []
+        movies = _without_scraped_posters(movies)
         if movies:
             await self.cache.put_json(
                 key, [m.__dict__ for m in movies], self.settings.cache_listings_ttl
@@ -650,7 +676,7 @@ class RenaissanceProvider(CinemaProvider):
             (b for b in branches if b.id == branch_id), Branch(branch_id, branch_id, self.name)
         )
         dates = parse_dates(html)
-        movies = parse_movies(html)
+        movies = _without_scraped_posters(parse_movies(html))
         primary = dates[0] if dates else date_cls.today().isoformat()
         showtimes = parse_showtimes(html, branch_id, primary)
         overview = BranchOverview(
@@ -677,7 +703,7 @@ class RenaissanceProvider(CinemaProvider):
         if not force_refresh:
             cached = await self.cache.get_json(key, ttl=ttl)
             if cached is not None:
-                return [Movie(**item) for item in cached]
+                return _without_scraped_posters([Movie(**item) for item in cached])
         try:
             html = await self._fetch(
                 f"{self.base_url}/en/coming-soon", _raw_key(key), ttl, force_refresh
@@ -686,7 +712,8 @@ class RenaissanceProvider(CinemaProvider):
         except Exception:
             logger.exception("Could not fetch Renaissance coming soon")
             stale = await self.cache.get_json(key, allow_stale=True)
-            return [Movie(**item) for item in stale] if stale else []
+            return _without_scraped_posters([Movie(**item) for item in stale]) if stale else []
+        movies = _without_scraped_posters(movies)
         if movies:
             await self.cache.put_json(key, [m.__dict__ for m in movies], ttl)
         return movies
@@ -702,7 +729,7 @@ class RenaissanceProvider(CinemaProvider):
             if cached:
                 merged = {**movie.__dict__}
                 merged.update({k: v for k, v in cached.items() if v not in (None, "")})
-                return Movie(**merged)
+                return await self._official_poster(Movie(**merged))
         try:
             html = await self._fetch(
                 f"{self.base_url}/en/movie/{_url_part(slug)}",
@@ -713,7 +740,8 @@ class RenaissanceProvider(CinemaProvider):
             details = parse_movie_details(html, movie)
         except Exception:
             logger.warning("Could not fetch Renaissance movie details for %s", slug)
-            return movie
+            return await self._official_poster(movie)
+        details = await self._official_poster(details)
         await self.cache.put_json(
             key,
             {
@@ -763,7 +791,7 @@ class RenaissanceProvider(CinemaProvider):
         return {
             "branch": overview.branch.__dict__,
             "dates": list(overview.dates),
-            "movies": [m.__dict__ for m in overview.movies],
+            "movies": [m.__dict__ for m in _without_scraped_posters(overview.movies)],
             "showtimes": [s.to_dict() for s in overview.showtimes],
             "fetched_date": overview.fetched_date,
         }
@@ -773,7 +801,7 @@ class RenaissanceProvider(CinemaProvider):
         return BranchOverview(
             branch=Branch(**data["branch"]),
             dates=tuple(data.get("dates", ())),
-            movies=tuple(Movie(**m) for m in data.get("movies", ())),
+            movies=tuple(_without_scraped_posters([Movie(**m) for m in data.get("movies", ())])),
             showtimes=tuple(Showtime.from_dict(s) for s in data.get("showtimes", ())),
             fetched_date=data.get("fetched_date"),
         )

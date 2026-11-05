@@ -54,6 +54,11 @@ class CinemaProvider(ABC):
 
         return movie
 
+    async def get_movie_poster(self, movie: Movie) -> str | None:
+        """Return official (TMDB-hosted) artwork for a listing, if available."""
+
+        return movie.poster_url
+
     async def get_branch_overview(
         self, branch_id: str, force_refresh: bool = False
     ) -> BranchOverview:
