@@ -1,29 +1,26 @@
 # syntax=docker/dockerfile:1
+#
+# Cinema Radar is a long-polling worker: it never listens on a port.
+# The SQLite database is expected at DB_PATH (see fly.toml) and is created
+# automatically on first start.
 
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
-    DB_PATH=/data/cinemaradar.sqlite3 \
-    PATH=/usr/local/bin:$PATH
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
+# Only the runtime requirements: the test/dev tools are not installed.
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN pip install -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /data /app/data \
-    && test -f /app/data/imax_films.json
-
-EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)"
+# Mount point for the Fly.io volume that keeps the database across deploys.
+RUN mkdir -p /data
 
 CMD ["python", "-m", "main"]

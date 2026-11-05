@@ -1,14 +1,18 @@
 # Fly.io configuration for Cinema Radar
 #
-# The bot uses Telegram long polling, so it never binds an HTTP port:
-# there is no [http_service] and no health check on purpose.
-# Data lives on the `cinema_data` volume mounted at /data.
+# The bot uses Telegram long polling, so it never binds an HTTP port: there is
+# deliberately no [http_service], no [services] and no health check.
+#
+# Run exactly ONE machine. Two long-polling processes on the same token fight
+# over getUpdates and Telegram answers both with 409 Conflict.
 app = "cinema-radar"
 primary_region = "cdg"
 
 [build]
   dockerfile = "Dockerfile"
 
+# Give the bot time to cancel background jobs and close SQLite on redeploy.
+kill_signal = "SIGINT"
 kill_timeout = "20s"
 
 [[vm]]
@@ -16,6 +20,7 @@ kill_timeout = "20s"
   memory = "256mb"
   cpu_kind = "shared"
 
+# Keeps cinemaradar.sqlite3 alive across deploys.
 [[mounts]]
   source = "cinema_data"
   destination = "/data"

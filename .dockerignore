@@ -1,16 +1,44 @@
+# Keep the image small: only runtime code, data and requirements go in.
 .git
+.gitignore
+.gitattributes
+.github
+
+# Python environments and caches
 .venv
+venv
+env
 __pycache__
-*.pyc
+*.py[cod]
+*.egg-info
 .pytest_cache
 .ruff_cache
-bot.log
-bot.err.log
-cinemaradar.sqlite3
-*.sqlite3
+.mypy_cache
+.coverage
+htmlcov
+
+# Local secrets and data
 .env
+.env.*
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.log
+logs/
+
+# Development-only files
+tests/
+docs/
+scripts/
+assets/
 README.md
 CHANGELOG.md
-docs/
-tests/
-scripts/
+DEPLOY.md
+pytest.ini
+requirements-dev.txt
+
+# Deployment files (read by Fly, not needed inside the image)
+fly.toml
+Dockerfile
+.dockerignore

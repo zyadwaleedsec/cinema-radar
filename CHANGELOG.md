@@ -11,6 +11,20 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+### Added
+
+- [`DEPLOY.md`](DEPLOY.md): a step-by-step Fly.io deployment guide (Docker
+  image, volume, secrets, logs, troubleshooting).
+
+### Changed
+
+- The Docker image is slimmer: runtime dependencies only, no apt packages, no
+  `EXPOSE`/health check (the bot is a long-polling worker with no HTTP server).
+- Ruff configuration moved to `ruff.toml` so a bare `pyproject.toml` can never
+  push Fly.io into its buildpack path again.
+- `fly.toml` pins the app to one worker machine with a `/data` volume and a
+  20-second shutdown timeout.
+
 ## [2.5.1] - 2026-11-05
 
 ### Fixed

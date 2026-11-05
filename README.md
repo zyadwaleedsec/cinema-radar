@@ -106,7 +106,9 @@ Before the first run, open [@BotFather](https://t.me/BotFather) → your bot:
 - Do not add commands manually: they are registered automatically at startup,
   in both Arabic and English.
 
-> Want it to keep running after you close the laptop? See the deployment notes in
+> Want it online 24/7? See [`DEPLOY.md`](DEPLOY.md) for a step-by-step Fly.io
+> deployment (Docker, volume, secrets, logs). For keeping it alive on your own
+> laptop, see
 > [`docs/TECHNICAL.md`](docs/TECHNICAL.md#deployment-on-a-local-laptop).
 
 ---
@@ -135,6 +137,7 @@ commands never appear in the public menu.
 
 | File | What is inside |
 | --- | --- |
+| [`DEPLOY.md`](DEPLOY.md) | Deploying online on Fly.io, step by step: Docker, volume, secrets, logs, troubleshooting |
 | [`docs/TECHNICAL.md`](docs/TECHNICAL.md) | How it works: provider parsing, polling, cache, languages, versioning, full configuration, deployment, troubleshooting |
 | [`docs/SPEC.md`](docs/SPEC.md) | Product specification and behaviour details |
 | [`CHANGELOG.md`](CHANGELOG.md) | Every release, newest first |

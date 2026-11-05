@@ -73,7 +73,10 @@ cinema-radar/
 ├── tests/                  # pytest suite (204 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
-├── pyproject.toml          # ruff lint/format configuration
+├── ruff.toml               # ruff lint/format configuration
+├── Dockerfile              # slim runtime image (worker, no HTTP port)
+├── fly.toml                # Fly.io app: region, volume, single machine
+├── DEPLOY.md               # step-by-step online deployment guide
 ├── CHANGELOG.md            # release history (Keep a Changelog)
 └── .env.example
 ```
@@ -535,7 +538,7 @@ python -m ruff format .
 python -m pip_audit -r requirements.txt
 ```
 
-Configuration lives in [`pyproject.toml`](../pyproject.toml). `ruff` and
+Configuration lives in [`ruff.toml`](../ruff.toml). `ruff` and
 `pip-audit` are included in `requirements-dev.txt`.
 
 ---
