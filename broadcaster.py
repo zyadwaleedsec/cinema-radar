@@ -32,11 +32,13 @@ class Broadcaster:
         stats: Any | None = None,
         clock: Callable[[], float] = time.time,
         sleep: Callable[[], Any] | None = None,
+        posters: Any | None = None,
     ) -> None:
         self.settings = settings
         self.db = db
         self.sender = sender
         self.stats = stats
+        self.posters = posters
         self._clock = clock
         self._queue: asyncio.Queue[list[DiscoveryEvent]] = asyncio.Queue()
         self._worker: asyncio.Task[Any] | None = None
@@ -106,7 +108,9 @@ class Broadcaster:
                     break
                 with i18n.use(sub.get("lang")):
                     text, keyboard = await self._build_message(int(sub["user_id"]), branch_events)
-                photo = branch_events[0].movie.poster_url if len(branch_events) == 1 else None
+                # The overview strips cinema-scraped artwork, so every alert
+                # resolves official artwork from TMDB (cached for a month).
+                photo = await self._poster(branch_events[0].movie)
                 try:
                     await self.sender.send(int(sub["telegram_id"]), text, keyboard, photo_url=photo)
                 except UserBlocked:
@@ -171,17 +175,31 @@ class Broadcaster:
     def _local_day(self, now: float) -> str:
         return local_date(now, self.settings.timezone).isoformat()
 
+    async def _poster(self, movie: Any) -> str | None:
+        """Return official artwork for a discovery event, if we can find it."""
+
+        existing = getattr(movie, "poster_url", None)
+        if existing:
+            return existing
+        if self.posters is None:
+            return None
+        try:
+            return await self.posters.url(getattr(movie, "name", "") or "")
+        except Exception:
+            logger.warning("Could not resolve a discovery poster")
+            return None
+
     async def _build_message(self, user_id: int, events: list[DiscoveryEvent]) -> tuple[str, Any]:
         from keyboards import discovery_keyboard
 
-        branch_name = events[0].branch.name
+        first = events[0]
+        branch_name = first.branch.name
         if len(events) == 1:
-            text = _event_text(events[0])
+            text = _event_text(first)
         else:
             lines = [_event_line(e) for e in events]
-            text = strings.discovery_digest(branch_name, len(events), lines)
+            text = strings.discovery_digest(branch_name, len(events), lines, first.branch.provider)
 
-        first = events[0]
         token = secrets.token_urlsafe(16)
         await self.db.add_discovery_action(
             token,
@@ -207,29 +225,36 @@ class Broadcaster:
         for event in events:
             with i18n.use(i18n.DEFAULT_LANGUAGE):
                 text = strings.discovery_channel(_event_text(event))
+            photo = await self._poster(event.movie)
             try:
-                await self.sender.send(channel, text, photo_url=event.movie.poster_url)
+                await self.sender.send(channel, text, photo_url=photo)
             except Exception:
                 logger.exception("Could not post to public channel")
 
 
 def _event_text(event: DiscoveryEvent) -> str:
+    provider = event.branch.provider
     if event.kind == "UPCOMING_MOVIE":
         hall = event.showtime.hall_type if event.showtime else None
         text = strings.discovery_upcoming_released(
-            event.movie.name, event.branch.name, event.date, hall
+            event.movie.name, event.branch.name, event.date, hall, provider
         )
     elif event.kind == "NEW_MOVIE":
         hall = event.showtime.hall_type if event.showtime else None
-        text = strings.discovery_new_movie(event.movie.name, event.branch.name, event.date, hall)
+        text = strings.discovery_new_movie(
+            event.movie.name, event.branch.name, event.date, hall, provider
+        )
     elif event.kind == "NEW_DATE_OPENED":
-        text = strings.discovery_new_date(event.movie.name, event.branch.name, event.date or "")
+        text = strings.discovery_new_date(
+            event.movie.name, event.branch.name, event.date or "", provider
+        )
     else:
         text = strings.discovery_new_showtimes(
             event.movie.name,
             event.branch.name,
             event.date or "",
             list(event.times or ((event.showtime.time,) if event.showtime else ())),
+            provider,
         )
     facts = strings.movie_facts(
         event.movie.duration_minutes, event.movie.rating, event.movie.language

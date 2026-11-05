@@ -72,7 +72,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (231 tests)
+├── tests/                  # pytest suite (237 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -460,10 +460,11 @@ TMDB is optional and serves two unrelated jobs behind `TMDB_READ_TOKEN`:
 1. **IMAX normalisation** — canonical title/year before matching the snapshot.
    It is not the source of truth: TMDB's `imax` keyword marks screenings, not
    films shot with IMAX cameras.
-2. **Official posters** — `posters.py` resolves a cached TMDB image URL for every
-   movie card and alert. Cinema-scraped poster URLs are stripped at the provider
-   boundary, and existing watch rows containing VOX/Renaissance image URLs are
-   cleared on startup. With no token, the bot sends text-only cards.
+2. **Official posters** - `posters.py` resolves a cached TMDB image URL for every
+   movie card and alert, including discovery alerts and public-channel posts
+   (resolved by `Broadcaster`). Cinema-scraped poster URLs are stripped at the
+   provider boundary, and existing watch rows containing VOX/Renaissance image
+   URLs are cleared on startup. With no token, the bot sends text-only cards.
 
 If the token is empty, IMAX matching is name-based and the snapshot still works.
 Put the token in `.env` only; rotate it if it was ever shared in chat. TMDB
@@ -557,7 +558,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `231 passed`.
+Expected: `237 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

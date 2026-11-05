@@ -11,6 +11,18 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-11-05
+
+### Changed
+
+- Discovery alerts are redesigned as a readable card: a TMDB poster, the movie
+  title, the cinema brand and branch on one line, the date, the showtimes and a
+  short call to action. The same layout is used for new movies, new dates and
+  released upcoming movies, and in the public channel.
+- Discovery alerts now resolve their poster through the same cached TMDB service
+  as watch alerts, so they never fall back to cinema-scraped artwork.
+- The discovery buttons now carry the bell icons used elsewhere in the bot.
+
 ## [2.7.0] - 2026-11-05
 
 ### Added

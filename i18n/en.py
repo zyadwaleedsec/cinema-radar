@@ -196,8 +196,8 @@ BTN_CONFIRM = "Confirm watch ✅"
 BTN_DELETE_ALL = "🗑️ Delete all"
 BTN_CONFIRM_DELETE_ALL = "Yes, delete all"
 BTN_OPEN_BOOKING = "🎟️ Open booking"
-BTN_WATCH_MOVIE = "Watch this movie"
-BTN_STOP_ALERTS = "Stop these alerts"
+BTN_WATCH_MOVIE = "🔔 Watch this movie"
+BTN_STOP_ALERTS = "🔕 Stop these alerts"
 BTN_REMOVE_WATCH = "❌ Remove watch"
 BTN_CONFIRM_REMOVE_WATCH = "Yes, remove it"
 BTN_SNOOZE = "⏰ Remind me in an hour"
@@ -1509,67 +1509,104 @@ def feedback_admin(
 
 
 # ------------------------------------------------------------------ discovery
-def discovery_new_movie(movie: str, branch: str, date: str | None, hall: str | None) -> str:
+def _cinema_line(branch: str, provider: str | None = None) -> str:
+    """Cinema brand and branch on one readable line."""
+
+    return f"🏢 <b>{cinema_name(provider)}</b> · {esc(branch)}"
+
+
+def discovery_new_movie(
+    movie: str,
+    branch: str,
+    date: str | None,
+    hall: str | None,
+    provider: str | None = None,
+) -> str:
     lines = [
-        "🎬 <b>A new movie just opened for booking</b>",
+        "🍿 <b>A new movie just opened</b>",
         DIVIDER,
         "",
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)}",
+        _cinema_line(branch, provider),
     ]
     if date:
         lines.append(f"📅 from {relative_date(date)}")
     if hall:
         lines.append(f"🎭 {esc(hall)}")
+    lines += ["", "<i>First showtimes are live — book early.</i>"]
     return "\n".join(lines)
 
 
-def discovery_new_date(movie: str, branch: str, date: str) -> str:
+def discovery_new_date(
+    movie: str,
+    branch: str,
+    date: str,
+    provider: str | None = None,
+) -> str:
     return (
         f"📅 <b>A new date just opened</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 from {relative_date(date)}"
+        f"{_cinema_line(branch, provider)}\n"
+        f"📅 from {relative_date(date)}\n\n"
+        "<i>The new dates are bookable now.</i>"
     )
 
 
-def discovery_new_showtimes(movie: str, branch: str, date: str, times: list[str]) -> str:
-    joined = ", ".join(format_time(t) for t in times[:8])
-    more = " and more" if len(times) > 8 else ""
+def discovery_new_showtimes(
+    movie: str,
+    branch: str,
+    date: str,
+    times: list[str],
+    provider: str | None = None,
+) -> str:
+    joined = " · ".join(format_time(t) for t in times[:6])
+    more = " and more" if len(times) > 6 else ""
     return (
-        f"🎟️ <b>New showtimes appeared</b>\n{DIVIDER}\n\n"
+        f"🎟️ <b>New showtimes just dropped</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
+        f"{_cinema_line(branch, provider)}\n"
         f"📅 {relative_date(date)}\n"
-        f"🕐 {joined}{more}"
+        f"🕘 {joined}{more}\n\n"
+        "<i>Grab your seats before they fill up.</i>"
     )
 
 
 def discovery_upcoming_released(
-    movie: str, branch: str, date: str | None, hall: str | None = None
+    movie: str,
+    branch: str,
+    date: str | None,
+    hall: str | None = None,
+    provider: str | None = None,
 ) -> str:
     lines = [
-        "🍿 <b>The movie you were waiting for is out</b>",
+        "🍿 <b>The movie you were waiting for is here</b>",
         DIVIDER,
         "",
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)}",
+        _cinema_line(branch, provider),
     ]
     if date:
         lines.append(f"📅 from {relative_date(date)}")
     if hall:
         lines.append(f"🎭 {esc(hall)}")
-    lines += ["", "Book before it fills up."]
+    lines += ["", "<i>Book before it fills up.</i>"]
     return "\n".join(lines)
 
 
-def discovery_digest(branch: str, count: int, lines: list[str]) -> str:
+def discovery_digest(
+    branch: str,
+    count: int,
+    lines: list[str],
+    provider: str | None = None,
+) -> str:
     body = "\n".join(f"• {line}" for line in lines[:6])
-    more = f"\nand {_count(count - 6, 'more update', 'more updates')}" if count > 6 else ""
+    more = f"\n<i>and {_count(count - 6, 'more update', 'more updates')}</i>" if count > 6 else ""
     return (
-        f"🎬 <b>{_count(count, 'new update', 'new updates')} at {esc(branch)}</b>\n\n"
+        f"🍿 <b>{_count(count, 'new update', 'new updates')} at "
+        f"{cinema_name(provider)} · {esc(branch)}</b>\n"
+        f"{DIVIDER}\n\n"
         f"{body}{more}\n\n"
-        "Open booking or watch the movie with one tap."
+        "<i>Open booking or watch the movie with one tap.</i>"
     )
 
 

@@ -128,7 +128,7 @@ async def run() -> None:
     provider = provider_objs[0]
     providers = ProviderRegistry(provider_objs)
     scheduler = Scheduler(settings, time.time)
-    broadcaster = Broadcaster(settings, db, sender)
+    broadcaster = Broadcaster(settings, db, sender, posters=posters)
     stats = StatsService(
         db,
         settings,

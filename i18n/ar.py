@@ -196,8 +196,8 @@ BTN_CONFIRM = "أكد المراقبة ✅"
 BTN_DELETE_ALL = "🗑️ امسح الكل"
 BTN_CONFIRM_DELETE_ALL = "أيوه امسح الكل"
 BTN_OPEN_BOOKING = "🎟️ افتح الحجز"
-BTN_WATCH_MOVIE = "راقب الفيلم ده"
-BTN_STOP_ALERTS = "إيقاف التنبيهات دي"
+BTN_WATCH_MOVIE = "🔔 راقب الفيلم ده"
+BTN_STOP_ALERTS = "🔕 إيقاف التنبيهات دي"
 BTN_REMOVE_WATCH = "❌ شيل المراقبة"
 BTN_CONFIRM_REMOVE_WATCH = "أيوه شيلها"
 BTN_SNOOZE = "⏰ فكّرني بعد ساعة"
@@ -1521,67 +1521,103 @@ def feedback_admin(
 
 
 # ------------------------------------------------------------------ discovery
-def discovery_new_movie(movie: str, branch: str, date: str | None, hall: str | None) -> str:
+def _cinema_line(branch: str, provider: str | None = None) -> str:
+    """Cinema brand and branch on one readable line."""
+
+    return f"🏢 <b>{cinema_name(provider)}</b> · {esc(branch)}"
+
+
+def discovery_new_movie(
+    movie: str,
+    branch: str,
+    date: str | None,
+    hall: str | None,
+    provider: str | None = None,
+) -> str:
     lines = [
-        "🎬 <b>فيلم جديد اتفتح له حجز</b>",
+        "🍿 <b>فيلم جديد بدأ حجزه</b>",
         DIVIDER,
         "",
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)}",
+        _cinema_line(branch, provider),
     ]
     if date:
-        lines.append(f"📅 من يوم {relative_date(date)}")
+        lines.append(f"📅 من {relative_date(date)}")
     if hall:
         lines.append(f"🎭 {esc(hall)}")
+    lines += ["", "<i>أول حفلاته ظهرت — احجز من بدري.</i>"]
     return "\n".join(lines)
 
 
-def discovery_new_date(movie: str, branch: str, date: str) -> str:
+def discovery_new_date(
+    movie: str,
+    branch: str,
+    date: str,
+    provider: str | None = None,
+) -> str:
     return (
-        f"📅 <b>يوم جديد اتفتح حجزه</b>\n{DIVIDER}\n\n"
+        f"📅 <b>يوم جديد اتفتح للحجز</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 من يوم {relative_date(date)}"
+        f"{_cinema_line(branch, provider)}\n"
+        f"📅 من {relative_date(date)}\n\n"
+        "<i>المواعيد الجديدة متاحة دلوقتي.</i>"
     )
 
 
-def discovery_new_showtimes(movie: str, branch: str, date: str, times: list[str]) -> str:
-    joined = "، ".join(format_time(t) for t in times[:8])
-    more = " وغيرها" if len(times) > 8 else ""
+def discovery_new_showtimes(
+    movie: str,
+    branch: str,
+    date: str,
+    times: list[str],
+    provider: str | None = None,
+) -> str:
+    joined = " · ".join(format_time(t) for t in times[:6])
+    more = " وغيرها" if len(times) > 6 else ""
     return (
         f"🎟️ <b>حفلات جديدة ظهرت</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
+        f"{_cinema_line(branch, provider)}\n"
         f"📅 {relative_date(date)}\n"
-        f"🕐 {joined}{more}"
+        f"🕘 {joined}{more}\n\n"
+        "<i>الحق احجز قبل ما تتكمل.</i>"
     )
 
 
 def discovery_upcoming_released(
-    movie: str, branch: str, date: str | None, hall: str | None = None
+    movie: str,
+    branch: str,
+    date: str | None,
+    hall: str | None = None,
+    provider: str | None = None,
 ) -> str:
     lines = [
         "🍿 <b>الفيلم اللي كنت مستنيه نزل</b>",
         DIVIDER,
         "",
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)}",
+        _cinema_line(branch, provider),
     ]
     if date:
         lines.append(f"📅 من {relative_date(date)}")
     if hall:
         lines.append(f"🎭 {esc(hall)}")
-    lines += ["", "الحق احجز قبل ما يتكمل."]
+    lines += ["", "<i>الحق احجز قبل ما يتكمل.</i>"]
     return "\n".join(lines)
 
 
-def discovery_digest(branch: str, count: int, lines: list[str]) -> str:
+def discovery_digest(
+    branch: str,
+    count: int,
+    lines: list[str],
+    provider: str | None = None,
+) -> str:
     body = "\n".join(f"• {line}" for line in lines[:6])
-    more = f"\nوكمان {_updates(count - 6)}" if count > 6 else ""
+    more = f"\n<i>وكمان {_updates(count - 6)}</i>" if count > 6 else ""
     return (
-        f"🎬 <b>{_updates(count)} في فرع {esc(branch)}</b>\n{DIVIDER}\n\n"
+        f"🍿 <b>{_updates(count)} في {cinema_name(provider)} · {esc(branch)}</b>\n"
+        f"{DIVIDER}\n\n"
         f"{body}{more}\n\n"
-        "افتح الحجز أو راقب الفيلم بضغطة."
+        "<i>افتح الحجز أو راقب الفيلم بضغطة.</i>"
     )
 
 
