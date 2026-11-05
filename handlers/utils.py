@@ -8,6 +8,7 @@ from typing import Any
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 
+import strings
 from ui import Screen, render
 from utils import json_list
 
@@ -32,7 +33,10 @@ async def edit(
 ) -> None:
     """Edit the current screen, ignoring "message is not modified"."""
 
-    await render.edit_screen(callback, Screen(text=text, keyboard=keyboard, photo_url=photo_url))
+    await render.edit_screen(
+        callback,
+        Screen(text=text, keyboard=keyboard, photo_url=photo_url, is_rtl=strings.RTL),
+    )
 
 
 async def send(
@@ -44,7 +48,8 @@ async def send(
     """Send a screen as a new message."""
 
     return await render.send_screen(
-        message, Screen(text=text, keyboard=keyboard, photo_url=photo_url)
+        message,
+        Screen(text=text, keyboard=keyboard, photo_url=photo_url, is_rtl=strings.RTL),
     )
 
 

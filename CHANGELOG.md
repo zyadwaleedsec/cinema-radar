@@ -11,6 +11,8 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-11-05
+
 ### Added
 
 - [`DEPLOY.md`](DEPLOY.md): a step-by-step Fly.io deployment guide (Docker
@@ -18,6 +20,14 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ### Changed
 
+- Polish pass across every screen: Arabic now uses proper dual and plural forms
+  ("مراقبتين", "5 فروع", "4 كراسي", "3 أفلام"), duplicated emojis are gone,
+  alert headers are distinct, and freshness/empty-state copy reads more
+  naturally. The English catalog received the same fixes.
+- Rich messages now follow the selected language direction, so English screens
+  are no longer forced right-to-left.
+- Morning/evening copy spells out "5 مساءً" / "8 صباحاً" instead of abbreviating
+  the period, and the custom quiet-hours prompt matches it.
 - `fly.toml` now sets `HTTP_IMPERSONATE=chrome124`, matching `.env`, so VOX
   requests no longer time out on the deployed bot.
 - The Docker image is slimmer: runtime dependencies only, no apt packages, no
@@ -311,7 +321,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.1...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.2...HEAD
+[2.5.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.3.0...v2.4.0

@@ -399,7 +399,7 @@ def privacy_text() -> str:
 # ------------------------------------------------------------------ add watch
 def choose_cinema() -> str:
     return (
-        "🎬 <b>Choose a cinema</b>\n\n"
+        f"🎬 <b>Choose a cinema</b>\n{DIVIDER}\n\n"
         "Pick the cinema you want to watch at, or «All cinemas» to watch the movie "
         "across every branch at once."
     )
@@ -447,7 +447,7 @@ def confirm_window(
         f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
         f"📅 {relative_date(date)}\n"
         f"🕐 {window_label(window, morning_end_hour)}\n"
-        f"🏢 {branch_count} branches\n\n"
+        f"🏢 {_count(branch_count, 'branch', 'branches')}\n\n"
         "You'll watch every show in this period across all cinemas, and get a ping "
         "when a new show opens or a seat comes back.\n\n"
         "Confirm the watch?"
@@ -461,7 +461,7 @@ def watch_created_window(
         "✅ <b>Watch active</b>\n\n"
         f"🎬 {esc(movie)}\n"
         f"📅 {relative_date(date)} · 🕐 {window_label(window, morning_end_hour)}\n"
-        f"🏢 All cinemas ({branch_count} branches)\n\n"
+        f"🏢 All cinemas ({_count(branch_count, 'branch', 'branches')})\n\n"
         "I'll alert you when a new show opens in this period."
     )
 
@@ -516,7 +516,7 @@ def search_results(query: str, count: int, total: int) -> str:
     return (
         f"🔎 <b>Search results</b>\n\n"
         f"“<b>{esc(query)}</b>”\n"
-        f"<b>{count}</b> of {total} movies\n\n"
+        f"<b>{count}</b> of {_count(total, 'movie')}\n\n"
         "Pick the movie you want:"
     )
 
@@ -786,14 +786,14 @@ def watch_limit_reached(
     if is_supporter:
         return (
             "⚠️ <b>You've reached the maximum</b>\n\n"
-            f"You have <b>{limit}</b> watches.\n\n"
+            f"You have <b>{_count(limit, 'watch', 'watches')}</b>.\n\n"
             "Remove an old watch from <b>My watches</b>\n"
             "to add a new one."
         )
     return (
         "⚠️ <b>You've reached the free limit</b>\n\n"
-        f"You have <b>{limit}</b> watches, which is the free limit.\n\n"
-        f"To reach <b>{supporter_limit} watches</b>,\n"
+        f"You have <b>{_count(limit, 'watch', 'watches')}</b>, which is the free limit.\n\n"
+        f"To reach <b>{_count(supporter_limit, 'watch', 'watches')}</b>,\n"
         "you can support the project <b>once</b>\n"
         f"with a minimum of <b>{min_amount} EGP</b> from <b>Support the project</b> 💛\n\n"
         "Or remove an old watch from <b>My watches</b>."
@@ -859,9 +859,9 @@ def watches_page_title(count: int) -> str:
 
 def watch_mode_label(mode: str | None) -> str:
     return {
-        "seats": "Seats came back 🪑",
-        "opening": "Booking opens only 🎟️",
-    }.get(mode or "all", "Everything 🔔")
+        "seats": "Seats came back",
+        "opening": "Booking opens only",
+    }.get(mode or "all", "Everything")
 
 
 def watch_row(
@@ -877,9 +877,9 @@ def watch_row(
     scope: str | None = "showtime",
     provider: str = "vox",
 ) -> str:
-    state = STATUS_LABELS_EN.get(status, status)
-    if seats is not None:
-        state = f"{state} · {_seats(seats)}"
+    state = STATUS_LABELS_EN.get(str(status or "").upper(), "Unknown")
+    if seats not in (None, ""):
+        state = f"{state} · {_seats(int(seats))}"
     scope = scope or "showtime"
     format_text = f" · {esc(hall)}" if hall and hall != "*" else ""
     if scope == "movie_all_dates":
@@ -887,7 +887,7 @@ def watch_row(
     elif scope == "movie":
         ticket = f"🎟️ All showtimes{format_text} · {esc(state)}"
     else:
-        ticket = f"🕐 {format_time(time)} · {esc(hall)} · {esc(state)}"
+        ticket = f"🕐 {format_time(time)}{format_text} · {esc(state)}"
     lines = [
         f"🎬 <b>{esc(movie)}</b>",
         f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}",
@@ -920,7 +920,7 @@ def watch_detail(
     elif scope == "movie":
         ticket = f"🎟️ All showtimes{format_text}"
     else:
-        ticket = f"🕐 {format_time(time)} · {esc(hall)}"
+        ticket = f"🕐 {format_time(time)}{format_text}"
     return (
         f"⚙️ <b>Watch settings</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
@@ -942,9 +942,9 @@ def watch_reminder(
     seats: int | None,
     scope: str | None = "showtime",
 ) -> str:
-    state = STATUS_LABELS_EN.get(status, status)
-    if seats is not None:
-        state = f"{state} · {_seats(seats)}"
+    state = STATUS_LABELS_EN.get(str(status or "").upper(), "Unknown")
+    if seats not in (None, ""):
+        state = f"{state} · {_seats(int(seats))}"
     scope = scope or "showtime"
     format_text = f" — {esc(hall)}" if hall and hall != "*" else ""
     if scope == "movie_all_dates":
@@ -952,7 +952,7 @@ def watch_reminder(
     elif scope == "movie":
         ticket = f"🎟️ All showtimes{format_text}"
     else:
-        ticket = f"🕐 {format_time(time)} · {esc(hall)}"
+        ticket = f"🕐 {format_time(time)}{format_text}"
     lines = [
         "⏰ <b>Here's the watch you asked about</b>",
         "",
@@ -1095,7 +1095,7 @@ def alert_new_date(
     more = " and more" if len(times) > 8 else ""
     hall_text = f"\n🎭 {esc(hall)}" if hall else ""
     return (
-        f"🎬 <b>A new date just opened</b>\n{DIVIDER}\n\n"
+        f"📅 <b>A new date just opened</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}"
@@ -1109,7 +1109,7 @@ def alert_new_showtimes(movie: str, branch: str, date: str, times: list[str]) ->
     joined = ", ".join(format_time(t) for t in times[:8])
     more = " and more" if len(times) > 8 else ""
     return (
-        f"🎬 <b>New showtimes appeared</b>\n{DIVIDER}\n\n"
+        f"🕐 <b>New showtimes appeared</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}\n"
@@ -1364,7 +1364,8 @@ def feedback_category_label(category: str) -> str:
 def feedback_text(category: str | None = None) -> str:
     label = feedback_category_label(category) if category else "Feedback"
     return (
-        f"✍️ <b>{esc(label)}</b>\n\n"
+        "✍️ <b>Send feedback</b>\n\n"
+        f"Type: <b>{esc(label)}</b>\n\n"
         "Write your feedback or idea in one message.\n"
         "Every message reaches the admin and helps us improve the bot."
     )
@@ -1440,9 +1441,9 @@ def discovery_upcoming_released(
 
 def discovery_digest(branch: str, count: int, lines: list[str]) -> str:
     body = "\n".join(f"• {line}" for line in lines[:6])
-    more = f"\nand {count - 6} more" if count > 6 else ""
+    more = f"\nand {_count(count - 6, 'more update', 'more updates')}" if count > 6 else ""
     return (
-        f"🎬 <b>{count} new things at {esc(branch)}</b>\n\n"
+        f"🎬 <b>{_count(count, 'new update', 'new updates')} at {esc(branch)}</b>\n\n"
         f"{body}{more}\n\n"
         "Open booking or watch the movie with one tap."
     )
@@ -1574,7 +1575,7 @@ def stale_notice(minutes: int, degraded: bool) -> str:
             "data may be stale.</i>"
         )
     if minutes >= 10:
-        return f"\n\n<i>Last update: {minutes} min ago.</i>"
+        return f"\n\n<i>Last update {minutes} min ago.</i>"
     return ""
 
 

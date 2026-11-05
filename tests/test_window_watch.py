@@ -159,11 +159,11 @@ def test_window_keyboard_hides_zero_counts() -> None:
 def test_window_cutoff_text_uses_setting() -> None:
     from i18n import ar, en
 
-    assert ar.window_cutoff_text(17) == "5 م"
-    assert ar.window_cutoff_text(12) == "12 م"
-    assert ar.window_cutoff_text(0) == "12 ص"
+    assert ar.window_cutoff_text(17) == "5 مساءً"
+    assert ar.window_cutoff_text(12) == "12 مساءً"
+    assert ar.window_cutoff_text(0) == "12 صباحاً"
     assert en.window_cutoff_text(17) == "5 PM"
     assert en.window_cutoff_text(12) == "12 PM"
     assert en.window_cutoff_text(0) == "12 AM"
-    assert "5 م" in ar.window_label("morning", 17)
+    assert "5 مساءً" in ar.window_label("morning", 17)
     assert "5 PM" in en.window_label("evening", 17)

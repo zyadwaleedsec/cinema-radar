@@ -30,6 +30,73 @@ NAME = "العربية"
 RTL = True
 
 
+def _plural(value: int, one: str, two: str, few: str, many: str) -> str:
+    """Pick the Egyptian-Arabic noun form for a count."""
+
+    remainder = abs(int(value)) % 100
+    if remainder == 1:
+        return one
+    if remainder == 2:
+        return two
+    if 3 <= remainder <= 10:
+        return few
+    return many
+
+
+def _count(value: int, one: str, two: str, few: str, many: str) -> str:
+    """Return ``5 فروع``, ``مراقبتين`` or ``12 مراقبة``."""
+
+    value = int(value)
+    noun = _plural(value, one, two, few, many)
+    if abs(value) % 100 == 2:
+        return noun
+    return f"{value} {noun}"
+
+
+def _watches(value: int) -> str:
+    return _count(value, "مراقبة", "مراقبتين", "مراقبات", "مراقبة")
+
+
+def _active_watches(value: int) -> str:
+    return _count(value, "مراقبة نشطة", "مراقبتين نشطتين", "مراقبات نشطة", "مراقبة نشطة")
+
+
+def _branches(value: int) -> str:
+    return _count(value, "فرع", "فرعين", "فروع", "فرع")
+
+
+def _seats(value: int) -> str:
+    return _count(value, "كرسي", "كرسيين", "كراسي", "كرسي")
+
+
+def _seats_state(value: int) -> str:
+    return _count(
+        value,
+        "كرسي متاح",
+        "كرسيين متاحين",
+        "كراسي متاحة",
+        "كرسي متاح",
+    )
+
+
+def _days(value: int) -> str:
+    return _count(value, "يوم", "يومين", "أيام", "يوم")
+
+
+def _movies(value: int) -> str:
+    return _count(value, "فيلم", "فيلمين", "أفلام", "فيلم")
+
+
+def _updates(value: int) -> str:
+    return _count(
+        value,
+        "تحديث جديد",
+        "تحديثين جديدين",
+        "تحديثات جديدة",
+        "تحديث جديد",
+    )
+
+
 def cinema_name(provider: str | None = None) -> str:
     code = (provider or get_provider() or _app_settings.provider).lower()
     return "رينيسانس" if code == "renaissance" else "فوكس"
@@ -145,7 +212,7 @@ BTN_ALL_HALLS = "كل القاعات"
 BTN_ALL_FORMATS = "🎭 كل الفورمات"
 BTN_MOVIE_INFO = "ℹ️ معلومات الفيلم"
 BTN_TRAILER = "▶️ شوف التريلر"
-BTN_BACK_TO_SHOWTIMES = "🔙 رجوع للحفلات"
+BTN_BACK_TO_SHOWTIMES = "⬅️ رجوع للحفلات"
 BTN_VODAFONE_CASH = "فودافون كاش"
 BTN_INSTAPAY = "إنستاباي"
 BTN_CANCELLATIONS = "تنبيه الإلغاء"
@@ -205,13 +272,13 @@ def dashboard(
         "",
     ]
     if active_watches:
-        lines.append(f"عندك <b>{active_watches}</b> مراقبة نشطة.")
+        lines.append(f"عندك <b>{_active_watches(active_watches)}</b>.")
     else:
         lines.append("مفيش مراقبات نشطة لسه — ابدأ بضغطة من تحت.")
     if next_watch:
         lines += ["", "⏭️ <b>أقرب مراقبة</b>", next_watch]
     if limit:
-        lines += ["", f"<i>حدك الحالي {limit} مراقبة.</i>"]
+        lines += ["", f"<i>حدك الحالي: {_watches(limit)}.</i>"]
     lines += ["", "اختار من تحت 👇"]
     return "\n".join(lines)
 
@@ -365,7 +432,7 @@ def privacy_text() -> str:
 # ------------------------------------------------------------------ add watch
 def choose_cinema() -> str:
     return (
-        "🎬 <b>اختار السينما</b>\n\n"
+        f"🎬 <b>اختار السينما</b>\n{DIVIDER}\n\n"
         "اختار السينما اللي عايز تراقب منها.\n"
         "ولو عايز تراقب الفيلم في كل الفروع مرة واحدة، اختار «كل السينمات»."
     )
@@ -382,7 +449,7 @@ def BTN_EVENING(count: int) -> str:
 def window_cutoff_text(hour: int) -> str:
     """Render the morning/evening split hour in Egyptian-Arabic 12-hour form."""
 
-    period = "م" if hour % 24 >= 12 else "ص"
+    period = "مساءً" if hour % 24 >= 12 else "صباحاً"
     value = hour % 12 or 12
     return f"{value} {period}"
 
@@ -409,7 +476,7 @@ def confirm_window(
         f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
         f"📅 {relative_date(date)}\n"
         f"🕐 {window_label(window, morning_end_hour)}\n"
-        f"🏢 {branch_count} فرع\n\n"
+        f"🏢 {_branches(branch_count)}\n\n"
         "هتراقب كل الحفلات المتاحة في الفترة دي في كل السينمات، "
         "وهبعتلك أول ما حفلة جديدة تفتح أو كرسي يرجع.\n\n"
         "تأكد المراقبة؟"
@@ -423,7 +490,7 @@ def watch_created_window(
         "✅ <b>تم تفعيل المراقبة</b>\n\n"
         f"🎬 {esc(movie)}\n"
         f"📅 {relative_date(date)} · 🕐 {window_label(window, morning_end_hour)}\n"
-        f"🏢 كل السينمات ({branch_count} فرع)\n\n"
+        f"🏢 كل السينمات ({_branches(branch_count)})\n\n"
         "هبعتلك تنبيه أول ما يفتح حجز أو يظهر وقت جديد في الفترة دي."
     )
 
@@ -476,7 +543,7 @@ def search_results(query: str, count: int, total: int) -> str:
     return (
         f"🔎 <b>نتائج البحث</b>\n\n"
         f"«<b>{esc(query)}</b>»\n"
-        f"<b>{count}</b> من {total} فيلم\n\n"
+        f"<b>{count}</b> من {_movies(total)}\n\n"
         "اختار الفيلم اللي عايزه:"
     )
 
@@ -532,8 +599,8 @@ def showtime_button(time: str, hall: str, status: str, seats: int | None) -> str
     else:
         icon = "⚪"
     label = f"{icon} {format_time(time)} · {esc(hall)}"
-    if status == AVAILABLE and seats is not None:
-        label += f" · {seats} كرسي"
+    if status == AVAILABLE and seats not in (None, ""):
+        label += f" · {_seats(int(seats))}"
     return label
 
 
@@ -702,7 +769,7 @@ def confirm_all_dates(branch: str, movie: str, count: int, hall: str | None = No
         "<b>تأكيد مراقبة كل الأيام</b>\n\n"
         f"🏢 {esc(branch)}\n"
         f"🎬 {esc(movie)}\n"
-        f"📅 كل الأيام المتاحة دلوقتي ({count} يوم){format_text}\n\n"
+        f"📅 كل الأيام المتاحة دلوقتي ({_days(count)}){format_text}\n\n"
         "هنراقب كل يوم يفتح فيه الفيلم في الفرع ده، "
         "وكمان أي يوم جديد ينزل للحجز.\n"
         "أول ما حجز يفتح أو كراسي ترجع هتوصلك رسالة."
@@ -715,7 +782,7 @@ def watch_created_all_dates(branch: str, movie: str, count: int, hall: str | Non
         "✅ <b>تمت إضافة المراقبة</b>\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}{format_text}\n"
-        f"📅 كل الأيام المتاحة ({count} يوم)\n\n"
+        f"📅 كل الأيام المتاحة ({_days(count)})\n\n"
         "أي يوم جديد ينزل أو كراسي ترجع،\n"
         "هتوصلك رسالة.\n\n"
         "تظبط نوع التنبيه من <b>⚙️ إعدادات التنبيه</b>."
@@ -740,14 +807,14 @@ def watch_limit_reached(
     if is_supporter:
         return (
             "⚠️ <b>وصلت للحد الأقصى</b>\n\n"
-            f"عندك <b>{limit}</b> مراقبة.\n\n"
+            f"عندك <b>{_watches(limit)}</b>.\n\n"
             "امسح مراقبة قديمة من <b>مراقباتي</b>\n"
             "عشان تضيف واحدة جديدة."
         )
     return (
         "⚠️ <b>وصلت للحد المجاني</b>\n\n"
-        f"عندك <b>{limit}</b> مراقبة، وهو الحد المجاني.\n\n"
-        f"لو عايز توصل لـ <b>{supporter_limit} مراقبات</b>،\n"
+        f"عندك <b>{_watches(limit)}</b>، وهو الحد المجاني.\n\n"
+        f"لو عايز توصل لـ <b>{_watches(supporter_limit)}</b>،\n"
         "تقدر تدعم المشروع <b>مرة واحدة</b>\n"
         f"بحد أدنى <b>{min_amount} جنيه</b> من <b>ادعم المشروع</b> 💛\n\n"
         "أو امسح مراقبة قديمة من <b>مراقباتي</b>."
@@ -756,8 +823,8 @@ def watch_limit_reached(
 
 def watches_trimmed(removed: int, limit: int) -> str:
     return (
-        f"قلّلنا مراقباتك بـ {removed} عشان الحد الجديد بقى <b>{limit}</b> "
-        "مراقبات.\n"
+        f"شيلنا {_watches(removed)} من مراقباتك عشان الحد الجديد بقى "
+        f"<b>{_watches(limit)}</b>.\n"
         "المراقبات الأقرب في المواعيد فضلت معاك، وتقدر تضيف غيرها من "
         "<b>ادعم المشروع</b> أو تمسح وتضيف من جديد."
     )
@@ -779,7 +846,7 @@ def no_watches() -> str:
 
 
 def watches_retention_note(days: int) -> str:
-    return f"<i>المراقبات اللي حفلاتها بدأت بتتشال تلقائيًا بعد {days} أيام.</i>"
+    return f"<i>المراقبات اللي حفلاتها بدأت بتتشال تلقائيًا بعد {_days(days)}.</i>"
 
 
 def watches_group(date: str) -> str:
@@ -789,10 +856,9 @@ def watches_group(date: str) -> str:
 
 
 def confirm_delete_all(count: int) -> str:
-    label = "مراقبة" if count == 1 else "مراقبات"
     return (
         "🗑️ <b>متأكد؟</b>\n\n"
-        f"هنمسح <b>{count}</b> {label} نشطة. مش هنقدر نرجّعهم، "
+        f"هنمسح <b>{_active_watches(count)}</b>. مش هنقدر نرجّعهم، "
         "ولو عايز تراقب تاني هتبدأ من الأول."
     )
 
@@ -807,15 +873,14 @@ def confirm_remove_watch(movie: str, when: str) -> str:
 
 
 def watches_page_title(count: int) -> str:
-    label = "مراقبة" if count == 1 else "مراقبات"
-    return f"🎟️ <b>مراقباتي</b> · {count} {label} نشطة"
+    return f"🎟️ <b>مراقباتي</b> · {_active_watches(count)}"
 
 
 def watch_mode_label(mode: str | None) -> str:
     return {
-        "seats": "كراسي رجعت 🪑",
-        "opening": "فتح الحجز بس 🎟️",
-    }.get(mode or "all", "كل حاجة 🔔")
+        "seats": "كراسي رجعت",
+        "opening": "فتح الحجز بس",
+    }.get(mode or "all", "كل حاجة")
 
 
 def watch_row(
@@ -831,9 +896,9 @@ def watch_row(
     scope: str | None = "showtime",
     provider: str = "vox",
 ) -> str:
-    state = STATUS_LABELS_AR.get(status, status)
-    if seats is not None:
-        state = f"{state} · {seats} كرسي"
+    state = STATUS_LABELS_AR.get(str(status or "").upper(), "مش معروف")
+    if seats not in (None, ""):
+        state = f"{state} · {_seats(int(seats))}"
     scope = scope or "showtime"
     format_text = f" · {esc(hall)}" if hall and hall != "*" else ""
     if scope == "movie_all_dates":
@@ -841,7 +906,7 @@ def watch_row(
     elif scope == "movie":
         ticket = f"🎟️ كل الحفلات{format_text} · {esc(state)}"
     else:
-        ticket = f"🕐 {format_time(time)} · {esc(hall)} · {esc(state)}"
+        ticket = f"🕐 {format_time(time)}{format_text} · {esc(state)}"
     lines = [
         f"🎬 <b>{esc(movie)}</b>",
         f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}",
@@ -872,7 +937,7 @@ def watch_detail(
     elif scope == "movie":
         ticket = f"🎟️ كل الحفلات{format_text}"
     else:
-        ticket = f"🕐 {format_time(time)} · {esc(hall)}"
+        ticket = f"🕐 {format_time(time)}{format_text}"
     return (
         f"⚙️ <b>إعدادات المراقبة</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
@@ -894,9 +959,9 @@ def watch_reminder(
     seats: int | None,
     scope: str | None = "showtime",
 ) -> str:
-    state = STATUS_LABELS_AR.get(status, status)
-    if seats is not None:
-        state = f"{state} · {seats} كرسي"
+    state = STATUS_LABELS_AR.get(str(status or "").upper(), "مش معروف")
+    if seats not in (None, ""):
+        state = f"{state} · {_seats(int(seats))}"
     scope = scope or "showtime"
     format_text = f" — {esc(hall)}" if hall and hall != "*" else ""
     if scope == "movie_all_dates":
@@ -904,7 +969,7 @@ def watch_reminder(
     elif scope == "movie":
         ticket = f"🎟️ كل الحفلات{format_text}"
     else:
-        ticket = f"🕐 {format_time(time)} · {esc(hall)}"
+        ticket = f"🕐 {format_time(time)}{format_text}"
     lines = [
         "⏰ <b>فكّرتك بالمراقبة دي</b>",
         "",
@@ -944,11 +1009,10 @@ def all_watches_removed() -> str:
 
 def watch_expired_summary(items: list[str], more: int = 0) -> str:
     total = len(items) + more
-    label = "مراقبة" if total == 1 else "مراقبات"
-    lines = [f"🧹 <b>شيلنا {total} {label} خلصت</b>", ""]
+    lines = [f"🧹 <b>شيلنا {_watches(total)} حفلاتهم بدأت</b>", ""]
     lines.extend(f"• {item}" for item in items)
     if more:
-        lines.append(f"• وغيرها {more} مراقبة")
+        lines.append(f"• وكمان {_watches(more)}")
     lines += [
         "",
         "المراقبات دي حفلاتها بدأت، فمش هينفع نبعتك عنها تنبيهات تاني.",
@@ -968,7 +1032,7 @@ def watch_expired_row(movie: str, branch: str, date: str, showtime: str) -> str:
 def alert_booking_opened(
     movie: str, hall: str, time: str, branch: str, seats: int | None, date: str
 ) -> str:
-    seat_text = f"\n🪑 {seats} كرسي متاح" if seats else ""
+    seat_text = f"\n🪑 {_seats_state(seats)}" if seats else ""
     return (
         f"🎟️ <b>الحجز فتح</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
@@ -983,14 +1047,14 @@ def alert_booking_opened(
 def alert_seats_available(
     movie: str, hall: str, time: str, branch: str, seats: int | None, date: str
 ) -> str:
-    seat_text = f"{seats} كرسي" if seats else "كرسي"
+    seat_text = _seats_state(seats) if seats else "كرسي"
     return (
         f"🪑 <b>رجعت كراسي</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)} · {format_time(time)}\n"
         f"🎭 {esc(hall)}\n\n"
-        f"بقى فيه <b>{seat_text}</b> متاح دلوقتي.\n\n"
+        f"بقى فيه <b>{seat_text}</b> دلوقتي.\n\n"
         "الحق احجز 🏃"
     )
 
@@ -1004,7 +1068,7 @@ def alert_movie_booking_opened(
 ) -> str:
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
-    seat_text = f"\n🪑 {seats} كرسي متاح" if seats else ""
+    seat_text = f"\n🪑 {_seats_state(seats)}" if seats else ""
     return (
         f"🎟️ <b>الحجز فتح لحفلات الفيلم</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
@@ -1025,7 +1089,7 @@ def alert_movie_seats_available(
 ) -> str:
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
-    seat_text = f"\n🪑 بقى فيه {seats} كرسي" if seats else ""
+    seat_text = f"\n🪑 {_seats_state(seats)}" if seats else ""
     return (
         f"🪑 <b>رجعت كراسي في حفلات الفيلم</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
@@ -1048,7 +1112,7 @@ def alert_new_date(
     more = " وغيرها" if len(times) > 8 else ""
     hall_text = f"\n🎭 {esc(hall)}" if hall else ""
     return (
-        f"🎬 <b>الفيلم نزل في يوم جديد</b>\n{DIVIDER}\n\n"
+        f"📅 <b>الفيلم نزل في يوم جديد</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}"
@@ -1062,7 +1126,7 @@ def alert_new_showtimes(movie: str, branch: str, date: str, times: list[str]) ->
     joined = "، ".join(format_time(t) for t in times[:8])
     more = " وغيرها" if len(times) > 8 else ""
     return (
-        f"🎬 <b>حفلات جديدة ظهرت</b>\n{DIVIDER}\n\n"
+        f"🕐 <b>حفلات جديدة ظهرت</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)}\n"
@@ -1125,7 +1189,7 @@ def settings_text(
     language: str | None = None,
 ) -> str:
     types = "، ".join(event_type_label(t) for t in event_types) or "كل الأنواع"
-    branches = "كل الفروع" if branch_count == 0 else f"{branch_count} فرع"
+    branches = "كل الفروع" if branch_count == 0 else _branches(branch_count)
     hall = hall_type or "كل القاعات"
     watch_quiet = "بتشمل المراقبات ✅" if quiet_watches else "المراقبات شغالة دايماً 🔔"
     return (
@@ -1163,13 +1227,13 @@ def quiet_custom_prompt() -> str:
     return (
         "<b>🕰️ وقت مخصص</b>\n\n"
         "ابعت البداية والنهاية بالساعات فقط، مثلًا: <code>23-8</code> "
-        "(من 11 م لـ 8 ص).\n"
+        "(من 11 مساءً لـ 8 صباحاً).\n"
         "الساعة بنظام 24 ساعة (0 = 12 بالليل)."
     )
 
 
 def quiet_custom_invalid() -> str:
-    return "مش فاهم الوقت. ابعت مثلًا <code>23-8</code> (من 11 م لـ 8 ص)."
+    return "مش فاهم الوقت. ابعت مثلًا <code>23-8</code> (من 11 مساءً لـ 8 صباحاً)."
 
 
 def choose_branches_text() -> str:
@@ -1201,7 +1265,7 @@ def support_text(limit: int = 10, min_amount: int = 50) -> str:
         "وكل مستخدم عنده <b>مراقبتين</b> مجانًا.\n\n"
         "لو عايز تتابع أكتر، تقدر تدعم المشروع <b>مرة واحدة</b>\n"
         f"بحد أدنى <b>{min_amount} جنيه</b>،\n"
-        f"وحدك يبقى <b>{limit} مراقبات</b> على طول.\n"
+        f"ويبقى حدك <b>{_watches(limit)}</b> على طول.\n"
         "مش اشتراك شهري.\n\n"
         "التحويل فودافون كاش أو إنستاباي،\n"
         "وبعدها تبعت صورة الإثبات.\n"
@@ -1315,7 +1379,8 @@ def feedback_category_label(category: str) -> str:
 def feedback_text(category: str | None = None) -> str:
     label = feedback_category_label(category) if category else "رأي"
     return (
-        f"✍️ <b>{esc(label)}</b>\n\n"
+        "✍️ <b>ابعتلنا رأيك</b>\n\n"
+        f"النوع: <b>{esc(label)}</b>\n\n"
         "اكتب رأيك أو اقتراحك في رسالة واحدة.\n"
         "كل رسالة بتوصل للأدمن، وبتساعدنا نطوّر البوت."
     )
@@ -1391,9 +1456,9 @@ def discovery_upcoming_released(
 
 def discovery_digest(branch: str, count: int, lines: list[str]) -> str:
     body = "\n".join(f"• {line}" for line in lines[:6])
-    more = f"\nو{count - 6} حاجات كمان" if count > 6 else ""
+    more = f"\nوكمان {_updates(count - 6)}" if count > 6 else ""
     return (
-        f"🎬 <b>{count} حاجات جديدة في فرع {esc(branch)}</b>\n{DIVIDER}\n\n"
+        f"🎬 <b>{_updates(count)} في فرع {esc(branch)}</b>\n{DIVIDER}\n\n"
         f"{body}{more}\n\n"
         "افتح الحجز أو راقب الفيلم بضغطة."
     )
@@ -1449,7 +1514,7 @@ def admin_limits_applied(users: int, watches: int) -> str:
         return "✅ حدود المراقبات اتظبطت (2 مجاني / 10 للداعمين)."
     return (
         "✅ حدود المراقبات اتظبطت (2 مجاني / 10 للداعمين).\n"
-        f"اتأثر {users} مستخدم، واتشال {watches} مراقبة زيادة."
+        f"اتأثر {users} مستخدم، واتشال {_watches(watches)} زيادة."
     )
 
 
@@ -1521,11 +1586,11 @@ def stale_notice(minutes: int, degraded: bool) -> str:
         return ""
     if degraded:
         return (
-            f"\n\n⚠️ <i>السينما مش متاحة دلوقتي. آخر تحديث من {minutes} دقيقة — "
+            f"\n\n⚠️ <i>السينما مش متاحة دلوقتي. آخر تحديث قبل {minutes} دقيقة — "
             "البيانات ممكن تكون قديمة.</i>"
         )
     if minutes >= 10:
-        return f"\n\n<i>آخر تحديث: من {minutes} دقيقة.</i>"
+        return f"\n\n<i>آخر تحديث قبل {minutes} دقيقة.</i>"
     return ""
 
 
@@ -1639,7 +1704,7 @@ def imax_override_usage() -> str:
 def imax_override_done(movie_id: str, status: str, updated: int) -> str:
     return (
         f"تم ضبط حالة IMAX للفيلم <code>{esc(movie_id)}</code> على <b>{esc(status)}</b> "
-        f"— اتحدّثت {updated} مراقبة."
+        f"— اتحدّثت {_watches(updated)}."
     )
 
 

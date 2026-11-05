@@ -265,6 +265,34 @@ def test_dashboard_shows_active_count_and_next_watch():
     assert "الماظة" in text
 
 
+def test_arabic_counts_use_dual_and_plural_forms():
+    ar = strings.catalog("ar")
+    assert "مراقبتين" in ar.watches_page_title(2)
+    assert "5 فروع" in ar.confirm_window("Film", "2026-11-06", "morning", 5)
+    assert "4 كراسي" in ar.watch_row("Branch", "2026-11-06", "Film", "18:30", "MAX", "AVAILABLE", 4)
+    assert "3 أفلام" in ar.search_results("x", 3, 3)
+    assert "8 صباحاً" in ar.quiet_custom_prompt()
+
+
+@pytest.mark.asyncio
+async def test_screen_direction_follows_the_selected_language(monkeypatch):
+    import handlers.utils as utils
+    import i18n
+
+    captured: dict[str, Screen] = {}
+
+    async def fake_edit(callback, screen, settings=None):
+        captured["screen"] = screen
+
+    monkeypatch.setattr(utils.render, "edit_screen", fake_edit)
+    i18n.set_language("en")
+    try:
+        await utils.edit(FakeCallback(), "hello")
+    finally:
+        i18n.set_language("ar")
+    assert captured["screen"].is_rtl is False
+
+
 def test_watch_list_is_grouped_and_paged():
     watches = [
         {
@@ -391,7 +419,7 @@ async def test_freshness_note_is_appended_to_text_screens_only():
 def test_stale_notice_is_quiet_while_fresh():
     assert strings.stale_notice(0, False) == ""
     assert strings.stale_notice(5, False) == ""
-    assert "من 12 دقيقة" in strings.stale_notice(12, False)
+    assert "قبل 12 دقيقة" in strings.stale_notice(12, False)
     assert "مش متاح" in strings.stale_notice(1, True)
 
 
