@@ -1509,10 +1509,23 @@ def feedback_admin(
 
 
 # ------------------------------------------------------------------ discovery
+def _blocks(*blocks: str) -> str:
+    """Join non-empty blocks with a blank line so every fact can breathe."""
+
+    return "\n\n".join(block for block in blocks if block)
+
+
 def _cinema_line(branch: str, provider: str | None = None) -> str:
     """Cinema brand and branch on one readable line."""
 
     return f"🏢 <b>{cinema_name(provider)}</b> · {esc(branch)}"
+
+
+def _place(movie: str, branch: str, provider: str | None) -> str:
+    return _blocks(
+        f"🎬 <b>{esc(movie)}</b>",
+        _cinema_line(branch, provider),
+    )
 
 
 def discovery_new_movie(
@@ -1522,19 +1535,14 @@ def discovery_new_movie(
     hall: str | None,
     provider: str | None = None,
 ) -> str:
-    lines = [
+    return _blocks(
         "🍿 <b>A new movie just opened</b>",
         DIVIDER,
-        "",
-        f"🎬 <b>{esc(movie)}</b>",
-        _cinema_line(branch, provider),
-    ]
-    if date:
-        lines.append(f"📅 from {relative_date(date)}")
-    if hall:
-        lines.append(f"🎭 {esc(hall)}")
-    lines += ["", "<i>First showtimes are live — book early.</i>"]
-    return "\n".join(lines)
+        _place(movie, branch, provider),
+        f"📅 from {relative_date(date)}" if date else "",
+        f"🎭 {esc(hall)}" if hall else "",
+        "✨ <i>First showtimes are live — book early.</i>",
+    )
 
 
 def discovery_new_date(
@@ -1543,12 +1551,12 @@ def discovery_new_date(
     date: str,
     provider: str | None = None,
 ) -> str:
-    return (
-        f"📅 <b>A new date just opened</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"{_cinema_line(branch, provider)}\n"
-        f"📅 from {relative_date(date)}\n\n"
-        "<i>The new dates are bookable now.</i>"
+    return _blocks(
+        "📅 <b>A new date just opened</b>",
+        DIVIDER,
+        _place(movie, branch, provider),
+        f"📅 from {relative_date(date)}",
+        "🗓️ <i>The new dates are bookable now — pick your slot.</i>",
     )
 
 
@@ -1561,13 +1569,13 @@ def discovery_new_showtimes(
 ) -> str:
     joined = " · ".join(format_time(t) for t in times[:6])
     more = " and more" if len(times) > 6 else ""
-    return (
-        f"🎟️ <b>New showtimes just dropped</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"{_cinema_line(branch, provider)}\n"
-        f"📅 {relative_date(date)}\n"
-        f"🕘 {joined}{more}\n\n"
-        "<i>Grab your seats before they fill up.</i>"
+    return _blocks(
+        "🎟️ <b>New showtimes just dropped</b>",
+        DIVIDER,
+        _place(movie, branch, provider),
+        f"📅 {relative_date(date)}",
+        f"🕘 {joined}{more}",
+        "🍿 <i>Pick your show and go — before the good seats go.</i>",
     )
 
 
@@ -1578,19 +1586,14 @@ def discovery_upcoming_released(
     hall: str | None = None,
     provider: str | None = None,
 ) -> str:
-    lines = [
-        "🍿 <b>The movie you were waiting for is here</b>",
+    return _blocks(
+        "🍿 <b>Finally — the movie you were waiting for is here</b>",
         DIVIDER,
-        "",
-        f"🎬 <b>{esc(movie)}</b>",
-        _cinema_line(branch, provider),
-    ]
-    if date:
-        lines.append(f"📅 from {relative_date(date)}")
-    if hall:
-        lines.append(f"🎭 {esc(hall)}")
-    lines += ["", "<i>Book before it fills up.</i>"]
-    return "\n".join(lines)
+        _place(movie, branch, provider),
+        f"📅 from {relative_date(date)}" if date else "",
+        f"🎭 {esc(hall)}" if hall else "",
+        "🎬 <i>Book before it fills up.</i>",
+    )
 
 
 def discovery_digest(
@@ -1601,12 +1604,12 @@ def discovery_digest(
 ) -> str:
     body = "\n".join(f"• {line}" for line in lines[:6])
     more = f"\n<i>and {_count(count - 6, 'more update', 'more updates')}</i>" if count > 6 else ""
-    return (
+    return _blocks(
         f"🍿 <b>{_count(count, 'new update', 'new updates')} at "
-        f"{cinema_name(provider)} · {esc(branch)}</b>\n"
-        f"{DIVIDER}\n\n"
-        f"{body}{more}\n\n"
-        "<i>Open booking or watch the movie with one tap.</i>"
+        f"{cinema_name(provider)} · {esc(branch)}</b>",
+        DIVIDER,
+        body + more,
+        "👀 <i>Take a look and pick your favourite.</i>",
     )
 
 

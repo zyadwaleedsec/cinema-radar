@@ -38,11 +38,33 @@ def test_showtimes_card_names_the_cinema_brand_and_branch():
         "ولا كان عبال", "Madinaty", "2026-11-05", ["21:30", "23:45"], "vox"
     )
 
-    assert "حفلات جديدة ظهرت" in text
+    assert "حفلات جديدة نزلت" in text
     assert "ولا كان عبال" in text
     assert "فوكس" in text and "Madinaty" in text
     assert "9:30 م" in text and "11:45 م" in text
     assert "<b>" in text and "<i>" in text
+
+
+def test_cards_leave_a_blank_line_between_blocks():
+    i18n.set_language("ar")
+    text = strings.discovery_new_showtimes(
+        "ولا كان عبال", "Madinaty", "2026-11-05", ["21:30"], "vox"
+    )
+
+    assert "\n\n" in text
+    assert text.splitlines()[1] == ""
+
+
+def test_arabic_cards_are_explicitly_rtl_and_isolate_latin_branches():
+    i18n.set_language("ar")
+    text = strings.discovery_new_showtimes(
+        "ولا كان عبال", "Madinaty", "2026-11-05", ["21:30"], "vox"
+    )
+
+    # Every Arabic line starts with RLM, and the Latin branch sits inside an
+    # LTR isolate so it cannot flip the surrounding Arabic punctuation.
+    assert text.startswith("\u200f")
+    assert "\u2066Madinaty\u2069" in text
 
 
 def test_alert_uses_the_renaissance_brand():

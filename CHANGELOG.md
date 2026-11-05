@@ -11,6 +11,18 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-11-05
+
+### Changed
+
+- Arabic discovery cards now use explicit RTL marks on every line, with Latin
+  branch names and showtimes wrapped in LTR isolates. This keeps Arabic words
+  from being re-ordered around English names and digits.
+- The copy is more colloquial Egyptian Arabic and every block (title, poster
+  details, cinema, date, showtimes, call to action) is separated by a blank line
+  so the card is easier to scan.
+- English cards follow the same airy layout.
+
 ## [2.7.1] - 2026-11-05
 
 ### Changed

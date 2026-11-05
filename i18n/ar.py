@@ -1521,10 +1521,43 @@ def feedback_admin(
 
 
 # ------------------------------------------------------------------ discovery
-def _cinema_line(branch: str, provider: str | None = None) -> str:
-    """Cinema brand and branch on one readable line."""
+# Telegram renders captions in an automatic direction.  Starting every Arabic
+# line with an RLM keeps punctuation and emojis in the right place, and Latin
+# branch names / times are wrapped in an LTR isolate so they never drag the
+# surrounding Arabic letters or numbers into the wrong order.
+_RLM = "\u200f"
+_LRI = "\u2066"
+_PDI = "\u2069"
 
-    return f"🏢 <b>{cinema_name(provider)}</b> · {esc(branch)}"
+
+def _rtl(line: str) -> str:
+    return f"{_RLM}{line}" if line else line
+
+
+def _ltr(value: str) -> str:
+    text = esc(value)
+    if any("\u0600" <= char <= "\u06ff" for char in text):
+        return text
+    return f"{_LRI}{text}{_PDI}"
+
+
+def _blocks(*blocks: str) -> str:
+    """Join non-empty blocks with a blank line so every fact can breathe."""
+
+    return "\n\n".join(block for block in blocks if block)
+
+
+def _cinema_line(branch: str, provider: str | None = None) -> str:
+    """Cinema brand and branch on one readable, correctly ordered line."""
+
+    return _rtl(f"🏢 <b>{cinema_name(provider)}</b> · {_ltr(branch)}")
+
+
+def _place(movie: str, branch: str, provider: str | None) -> str:
+    return _blocks(
+        _rtl(f"🎬 <b>{esc(movie)}</b>"),
+        _cinema_line(branch, provider),
+    )
 
 
 def discovery_new_movie(
@@ -1534,19 +1567,14 @@ def discovery_new_movie(
     hall: str | None,
     provider: str | None = None,
 ) -> str:
-    lines = [
-        "🍿 <b>فيلم جديد بدأ حجزه</b>",
-        DIVIDER,
-        "",
-        f"🎬 <b>{esc(movie)}</b>",
-        _cinema_line(branch, provider),
-    ]
-    if date:
-        lines.append(f"📅 من {relative_date(date)}")
-    if hall:
-        lines.append(f"🎭 {esc(hall)}")
-    lines += ["", "<i>أول حفلاته ظهرت — احجز من بدري.</i>"]
-    return "\n".join(lines)
+    return _blocks(
+        _rtl("🍿 <b>فيلم جديد فتح حجزه</b>"),
+        _rtl(DIVIDER),
+        _place(movie, branch, provider),
+        _rtl(f"📅 من {relative_date(date)}") if date else "",
+        _rtl(f"🎭 {esc(hall)}") if hall else "",
+        _rtl("✨ <i>أول حفلاته نزلت… خد مكانك من بدري.</i>"),
+    )
 
 
 def discovery_new_date(
@@ -1555,12 +1583,12 @@ def discovery_new_date(
     date: str,
     provider: str | None = None,
 ) -> str:
-    return (
-        f"📅 <b>يوم جديد اتفتح للحجز</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"{_cinema_line(branch, provider)}\n"
-        f"📅 من {relative_date(date)}\n\n"
-        "<i>المواعيد الجديدة متاحة دلوقتي.</i>"
+    return _blocks(
+        _rtl("📅 <b>يوم جديد فتح للحجز</b>"),
+        _rtl(DIVIDER),
+        _place(movie, branch, provider),
+        _rtl(f"📅 من {relative_date(date)}"),
+        _rtl("🗓️ <i>المواعيد الجديدة بقت متاحة… شوف اللي يناسبك.</i>"),
     )
 
 
@@ -1571,16 +1599,20 @@ def discovery_new_showtimes(
     times: list[str],
     provider: str | None = None,
 ) -> str:
-    joined = " · ".join(format_time(t) for t in times[:6])
+    joined = f" {_RLM}·{_RLM} ".join(_ltr_time(t) for t in times[:6])
     more = " وغيرها" if len(times) > 6 else ""
-    return (
-        f"🎟️ <b>حفلات جديدة ظهرت</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"{_cinema_line(branch, provider)}\n"
-        f"📅 {relative_date(date)}\n"
-        f"🕘 {joined}{more}\n\n"
-        "<i>الحق احجز قبل ما تتكمل.</i>"
+    return _blocks(
+        _rtl("🎟️ <b>حفلات جديدة نزلت</b>"),
+        _rtl(DIVIDER),
+        _place(movie, branch, provider),
+        _rtl(f"📅 {relative_date(date)}"),
+        _rtl(f"🕘 {joined}{more}"),
+        _rtl("🍿 <i>اختار حفلتك ويلا بينا… قبل ما الكراسي تطير.</i>"),
     )
+
+
+def _ltr_time(value: str) -> str:
+    return f"{_LRI}{format_time(value)}{_PDI}"
 
 
 def discovery_upcoming_released(
@@ -1590,19 +1622,14 @@ def discovery_upcoming_released(
     hall: str | None = None,
     provider: str | None = None,
 ) -> str:
-    lines = [
-        "🍿 <b>الفيلم اللي كنت مستنيه نزل</b>",
-        DIVIDER,
-        "",
-        f"🎬 <b>{esc(movie)}</b>",
-        _cinema_line(branch, provider),
-    ]
-    if date:
-        lines.append(f"📅 من {relative_date(date)}")
-    if hall:
-        lines.append(f"🎭 {esc(hall)}")
-    lines += ["", "<i>الحق احجز قبل ما يتكمل.</i>"]
-    return "\n".join(lines)
+    return _blocks(
+        _rtl("🍿 <b>أخيرًا… الفيلم اللي مستنيه وصل</b>"),
+        _rtl(DIVIDER),
+        _place(movie, branch, provider),
+        _rtl(f"📅 من {relative_date(date)}") if date else "",
+        _rtl(f"🎭 {esc(hall)}") if hall else "",
+        _rtl("🎬 <i>الحق احجز قبل ما يتكمل.</i>"),
+    )
 
 
 def discovery_digest(
@@ -1611,13 +1638,13 @@ def discovery_digest(
     lines: list[str],
     provider: str | None = None,
 ) -> str:
-    body = "\n".join(f"• {line}" for line in lines[:6])
-    more = f"\n<i>وكمان {_updates(count - 6)}</i>" if count > 6 else ""
-    return (
-        f"🍿 <b>{_updates(count)} في {cinema_name(provider)} · {esc(branch)}</b>\n"
-        f"{DIVIDER}\n\n"
-        f"{body}{more}\n\n"
-        "<i>افتح الحجز أو راقب الفيلم بضغطة.</i>"
+    body = "\n".join(_rtl(f"• {line}") for line in lines[:6])
+    more = f"\n{_rtl(f'<i>وكمان {_updates(count - 6)}</i>')}" if count > 6 else ""
+    return _blocks(
+        _rtl(f"🍿 <b>عندك {_updates(count)} في {cinema_name(provider)} · {_ltr(branch)}</b>"),
+        _rtl(DIVIDER),
+        body + more,
+        _rtl("👀 <i>بص عليهم واختار اللي يعجبك.</i>"),
     )
 
 
