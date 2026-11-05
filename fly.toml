@@ -30,3 +30,6 @@ kill_timeout = "20s"
   DB_PATH = "/data/cinemaradar.sqlite3"
   PYTHONUNBUFFERED = "1"
   PYTHONPATH = "/app"
+  # VOX Egypt resets plain TLS clients; curl_cffi gives the bot a real Chrome
+  # fingerprint. Without this the VOX requests time out.
+  HTTP_IMPERSONATE = "chrome124"

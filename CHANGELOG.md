@@ -18,6 +18,8 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ### Changed
 
+- `fly.toml` now sets `HTTP_IMPERSONATE=chrome124`, matching `.env`, so VOX
+  requests no longer time out on the deployed bot.
 - The Docker image is slimmer: runtime dependencies only, no apt packages, no
   `EXPOSE`/health check (the bot is a long-polling worker with no HTTP server).
 - Ruff configuration moved to `ruff.toml` so a bare `pyproject.toml` can never

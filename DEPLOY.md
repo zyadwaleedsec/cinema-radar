@@ -134,7 +134,8 @@ fly secrets set DONATION_PHONE="01xxxxxxxxx"
 fly secrets set CHANNEL_ID="-100xxxxxxxxxx"
 ```
 
-`DB_PATH` is already set in `fly.toml` to `/data/cinemaradar.sqlite3`.
+`DB_PATH` is already set in `fly.toml` to `/data/cinemaradar.sqlite3`, together
+with `HTTP_IMPERSONATE=chrome124` (VOX Egypt resets plain TLS clients).
 Everything else (providers, cache TTLs, quiet hours defaults) has a safe
 default in `config.py` and can stay unset.
 
@@ -218,6 +219,7 @@ fly sftp get /data/backup.sqlite3 .\cinemaradar-backup.sqlite3
 | `needs volumes with name 'cinema_data'` | volume not created, or in another region | `fly volumes create cinema_data --region cdg --size 1 --yes` |
 | `409 Conflict: terminated by other getUpdates request` | two machines or two machines running the bot | `fly scale count 1`, and stop any local instance |
 | `Process appears to have been OOM killed!` | 256 MB is not enough for Python + lxml + the cache | set `memory = "512mb"` (or `1gb`) in `[[vm]]`, then `fly deploy` |
+| VOX requests time out (`فوكس واقعة`, `ReadTimeout`) | `HTTP_IMPERSONATE` is unset, so plain httpx is used | keep `HTTP_IMPERSONATE = "chrome124"` in `[env]` of `fly.toml` |
 | `database is locked` | bot running twice on the same SQLite file | keep one machine, never share one volume between machines |
 | Machine restarts in a loop | bad token / missing secret | `fly logs`, then re-check `fly secrets list` |
 | `instance refused connection ... :8080` | leftover `[http_service]` from the web launcher | remove it (already removed here) |
