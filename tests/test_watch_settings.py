@@ -123,6 +123,33 @@ async def test_quiet_watches_can_be_disabled_per_user(db):
     assert row is not None and row["quiet_watches"] == 0
 
 
+async def test_required_seats_default_and_owner_only_update(db):
+    user = await db.get_or_create_user(903)
+    watch_id = await db.add_watch(
+        user_id=int(user["id"]),
+        provider="vox",
+        branch_id="almaza",
+        branch_name="Almaza",
+        date="2026-12-16",
+        movie_id="HO1",
+        movie_name="Avengers",
+        showtime="10:45",
+        hall_type="MAX",
+        watch_limit=10,
+    )
+    row = await db.get_watch(watch_id)
+    assert row is not None and row["required_seats"] == 1
+
+    assert await db.set_watch_required_seats(watch_id, int(user["id"]), 4)
+    row = await db.get_watch(watch_id)
+    assert row is not None and row["required_seats"] == 4
+
+    stranger = await db.get_or_create_user(904)
+    assert not await db.set_watch_required_seats(watch_id, int(stranger["id"]), 2)
+    row = await db.get_watch(watch_id)
+    assert row is not None and row["required_seats"] == 4
+
+
 async def test_movie_scope_watch_uses_sentinel_time_and_hall(db):
     user = await db.get_or_create_user(902)
     watch_id = await db.add_watch(

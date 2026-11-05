@@ -10,6 +10,7 @@ from keyboards import (
     movie_keyboard,
     search_keyboard,
     search_results_keyboard,
+    seat_choice_keyboard,
     showtime_keyboard,
     watch_alert_keyboard,
     watch_created_keyboard,
@@ -45,6 +46,20 @@ def test_movie_keyboard_accepts_cached_dicts():
 def test_movie_keyboard_accepts_models():
     movies = [Movie("m1", "فيلم تجريبي", "demo")]
     assert _texts(movie_keyboard(movies))[0] == "فيلم تجريبي"
+
+
+def test_seat_choice_keyboard_offers_one_to_four_and_custom():
+    keyboard = seat_choice_keyboard()
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert callbacks[:4] == ["add:seats:1", "add:seats:2", "add:seats:3", "add:seats:4"]
+    assert "add:seats_custom" in callbacks
+
+
+def test_watch_detail_keyboard_shows_and_edits_the_seat_count():
+    keyboard = watch_detail_keyboard({"id": 7, "alert_mode": "all", "required_seats": 3})
+    button = keyboard.inline_keyboard[2][0]
+    assert button.callback_data == "w:seats:7"
+    assert "3" in button.text
 
 
 def test_branches_filter_keyboard_marks_selected_dict():

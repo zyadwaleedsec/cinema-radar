@@ -381,6 +381,7 @@ def watches_keyboard(watches: list[dict[str, Any]], page: int = 0) -> Any:
 def watch_detail_keyboard(watch: dict[str, Any]) -> Any:
     watch_id = int(watch["id"])
     mode = watch.get("alert_mode") or "all"
+    required_seats = int(watch.get("required_seats") or 1)
     marked = lambda value: "✅ " if mode == value else ""  # noqa: E731
     rows = [
         [
@@ -388,6 +389,7 @@ def watch_detail_keyboard(watch: dict[str, Any]) -> Any:
             _btn(marked("opening") + strings.BTN_MODE_OPENING, f"w:mode:{watch_id}:opening"),
         ],
         [_btn(marked("all") + strings.BTN_MODE_ALL, f"w:mode:{watch_id}:all")],
+        [_btn(strings.seats_button(required_seats), f"w:seats:{watch_id}")],
     ]
     if watch.get("snoozed_until"):
         rows.append([_btn(strings.BTN_UNSNOOZE, f"w:snz0:{watch_id}")])
@@ -396,6 +398,26 @@ def watch_detail_keyboard(watch: dict[str, Any]) -> Any:
     rows.append([_btn(strings.BTN_REMOVE_WATCH, f"w:del:{watch_id}", style="danger")])
     rows.append([_btn(strings.BTN_BACK, "menu:watches"), _btn(strings.BTN_HOME, "menu:home")])
     return _markup(rows)
+
+
+def seat_choice_keyboard() -> Any:
+    return _markup(
+        [
+            [_btn(str(seats), f"add:seats:{seats}") for seats in (1, 2, 3, 4)],
+            [_btn(strings.BTN_SEATS_CUSTOM, "add:seats_custom")],
+            [_btn(strings.BTN_CANCEL, "menu:home")],
+        ]
+    )
+
+
+def watch_seat_choice_keyboard(watch_id: int) -> Any:
+    return _markup(
+        [
+            [_btn(str(seats), f"ws:{watch_id}:{seats}") for seats in (1, 2, 3, 4)],
+            [_btn(strings.BTN_SEATS_CUSTOM, f"ws:{watch_id}:custom")],
+            [_btn(strings.BTN_CANCEL, f"w:cfg:{watch_id}")],
+        ]
+    )
 
 
 def watch_delete_confirm_keyboard(watch_id: int) -> Any:

@@ -44,6 +44,31 @@ def test_confirmation_explains_sold_out_watch():
     assert "ترجع كراسي" in text
 
 
+def test_feedback_admin_prefers_the_sender_name():
+    ar = strings.catalog("ar")
+    assert "@zyad" in ar.feedback_admin(42, "zyad", "hi", "Zeyad")
+    named = ar.feedback_admin(42, None, "hi", "Zeyad")
+    assert "Zeyad" in named
+    assert "<code>42</code>" in named
+    anonymous = ar.feedback_admin(42, None, "hi")
+    assert "<code>42</code>" in anonymous
+    assert "ID:" not in anonymous
+
+
+def test_seat_requirement_appears_on_the_confirmation():
+    text = strings.confirm_watch(
+        "City Centre Almaza",
+        "2026-12-16",
+        "Avengers: Doomsday",
+        "10:45",
+        "MAX",
+        SOLD_OUT,
+        required_seats=3,
+    )
+    assert "3 كراسي" in text
+    assert "محتاج" in text
+
+
 def test_movie_facts_show_duration_rating_and_language():
     facts = strings.movie_facts(125, "PG-13", "English")
     assert "ساعتين و5 دقيقة" in facts

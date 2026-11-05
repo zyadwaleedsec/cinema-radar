@@ -56,7 +56,8 @@ unchanged when another cinema is added.
 - `watcher.py`: takes due targets, fetches each target once (request
   coalescing), diffs against the stored state and fires events only on change:
   1. `NOT_AVAILABLE -> AVAILABLE` (booking opened),
-  2. `SOLD_OUT -> AVAILABLE` (cancelled seats freed up),
+  2. `SOLD_OUT -> AVAILABLE` (cancelled seats freed up), when the free count
+     meets the watch's `required_seats` threshold,
   3. new showtimes for a watched movie/day,
   4. a new bookable day for a same-branch, all-days watch.
 - `discovery.py`: the new-movie / new-booking discovery job.
@@ -160,11 +161,13 @@ Sending:
 - `watches(id, user_id, provider, branch_id, branch_name, date, movie_id,
   movie_name, poster_url, duration_minutes, rating, language, synopsis,
   trailer_url, scope, showtime, hall_type, booking_url, alert_mode,
-  snoozed_until, last_status, last_seats, baseline_done, imax_status,
-  expires_at, deactivated_at, expiry_notified, active, last_alert_at,
-  created_at)`
+  snoozed_until, last_status, last_seats, required_seats, baseline_done,
+  imax_status, expires_at, deactivated_at, expiry_notified, active,
+  last_alert_at, created_at)`
   - `scope`: `showtime`, `day` (whole movie/day) or `*` (all bookable days at one
     branch).
+  - `required_seats`: minimum number of free seats before a seat alert fires
+    (default `1`). Unknown seat counts still alert so nothing is missed.
 - `watch_baselines(watch_id, date, status)`
 - `state_cache(target_key, payload, etag, last_modified, body_hash, fetched_at,
   ttl)`

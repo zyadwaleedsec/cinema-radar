@@ -70,7 +70,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (206 tests)
+├── tests/                  # pytest suite (216 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -350,6 +350,16 @@ evening, split by `MORNING_END_HOUR`) so only shows in the chosen period alert.
 The day list and the movie's shows are read once per branch from the normal
 cached pages — no extra endpoints.
 
+Seat alerts compare the freed-seat count with the watch's `required_seats`
+(1–10, default `1`). `SEATS_AVAILABLE` fires when a showtime newly reaches the
+threshold — either a `SOLD_OUT -> AVAILABLE` transition or a rise inside
+`AVAILABLE` that crosses it — and stays quiet once the count was already enough,
+until it drops below and climbs again. When the provider does not report a count
+(`None`) the alert still fires, so a missing field never hides a returned seat.
+Movie and all-dates watches apply the threshold to each showtime separately,
+never to a sum across halls. The value is set during the add flow (step 5 of 6)
+and can be changed from **Manage watch**.
+
 IMAX matching reads a local JSON snapshot and adds no VOX requests. TMDB is
 contacted only when a film has an IMAX screening and its title is not already in
 the snapshot, and the result is cached for 30 days.
@@ -527,7 +537,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `206 passed`.
+Expected: `216 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.

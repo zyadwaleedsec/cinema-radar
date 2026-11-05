@@ -69,6 +69,11 @@ def _seats(value: int) -> str:
     return _count(value, "كرسي", "كرسيين", "كراسي", "كرسي")
 
 
+def _needed_seats(value: int) -> str:
+    value = max(1, int(value))
+    return "كرسي واحد" if value == 1 else _seats(value)
+
+
 def _seats_state(value: int) -> str:
     return _count(
         value,
@@ -226,6 +231,7 @@ BTN_QUIET_WATCHES = "تنبيهات المراقبات بتحترم الهدوء
 BTN_DELETE_MY_DATA = "🗑️ حذف بياناتي"
 BTN_COPY_PHONE = "📋 نسخ الرقم"
 BTN_MANAGE_WATCH = "⚙️ إدارة المراقبة"
+BTN_SEATS_CUSTOM = "✍️ عدد معين"
 BTN_LANGUAGE = "🌐 اللغة"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
@@ -469,14 +475,54 @@ def choose_window(movie: str, date: str, morning_end_hour: int = 17) -> str:
     )
 
 
+def choose_seats(context: str = "") -> str:
+    path = context or "عدد الكراسي"
+    return (
+        f"{step_header(5, 6, path)}\n\n"
+        "<b>محتاج كام كرسي؟</b> 🪑\n\n"
+        "هبعتلك تنبيه أول ما عدد الكراسي المتاحة يوصل للرقم ده أو أكتر.\n"
+        "اختار من تحت، أو اكتب عدد معين."
+    )
+
+
+def seats_custom_prompt() -> str:
+    return (
+        f"{step_header(5, 6, 'عدد مخصص')}\n\n"
+        "<b>اكتب عدد الكراسي</b> 🪑\n\n"
+        "اكتب رقم من <b>1</b> لـ <b>10</b>."
+    )
+
+
+def seats_custom_invalid() -> str:
+    return "اكتب رقم صحيح من 1 لـ 10، مثال: 3"
+
+
+def required_seats_line(seats: int) -> str:
+    return f"🪑 محتاج {_needed_seats(seats)}"
+
+
+def seats_updated(seats: int) -> str:
+    return f"تم ✅ هبعتلك لما يتوفر {_needed_seats(seats)} أو أكتر."
+
+
+def seats_button(seats: int) -> str:
+    return f"🪑 عدد الكراسي: {_needed_seats(seats)}"
+
+
 def confirm_window(
-    movie: str, date: str, window: str, branch_count: int, morning_end_hour: int = 17
+    movie: str,
+    date: str,
+    window: str,
+    branch_count: int,
+    morning_end_hour: int = 17,
+    required_seats: int = 1,
 ) -> str:
     return (
         f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
         f"📅 {relative_date(date)}\n"
         f"🕐 {window_label(window, morning_end_hour)}\n"
-        f"🏢 {_branches(branch_count)}\n\n"
+        f"🏢 {_branches(branch_count)}\n"
+        f"{required_seats_line(required_seats)}\n\n"
         "هتراقب كل الحفلات المتاحة في الفترة دي في كل السينمات، "
         "وهبعتلك أول ما حفلة جديدة تفتح أو كرسي يرجع.\n\n"
         "تأكد المراقبة؟"
@@ -605,7 +651,13 @@ def showtime_button(time: str, hall: str, status: str, seats: int | None) -> str
 
 
 def confirm_watch(
-    branch: str, date: str, movie: str, time: str, hall: str, status: str = ""
+    branch: str,
+    date: str,
+    movie: str,
+    time: str,
+    hall: str,
+    status: str = "",
+    required_seats: int = 1,
 ) -> str:
     if status == SOLD_OUT:
         note = "الحفلة دي حجوزاتها مكتملة دلوقتي. هنراقبها ونبعتلك أول ما ترجع كراسي."
@@ -616,12 +668,13 @@ def confirm_watch(
     else:
         note = "هنراقب الحفلة ونبعتلك أول ما يحصل جديد."
     return (
-        f"{step_header(5, 5, 'تأكيد')}\n\n"
+        f"{step_header(6, 6, 'تأكيد')}\n\n"
         "<b>تأكيد المراقبة</b>\n\n"
         f"🎬 {esc(movie)}\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)} ({format_date(date)})\n"
-        f"🕐 {format_time(time)} · {esc(hall)}\n\n"
+        f"🕐 {format_time(time)} · {esc(hall)}\n"
+        f"{required_seats_line(required_seats)}\n\n"
         f"{note}"
     )
 
@@ -712,6 +765,7 @@ def confirm_movie_watch(
     count: int,
     statuses: list[str] | None = None,
     hall: str | None = None,
+    required_seats: int = 1,
 ) -> str:
     states = statuses or []
     if states and all(state == "AVAILABLE" for state in states):
@@ -724,12 +778,13 @@ def confirm_movie_watch(
     if hall:
         ticket = f"🎭 {esc(hall)} — كل الحفلات ({count} حفلة)"
     return (
-        f"{step_header(5, 5, 'تأكيد')}\n\n"
+        f"{step_header(6, 6, 'تأكيد')}\n\n"
         "<b>تأكيد مراقبة اليوم كامل</b>\n\n"
         f"🎬 {esc(movie)}\n"
         f"🏢 {esc(branch)}\n"
         f"📅 {relative_date(date)} ({format_date(date)})\n"
-        f"{ticket}\n\n"
+        f"{ticket}\n"
+        f"{required_seats_line(required_seats)}\n\n"
         f"{note}"
     )
 
@@ -762,14 +817,21 @@ def watch_created(branch: str, date: str, movie: str, time: str, hall: str) -> s
     )
 
 
-def confirm_all_dates(branch: str, movie: str, count: int, hall: str | None = None) -> str:
+def confirm_all_dates(
+    branch: str,
+    movie: str,
+    count: int,
+    hall: str | None = None,
+    required_seats: int = 1,
+) -> str:
     format_text = f"\n🎭 {esc(hall)}" if hall else ""
     return (
-        f"{step_header(5, 5, 'تأكيد')}\n\n"
+        f"{step_header(6, 6, 'تأكيد')}\n\n"
         "<b>تأكيد مراقبة كل الأيام</b>\n\n"
         f"🏢 {esc(branch)}\n"
         f"🎬 {esc(movie)}\n"
-        f"📅 كل الأيام المتاحة دلوقتي ({_days(count)}){format_text}\n\n"
+        f"📅 كل الأيام المتاحة دلوقتي ({_days(count)}){format_text}\n"
+        f"{required_seats_line(required_seats)}\n\n"
         "هنراقب كل يوم يفتح فيه الفيلم في الفرع ده، "
         "وكمان أي يوم جديد ينزل للحجز.\n"
         "أول ما حجز يفتح أو كراسي ترجع هتوصلك رسالة."
@@ -895,6 +957,7 @@ def watch_row(
     snoozed_until: str | None = None,
     scope: str | None = "showtime",
     provider: str = "vox",
+    required_seats: int = 1,
 ) -> str:
     state = STATUS_LABELS_AR.get(str(status or "").upper(), "مش معروف")
     if seats not in (None, ""):
@@ -913,6 +976,8 @@ def watch_row(
         ticket,
         f"🔔 {watch_mode_label(mode)}",
     ]
+    if int(required_seats) > 1:
+        lines[-1] += f" · 🪑 {_needed_seats(required_seats)}"
     if snoozed_until:
         lines.append("⏰ التنبيهات متأجلة مؤقتاً")
     return "\n".join(lines)
@@ -928,6 +993,7 @@ def watch_detail(
     snoozed_until_text: str | None = None,
     scope: str | None = "showtime",
     provider: str = "vox",
+    required_seats: int = 1,
 ) -> str:
     snooze = f"⏰ متأجل لحد {esc(snoozed_until_text)}" if snoozed_until_text else "⏰ مفيش تأجيل"
     scope = scope or "showtime"
@@ -944,6 +1010,7 @@ def watch_detail(
         f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}\n"
         f"{ticket}\n\n"
         f"🔔 التنبيهات: <b>{watch_mode_label(mode)}</b>\n"
+        f"🪑 التنبيه عند: <b>{_needed_seats(required_seats)} أو أكتر</b>\n"
         f"{snooze}\n\n"
         "اختار نوع التنبيه اللي يناسبك:"
     )
@@ -1394,9 +1461,17 @@ def feedback_too_soon() -> str:
     return "وصلنا رأيك قريب. جرّب تاني بعد ساعة 🙏"
 
 
-def feedback_admin(user_id: int, username: str | None, text: str) -> str:
-    who = f"@{esc(username)}" if username else f"<code>{user_id}</code>"
-    return f"<b>فيدباك جديد</b> من {who}:\n\n{esc(text)}"
+def feedback_admin(
+    user_id: int, username: str | None, text: str, first_name: str | None = None
+) -> str:
+    if username:
+        who = f"@{esc(username)}"
+    elif first_name:
+        who = esc(first_name)
+    else:
+        who = f"<code>{user_id}</code>"
+    reference = f"\n\n<i>ID: <code>{user_id}</code></i>" if username or first_name else ""
+    return f"<b>فيدباك جديد</b> من {who}:\n\n{esc(text)}{reference}"
 
 
 # ------------------------------------------------------------------ discovery

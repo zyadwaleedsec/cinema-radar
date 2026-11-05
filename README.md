@@ -21,6 +21,8 @@ has one button that opens the cinema's own booking page.
 - 🌍 **Arabic or English** — pick your language on first launch and change it
   anytime from Settings. Every screen, alert and error follows your choice.
 - 🎯 **Watch one showtime, a whole movie/day, or every open day at a branch.**
+- 🪑 **Seat threshold** — ask for 1–4 seats or a custom count (1–10) and only
+  get the seat alert once that many are free.
 - 🎭 **Filter by format** — IMAX, 4DX, VIP, MAX, DBOX, 3D and whatever the
   provider lists.
 - 🏢 **Two cinemas** — VOX and Renaissance run together; pick one in-app, or
@@ -42,7 +44,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v2.5.2** - see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v2.6.0** - see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

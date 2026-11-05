@@ -123,6 +123,32 @@ def _in_window(showtime: Showtime, window: str | None, morning_end_hour: int) ->
     return hour < morning_end_hour if window == "morning" else hour >= morning_end_hour
 
 
+def _required_seats(watch: dict[str, Any]) -> int:
+    """Seats the user asked for; older rows and ``None`` mean one seat."""
+
+    try:
+        value = int(watch.get("required_seats") or 1)
+    except (TypeError, ValueError):
+        return 1
+    return max(1, value)
+
+
+def _seat_alertable(prev: Showtime | None, curr: Showtime, watch: dict[str, Any]) -> bool:
+    """True when this poll just crossed the watch's seat requirement.
+
+    ``prev`` and ``curr`` are the same showtime on consecutive polls.  An
+    unknown current count fails open, and a count that was already enough does
+    not alert again until it drops below the requirement.
+    """
+
+    required = _required_seats(watch)
+    if curr.seats_available is None:
+        return True
+    if curr.seats_available < required:
+        return False
+    return prev is None or prev.seats_available is None or prev.seats_available < required
+
+
 def compute_watch_events(
     previous: Iterable[Showtime],
     current: Iterable[Showtime],
@@ -147,10 +173,12 @@ def compute_watch_events(
                 continue
             if prev.status in {NOT_AVAILABLE, UNKNOWN} and curr.status == AVAILABLE:
                 opened_by_movie.setdefault(curr.movie_id, []).append(curr)
-            elif (
-                prev.status == SOLD_OUT
+            elif (prev.status == SOLD_OUT and curr.status == AVAILABLE) or (
+                prev.status == AVAILABLE
                 and curr.status == AVAILABLE
-                and (curr.seats_available is None or curr.seats_available > 0)
+                and prev.seats_available is not None
+                and curr.seats_available is not None
+                and curr.seats_available > prev.seats_available
             ):
                 seats_by_movie.setdefault(curr.movie_id, []).append(curr)
         return new_by_movie, opened_by_movie, seats_by_movie
@@ -192,7 +220,13 @@ def compute_watch_events(
             if movie_id in opened_by_movie:
                 events.append(aggregated(watch, opened_by_movie[movie_id], BOOKING_OPENED))
             if movie_id in seats_by_movie:
-                events.append(aggregated(watch, seats_by_movie[movie_id], SEATS_AVAILABLE))
+                eligible = [
+                    show
+                    for show in seats_by_movie[movie_id]
+                    if _seat_alertable(prev_map.get(f"{show.time}|{show.hall_type}"), show, watch)
+                ]
+                if eligible:
+                    events.append(aggregated(watch, eligible, SEATS_AVAILABLE))
             if movie_id in new_by_movie:
                 events.append(aggregated(watch, new_by_movie[movie_id], NEW_SHOWTIMES))
             continue
@@ -223,11 +257,14 @@ def compute_watch_events(
                     ),
                 )
             )
-        elif (
-            prev_status == SOLD_OUT
+        seat_event = (prev_status == SOLD_OUT and curr.status == AVAILABLE) or (
+            prev_status == AVAILABLE
             and curr.status == AVAILABLE
-            and (curr.seats_available is None or curr.seats_available > 0)
-        ):
+            and prev.seats_available is not None
+            and curr.seats_available is not None
+            and curr.seats_available > prev.seats_available
+        )
+        if seat_event and _seat_alertable(prev, curr, watch):
             events.append(
                 (
                     watch,

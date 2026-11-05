@@ -31,12 +31,14 @@ from keyboards import (
     retry_keyboard,
     search_keyboard,
     search_results_keyboard,
+    seat_choice_keyboard,
     showtime_keyboard,
     suggestion_keyboard,
     support_keyboard,
     watch_created_keyboard,
     watch_delete_confirm_keyboard,
     watch_detail_keyboard,
+    watch_seat_choice_keyboard,
     watches_clear_confirm_keyboard,
     watches_keyboard,
     window_keyboard,
@@ -57,8 +59,18 @@ class AddWatch(StatesGroup):
     movie = State()
     search = State()
     showtime = State()
+    seats = State()
+    seats_custom = State()
     window_movie = State()
     window = State()
+
+
+class EditSeats(StatesGroup):
+    custom = State()
+
+
+SEAT_MIN = 1
+SEAT_MAX = 10
 
 
 async def _cached(cache: Any, key: str, ttl: float) -> Any:
@@ -436,25 +448,15 @@ async def window_movie_query(
 
 
 @router.callback_query(AddWatch.window, F.data.startswith("win:"))
-async def window_chosen(callback: CallbackQuery, state: FSMContext, settings: Settings) -> None:
+async def window_chosen(callback: CallbackQuery, state: FSMContext) -> None:
     window = split_cb(callback.data, 2)[1]
     if window not in {"morning", "evening"}:
         await answer(callback, strings.error_expired(), alert=True)
         return
     data = await state.get_data()
     await state.update_data(window=window)
-    date = data.get("date", "")
-    movie_name = data.get("movie_name", data.get("pending_query", ""))
-    branch_count = sum(
-        1
-        for br in data.get("window_branches", [])
-        if any(_window_match(s, window, settings.morning_end_hour) for s in br["showtimes"])
-    )
-    await edit(
-        callback,
-        strings.confirm_window(movie_name, date, window, branch_count, settings.morning_end_hour),
-        confirm_window_keyboard(),
-    )
+    await _show_seat_picker(callback, state, data)
+    await answer(callback)
 
 
 @router.callback_query(AddWatch.window, F.data == "add:confirm_window")
@@ -467,6 +469,7 @@ async def confirm_window_watch(
     date = data.get("date", "")
     movie_name = data.get("movie_name", data.get("pending_query", ""))
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    required_seats = _required_seats(data.get("required_seats")) or 1
     group_id = secrets.token_urlsafe(16)
     entries: list[dict[str, Any]] = []
     for br in data.get("window_branches", []):
@@ -488,6 +491,7 @@ async def confirm_window_watch(
                 "scope": "movie",
                 "group_id": group_id,
                 "time_window": window,
+                "required_seats": required_seats,
                 "expires_at": day_end_iso(date, settings.timezone),
             }
         )
@@ -992,6 +996,111 @@ def _visible_showtimes(data: dict[str, Any]) -> list[Showtime]:
     return [s for s in showtimes if format_key(s.hall_type) == selected]
 
 
+def _required_seats(value: Any) -> int | None:
+    """Parse a seat count from a button or typed message, enforcing 1–10."""
+
+    try:
+        number = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return number if SEAT_MIN <= number <= SEAT_MAX else None
+
+
+def _seat_context(data: dict[str, Any]) -> str:
+    movie = (data.get("movie") or {}).get("name") or data.get("movie_name")
+    return str(movie or data.get("pending_query") or "")
+
+
+def _confirm_payload(
+    data: dict[str, Any], settings: Settings, required_seats: int
+) -> tuple[str, Any]:
+    """Rebuild the confirmation screen from the stored flow data."""
+
+    branch = data.get("branch", {})
+    movie = data.get("movie", {})
+    date = data.get("date", "")
+    showtime = data.get("showtime", {})
+    scope = data.get("scope", "showtime")
+    window = data.get("window")
+    selected_format = data.get("format")
+    if window:
+        movie_name = data.get("movie_name", data.get("pending_query", ""))
+        branch_count = sum(
+            1
+            for br in data.get("window_branches", [])
+            if any(_window_match(s, window, settings.morning_end_hour) for s in br["showtimes"])
+        )
+        text = strings.confirm_window(
+            movie_name,
+            date,
+            window,
+            branch_count,
+            settings.morning_end_hour,
+            required_seats,
+        )
+        return text, confirm_window_keyboard()
+    format_label = strings.format_label(selected_format) if selected_format else None
+    if scope == "movie_all_dates":
+        text = strings.confirm_all_dates(
+            branch.get("name", ""),
+            movie.get("name", ""),
+            int(data.get("date_count") or 0),
+            format_label,
+            required_seats,
+        )
+    elif scope == "movie":
+        shows = _visible_showtimes(data)
+        text = strings.confirm_movie_watch(
+            branch.get("name", ""),
+            date,
+            movie.get("name", ""),
+            int(data.get("showtime_count") or len(shows)),
+            [s.status for s in shows],
+            format_label,
+            required_seats,
+        )
+    else:
+        text = strings.confirm_watch(
+            branch.get("name", ""),
+            date,
+            movie.get("name", ""),
+            showtime.get("time", ""),
+            showtime.get("hall_type", ""),
+            showtime.get("status", ""),
+            required_seats,
+        )
+    return text, confirm_keyboard()
+
+
+def _confirm_poster(data: dict[str, Any]) -> str | None:
+    return (data.get("movie") or {}).get("poster_url")
+
+
+async def _show_seat_picker(
+    callback: CallbackQuery, state: FSMContext, data: dict[str, Any]
+) -> None:
+    await state.set_state(AddWatch.seats)
+    await edit(
+        callback,
+        strings.choose_seats(_seat_context(data)),
+        seat_choice_keyboard(),
+    )
+
+
+async def _show_confirm(callback: CallbackQuery, state: FSMContext, settings: Settings) -> None:
+    data = await state.get_data()
+    seats = _required_seats(data.get("required_seats")) or 1
+    await state.set_state(AddWatch.window if data.get("window") else AddWatch.showtime)
+    text, keyboard = _confirm_payload(data, settings, seats)
+    poster = _confirm_poster(data)
+    await edit(
+        callback,
+        strings.truncate(text, 1000) if poster else text,
+        keyboard,
+        photo_url=poster,
+    )
+
+
 @router.callback_query(AddWatch.showtime, F.data.startswith("fm:"))
 async def showtime_format(callback: CallbackQuery, state: FSMContext) -> None:
     value = split_cb(callback.data, 2)[1]
@@ -1116,25 +1225,9 @@ async def showtime_chosen(callback: CallbackQuery, state: FSMContext) -> None:
         await answer(callback, strings.error_expired(), alert=True)
         return
     showtime = showtimes[index].to_dict()
-    branch = data.get("branch", {})
-    movie = data.get("movie", {})
-    date = data.get("date", "")
     await state.update_data(showtime=showtime, scope="showtime")
-    poster = movie.get("poster_url")
-    text = strings.confirm_watch(
-        branch.get("name", ""),
-        date,
-        movie.get("name", ""),
-        showtime["time"],
-        showtime["hall_type"],
-        showtime.get("status", ""),
-    )
-    await edit(
-        callback,
-        strings.truncate(text, 1000) if poster else text,
-        confirm_keyboard(),
-        photo_url=poster,
-    )
+    data = await state.get_data()
+    await _show_seat_picker(callback, state, data)
     await answer(callback)
 
 
@@ -1145,28 +1238,10 @@ async def showtime_all_chosen(callback: CallbackQuery, state: FSMContext) -> Non
     if not showtimes:
         await answer(callback, strings.error_generic(), alert=True)
         return
-    branch = data.get("branch", {})
-    movie = data.get("movie", {})
-    date = data.get("date", "")
     first = sorted(showtimes, key=lambda s: (s.time, s.hall_type))[0]
-    statuses = [s.status for s in showtimes]
-    selected = data.get("format")
     await state.update_data(scope="movie", showtime=first.to_dict(), showtime_count=len(showtimes))
-    poster = movie.get("poster_url")
-    text = strings.confirm_movie_watch(
-        branch.get("name", ""),
-        date,
-        movie.get("name", ""),
-        len(showtimes),
-        statuses,
-        strings.format_label(selected) if selected else None,
-    )
-    await edit(
-        callback,
-        strings.truncate(text, 1000) if poster else text,
-        confirm_keyboard(),
-        photo_url=poster,
-    )
+    data = await state.get_data()
+    await _show_seat_picker(callback, state, data)
     await answer(callback)
 
 
@@ -1181,24 +1256,52 @@ async def showtime_all_dates(
     if not dates:
         await answer(callback, strings.all_dates_unavailable(), alert=True)
         return
-    branch = data.get("branch", {})
-    movie = data.get("movie", {})
-    selected = data.get("format")
     await state.update_data(scope="movie_all_dates", date_count=len(dates))
-    poster = movie.get("poster_url")
-    text = strings.confirm_all_dates(
-        branch.get("name", ""),
-        movie.get("name", ""),
-        len(dates),
-        strings.format_label(selected) if selected else None,
-    )
-    await edit(
-        callback,
+    data = await state.get_data()
+    await _show_seat_picker(callback, state, data)
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.seats, F.data.startswith("add:seats:"))
+async def seats_chosen(callback: CallbackQuery, state: FSMContext, settings: Settings) -> None:
+    seats = _required_seats(int_part(callback.data, 2, 3))
+    if seats is None:
+        await answer(callback, strings.seats_custom_invalid(), alert=True)
+        return
+    await state.update_data(required_seats=seats)
+    await _show_confirm(callback, state, settings)
+    await answer(callback)
+
+
+@router.callback_query(AddWatch.seats, F.data == "add:seats_custom")
+async def seats_custom_start(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(AddWatch.seats_custom)
+    await edit(callback, strings.seats_custom_prompt(), back_home_keyboard())
+    await answer(callback)
+
+
+@router.message(AddWatch.seats_custom)
+async def seats_custom_value(message: Message, state: FSMContext, settings: Settings) -> None:
+    seats = _required_seats(message.text)
+    if seats is None:
+        await send(message, strings.seats_custom_invalid())
+        return
+    await state.update_data(required_seats=seats)
+    data = await state.get_data()
+    await state.set_state(AddWatch.window if data.get("window") else AddWatch.showtime)
+    text, keyboard = _confirm_payload(data, settings, seats)
+    poster = _confirm_poster(data)
+    await send(
+        message,
         strings.truncate(text, 1000) if poster else text,
-        confirm_keyboard(),
+        keyboard,
         photo_url=poster,
     )
-    await answer(callback)
+
+
+@router.callback_query(F.data.startswith("add:seats"))
+async def seats_expired(callback: CallbackQuery) -> None:
+    await answer(callback, strings.error_expired(), alert=True)
 
 
 @router.callback_query(AddWatch.showtime, F.data == "add:confirm")
@@ -1220,6 +1323,7 @@ async def confirm_add(
     scope = data.get("scope", "showtime")
     movie_scope = scope in {"movie", "movie_all_dates"}
     all_dates = scope == "movie_all_dates"
+    required_seats = _required_seats(data.get("required_seats")) or 1
     selected_format = data.get("format")
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     details = movie
@@ -1253,6 +1357,7 @@ async def confirm_add(
             trailer_url=details.get("trailer_url"),
             imax_status=imax_status or details.get("imax_status"),
             expires_at=expires_at,
+            required_seats=required_seats,
         )
     except WatchLimitReached:
         await edit(
@@ -1353,6 +1458,7 @@ def _watches_view(
                 watch.get("snoozed_until"),
                 watch.get("scope"),
                 watch.get("provider"),
+                watch.get("required_seats") or 1,
             )
         )
     lines += ["", strings.watches_retention_note(settings.watch_retention_days)]
@@ -1417,11 +1523,8 @@ def _snooze_clock(value: str | None, settings: Settings) -> str | None:
     return strings.format_time(local.strftime("%H:%M"))
 
 
-async def _render_watch_detail(
-    callback: CallbackQuery, watch: dict[str, Any], settings: Settings
-) -> None:
-    await edit(
-        callback,
+def _watch_detail_payload(watch: dict[str, Any], settings: Settings) -> tuple[str, Any]:
+    return (
         strings.watch_detail(
             watch["branch_name"],
             watch["date"],
@@ -1432,17 +1535,28 @@ async def _render_watch_detail(
             _snooze_clock(watch.get("snoozed_until"), settings),
             watch.get("scope"),
             watch.get("provider"),
+            watch.get("required_seats") or 1,
         ),
         watch_detail_keyboard(watch),
     )
 
 
+async def _render_watch_detail(
+    callback: CallbackQuery, watch: dict[str, Any], settings: Settings
+) -> None:
+    text, keyboard = _watch_detail_payload(watch, settings)
+    await edit(callback, text, keyboard)
+
+
 @router.callback_query(F.data.startswith("w:cfg:"))
-async def watch_settings(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+async def watch_settings(
+    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
+) -> None:
     watch_id = int_part(callback.data, 2, 3)
     if watch_id is None:
         await answer(callback, strings.error_generic(), alert=True)
         return
+    await state.clear()
     watch, user = await _owned_watch(callback, db, settings, watch_id)
     if watch is None:
         await _render_watches(callback, db, user, settings)
@@ -1471,6 +1585,86 @@ async def watch_alert_mode(callback: CallbackQuery, db: Database, settings: Sett
     if watch is not None:
         await _render_watch_detail(callback, watch, settings)
     await answer(callback, strings.watch_mode_set(mode))
+
+
+@router.callback_query(F.data.startswith("w:seats:"))
+async def watch_seats(
+    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
+) -> None:
+    watch_id = int_part(callback.data, 2, 3)
+    if watch_id is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    await state.clear()
+    watch, _ = await _owned_watch(callback, db, settings, watch_id)
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    await edit(
+        callback,
+        strings.choose_seats(watch["movie_name"]),
+        watch_seat_choice_keyboard(watch_id),
+    )
+    await answer(callback)
+
+
+@router.callback_query(F.data.startswith("ws:"))
+async def watch_seats_chosen(
+    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
+) -> None:
+    watch_id = int_part(callback.data, 1, 3)
+    value = split_cb(callback.data, 3)[2]
+    await state.clear()
+    watch, user = (
+        await _owned_watch(callback, db, settings, watch_id) if watch_id is not None else (None, {})
+    )
+    if watch is None:
+        await answer(callback, strings.error_generic(), alert=True)
+        return
+    if value == "custom":
+        await state.set_state(EditSeats.custom)
+        await state.update_data(edit_seats_watch_id=watch_id)
+        await edit(callback, strings.seats_custom_prompt(), watch_seat_choice_keyboard(watch_id))
+        await answer(callback)
+        return
+    seats = _required_seats(value)
+    if seats is None:
+        await answer(callback, strings.seats_custom_invalid(), alert=True)
+        return
+    await db.set_watch_required_seats(watch_id, int(user["id"]), seats)
+    watch = await db.get_watch(watch_id)
+    if watch is not None:
+        await _render_watch_detail(callback, watch, settings)
+    await answer(callback, strings.seats_updated(seats))
+
+
+@router.message(EditSeats.custom)
+async def watch_seats_custom_value(
+    message: Message, state: FSMContext, db: Database, settings: Settings
+) -> None:
+    seats = _required_seats(message.text)
+    if seats is None:
+        await send(message, strings.seats_custom_invalid())
+        return
+    data = await state.get_data()
+    try:
+        watch_id = int(data.get("edit_seats_watch_id"))
+    except (TypeError, ValueError):
+        await state.clear()
+        await send(message, strings.error_expired(), back_home_keyboard())
+        return
+    user = await db.get_or_create_user(message.from_user.id, watch_limit=settings.free_watch_limit)
+    watch = await db.get_watch(watch_id)
+    if not watch or int(watch["user_id"]) != int(user["id"]) or not watch.get("active"):
+        await state.clear()
+        await send(message, strings.error_generic(), back_home_keyboard())
+        return
+    await db.set_watch_required_seats(watch_id, int(user["id"]), seats)
+    await state.clear()
+    watch = await db.get_watch(watch_id)
+    if watch is not None:
+        text, keyboard = _watch_detail_payload(watch, settings)
+        await send(message, text, keyboard)
 
 
 @router.callback_query(F.data.startswith("w:snz:"))

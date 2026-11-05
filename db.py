@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS watches (
     snoozed_until TEXT,
     last_status TEXT,
     last_seats INTEGER,
+    required_seats INTEGER NOT NULL DEFAULT 1,
     baseline_done INTEGER NOT NULL DEFAULT 0,
     imax_status TEXT,
     expires_at TEXT,
@@ -239,6 +240,7 @@ class Database:
         )
         await self._ensure_column("watches", "group_id", "TEXT")
         await self._ensure_column("watches", "time_window", "TEXT")
+        await self._ensure_column("watches", "required_seats", "INTEGER NOT NULL DEFAULT 1")
         if deactivated_added:
             # Give watches that were already closed a short grace period
             # instead of deleting them the moment the feature ships, and never
@@ -520,6 +522,7 @@ class Database:
         trailer_url: str | None = None,
         imax_status: str | None = None,
         expires_at: str | None = None,
+        required_seats: int = 1,
     ) -> int:
         count = await self.count_active_watches(user_id)
         if count >= watch_limit:
@@ -545,6 +548,7 @@ class Database:
             trailer_url=trailer_url,
             imax_status=imax_status,
             expires_at=expires_at,
+            required_seats=required_seats,
         )
 
     async def add_watch_group(
@@ -591,6 +595,7 @@ class Database:
         expires_at: str | None = None,
         group_id: str | None = None,
         time_window: str | None = None,
+        required_seats: int = 1,
     ) -> int:
         try:
             cur = await self.execute(
@@ -600,9 +605,9 @@ class Database:
                     movie_name, poster_url, duration_minutes, rating, language,
                     synopsis, trailer_url, imax_status, expires_at,
                     scope, showtime, hall_type, booking_url,
-                    alert_mode, group_id, time_window, active, created_at
+                    alert_mode, group_id, time_window, required_seats, active, created_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?
                 )
                 """,
                 (
@@ -628,6 +633,7 @@ class Database:
                     alert_mode,
                     group_id,
                     time_window,
+                    required_seats,
                     utc_now_iso(),
                 ),
             )
@@ -876,6 +882,13 @@ class Database:
         cur = await self.execute(
             "UPDATE watches SET alert_mode = ? WHERE id = ? AND user_id = ? AND active = 1",
             (mode, watch_id, user_id),
+        )
+        return cur.rowcount > 0
+
+    async def set_watch_required_seats(self, watch_id: int, user_id: int, seats: int) -> bool:
+        cur = await self.execute(
+            "UPDATE watches SET required_seats = ? WHERE id = ? AND user_id = ? AND active = 1",
+            (seats, watch_id, user_id),
         )
         return cur.rowcount > 0
 

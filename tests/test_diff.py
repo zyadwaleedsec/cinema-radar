@@ -60,6 +60,93 @@ def test_sold_out_to_seats() -> None:
     assert events[0][1].seats_available == 4
 
 
+def test_seat_requirement_is_respected() -> None:
+    watch_with_four = {**watch(), "required_seats": 4}
+    too_few = compute_watch_events(
+        [showtime(SOLD_OUT, seats=0)],
+        [showtime(AVAILABLE, seats=2)],
+        [watch_with_four],
+    )
+    assert too_few == []
+
+    enough = compute_watch_events(
+        [showtime(SOLD_OUT, seats=0)],
+        [showtime(AVAILABLE, seats=4)],
+        [watch_with_four],
+    )
+    assert [event[1].kind for event in enough] == [SEATS_AVAILABLE]
+
+
+def test_seat_requirement_alerts_when_the_count_rises() -> None:
+    required = {**watch(), "required_seats": 4}
+    rising = compute_watch_events(
+        [showtime(AVAILABLE, seats=2)],
+        [showtime(AVAILABLE, seats=4)],
+        [required],
+    )
+    assert [event[1].kind for event in rising] == [SEATS_AVAILABLE]
+    assert rising[0][1].previous_seats == 2
+    assert rising[0][1].seats_available == 4
+
+    already_enough = compute_watch_events(
+        [showtime(AVAILABLE, seats=4)],
+        [showtime(AVAILABLE, seats=6)],
+        [required],
+    )
+    assert already_enough == []
+
+    default_watch = compute_watch_events(
+        [showtime(AVAILABLE, seats=1)],
+        [showtime(AVAILABLE, seats=2)],
+        [watch()],
+    )
+    assert default_watch == []
+
+
+def test_unknown_seats_fail_open() -> None:
+    events = compute_watch_events(
+        [showtime(SOLD_OUT, seats=0)],
+        [showtime(AVAILABLE, seats=None)],
+        [{**watch(), "required_seats": 4}],
+    )
+    assert [event[1].kind for event in events] == [SEATS_AVAILABLE]
+
+
+def test_movie_watch_alerts_when_one_hall_rises() -> None:
+    previous = [
+        showtime(AVAILABLE, time="10:45", seats=2),
+        showtime(AVAILABLE, time="13:30", hall="STANDARD", seats=0),
+    ]
+    current = [
+        showtime(AVAILABLE, time="10:45", seats=4),
+        showtime(AVAILABLE, time="13:30", hall="STANDARD", seats=0),
+    ]
+    events = compute_watch_events(previous, current, [{**movie_watch(), "required_seats": 4}])
+    assert [event[1].kind for event in events] == [SEATS_AVAILABLE]
+    assert events[0][1].seats_available == 4
+
+
+def test_movie_watch_applies_the_requirement_per_showtime() -> None:
+    previous = [
+        showtime(SOLD_OUT, time="10:45", seats=0),
+        showtime(SOLD_OUT, time="13:30", hall="STANDARD", seats=0),
+    ]
+    split_two = [
+        showtime(AVAILABLE, time="10:45", seats=2),
+        showtime(AVAILABLE, time="13:30", hall="STANDARD", seats=2),
+    ]
+    required = {**movie_watch(), "required_seats": 4}
+    assert compute_watch_events(previous, split_two, [required]) == []
+
+    one_hall = [
+        showtime(AVAILABLE, time="10:45", seats=4),
+        showtime(AVAILABLE, time="13:30", hall="STANDARD", seats=0),
+    ]
+    events = compute_watch_events(previous, one_hall, [required])
+    assert [event[1].kind for event in events] == [SEATS_AVAILABLE]
+    assert events[0][1].seats_available == 4
+
+
 def test_no_change_no_event() -> None:
     assert compute_watch_events([showtime(AVAILABLE)], [showtime(AVAILABLE)], [watch()]) == []
 

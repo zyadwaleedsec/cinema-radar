@@ -64,6 +64,7 @@ async def feedback_received(message: Message, state: FSMContext, feedback) -> No
         message.from_user.id,
         message.from_user.username,
         f"[{category}] {text}",
+        first_name=message.from_user.first_name,
     )
     await state.clear()
     await send(

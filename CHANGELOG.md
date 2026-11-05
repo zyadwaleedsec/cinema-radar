@@ -11,6 +11,20 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-05
+
+### Added
+
+- Watches can now require a minimum number of free seats. The add flow asks
+  "how many seats?" as step 5 of 6 with quick buttons **1–4** and a
+  **custom number** option (1–10). Seat alerts only fire when a showtime has at
+  least that many seats free; an unknown count still alerts so nothing is
+  missed. Movie and all-dates watches apply the requirement per showtime.
+- The seat requirement can be changed later from **Manage watch**, and is shown
+  on the watch list and watch settings screen.
+- Feedback sent to the admin now shows the sender's `@username`, then their
+  first name, then the Telegram ID, with the ID kept in a small reference line.
+
 ## [2.5.2] - 2026-11-05
 
 ### Added
@@ -321,7 +335,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.2...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.2...v2.6.0
 [2.5.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.4.0...v2.5.0

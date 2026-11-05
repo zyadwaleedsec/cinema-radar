@@ -17,7 +17,13 @@ class FeedbackService:
         self.settings = settings
         self.notifier = notifier
 
-    async def submit(self, telegram_id: int, username: str | None, text: str) -> bool:
+    async def submit(
+        self,
+        telegram_id: int,
+        username: str | None,
+        text: str,
+        first_name: str | None = None,
+    ) -> bool:
         user = await self.db.get_or_create_user(
             telegram_id, watch_limit=self.settings.free_watch_limit
         )
@@ -33,6 +39,6 @@ class FeedbackService:
                 pass
         await self.db.add_feedback(int(user["id"]), username, text.strip()[:4000])
         with i18n.use(i18n.admin_language()):
-            notice = strings.feedback_admin(telegram_id, username, text)
+            notice = strings.feedback_admin(telegram_id, username, text, first_name)
         await self.notifier.send_admin(notice)
         return True

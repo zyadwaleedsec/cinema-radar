@@ -164,7 +164,7 @@ fly scale count 1 --region cdg   # must be 1, never 2
 fly logs
 ```
 
-`fly logs` should show `Cinema Radar v2.5.2 starting` and no traceback.
+`fly logs` should show `Cinema Radar v2.6.0 starting` and no traceback.
 
 ---
 
