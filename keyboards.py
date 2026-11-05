@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any
-from urllib.parse import quote
 
 import i18n
 import strings
@@ -478,13 +477,10 @@ def watch_alert_keyboard(
     booking_url: str | None,
     trailer_url: str | None = None,
     manage_url: str | None = None,
-    share_link: str | None = None,
 ) -> Any:
     rows = []
     if booking_url:
         rows.append([_btn(strings.BTN_OPEN_BOOKING, url=booking_url, style="success")])
-    if share_link:
-        rows.append([_btn(strings.BTN_SHARE, url=share_link)])
     if manage_url:
         rows.append([_btn(strings.BTN_MANAGE_WATCH, url=manage_url)])
     if trailer_url:
@@ -664,23 +660,13 @@ def feedback_waiting_keyboard() -> Any:
     return _markup([[_btn(strings.BTN_CANCEL, "menu:home")]])
 
 
-def discovery_keyboard(token: str, booking_url: str | None, share_link: str | None = None) -> Any:
+def discovery_keyboard(token: str, booking_url: str | None) -> Any:
     rows = []
     if booking_url:
         rows.append([_btn(strings.BTN_OPEN_BOOKING, url=booking_url, style="success")])
-    if share_link:
-        rows.append([_btn(strings.BTN_SHARE, url=share_link)])
     rows.append([_btn(strings.BTN_WATCH_MOVIE, f"dw:{token}")])
     rows.append([_btn(strings.BTN_STOP_ALERTS, "ds:stop")])
     return _markup(rows)
-
-
-def share_url(url: str, text: str = "") -> str:
-    """Telegram's share sheet, pre-filled with a booking link and a caption."""
-
-    target = (url or "").strip()
-    caption = (text or "").strip()
-    return f"https://t.me/share/url?url={quote(target, safe='')}&text={quote(caption, safe='')}"
 
 
 def delete_me_keyboard() -> Any:

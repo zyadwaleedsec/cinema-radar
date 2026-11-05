@@ -13,7 +13,7 @@ import strings
 from config import Settings
 from db import Database
 from http_client import TokenBucket
-from keyboards import share_url, watch_alert_keyboard, watch_expired_keyboard
+from keyboards import watch_alert_keyboard, watch_expired_keyboard
 from metadata import display_language
 
 logger = logging.getLogger(__name__)
@@ -268,13 +268,11 @@ class Notifier:
         if imax:
             text += f"\n\n{imax}"
         text += f"\n\n<i>{strings.alert_footer()}</i>"
-        booking_url = showtime.booking_url or watch.get("booking_url")
         keyboard = watch_alert_keyboard(
             int(watch["id"]),
-            booking_url,
+            showtime.booking_url,
             watch.get("trailer_url"),
             self.manage_url(int(watch["id"])),
-            share_url(booking_url, movie_title) if booking_url else None,
         )
         return text, keyboard
 
@@ -285,15 +283,11 @@ class Notifier:
             brand = strings.cinema_name(watch.get("provider")) if watch.get("provider") else ""
             if brand:
                 text = f"🎬 ({brand})\n{text}"
-            booking_url = watch.get("booking_url")
             keyboard = watch_alert_keyboard(
                 int(watch["id"]),
-                booking_url,
+                watch.get("booking_url"),
                 watch.get("trailer_url"),
                 self.manage_url(int(watch["id"])),
-                share_url(booking_url, title or watch.get("movie_name") or "")
-                if booking_url
-                else None,
             )
         try:
             await self.sender.send(

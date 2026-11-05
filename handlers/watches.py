@@ -75,10 +75,6 @@ class EditSeats(StatesGroup):
 SEAT_MIN = 1
 SEAT_MAX = 10
 
-#: Only mention the audience when enough people watch the same movie, so a
-#: quiet movie never looks lonely.
-WATCHERS_MIN = 3
-
 #: TMDB is only consulted when the query actually contains Arabic letters.
 _ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 
@@ -1595,23 +1591,10 @@ def _snooze_clock(value: str | None, settings: Settings) -> str | None:
     return strings.format_time(local.strftime("%H:%M"))
 
 
-async def _watcher_count(db: Any, watch: dict[str, Any]) -> int | None:
-    """Distinct active watchers for this movie, once it is worth mentioning."""
-
-    if db is None:
-        return None
-    try:
-        count = await db.count_movie_watchers(watch.get("provider") or "vox", watch["movie_id"])
-    except Exception:
-        return None
-    return count if count >= WATCHERS_MIN else None
-
-
 async def _watch_detail_payload(
     watch: dict[str, Any],
     settings: Settings,
     metadata: Any = None,
-    watchers: int | None = None,
 ) -> tuple[str, Any]:
     title = watch["movie_name"]
     localized = await _localized_movie(metadata, title)
@@ -1629,7 +1612,6 @@ async def _watch_detail_payload(
             watch.get("scope"),
             watch.get("provider"),
             watch.get("required_seats") or 1,
-            watchers=watchers,
         ),
         watch_detail_keyboard(watch),
     )
@@ -1639,12 +1621,9 @@ async def _render_watch_detail(
     callback: CallbackQuery,
     watch: dict[str, Any],
     settings: Settings,
-    db: Any = None,
     metadata: Any = None,
 ) -> None:
-    text, keyboard = await _watch_detail_payload(
-        watch, settings, metadata, await _watcher_count(db, watch)
-    )
+    text, keyboard = await _watch_detail_payload(watch, settings, metadata)
     await edit(callback, text, keyboard)
 
 
@@ -1666,7 +1645,7 @@ async def watch_settings(
         await _render_watches(callback, db, user, settings)
         await answer(callback, strings.error_generic(), alert=True)
         return
-    await _render_watch_detail(callback, watch, settings, db, metadata)
+    await _render_watch_detail(callback, watch, settings, metadata)
     await answer(callback)
 
 
@@ -1689,7 +1668,7 @@ async def watch_alert_mode(
     await db.set_watch_alert_mode(watch_id, int(user["id"]), mode)
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings, db, metadata)
+        await _render_watch_detail(callback, watch, settings, metadata)
     await answer(callback, strings.watch_mode_set(mode))
 
 
@@ -1744,7 +1723,7 @@ async def watch_seats_chosen(
     await db.set_watch_required_seats(watch_id, int(user["id"]), seats)
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings, db, metadata)
+        await _render_watch_detail(callback, watch, settings, metadata)
     await answer(callback, strings.seats_updated(seats))
 
 
@@ -1773,9 +1752,7 @@ async def watch_seats_custom_value(
     await state.clear()
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        text, keyboard = await _watch_detail_payload(
-            watch, settings, metadata, await _watcher_count(db, watch)
-        )
+        text, keyboard = await _watch_detail_payload(watch, settings, metadata)
         await send(message, text, keyboard)
 
 
@@ -1795,7 +1772,7 @@ async def watch_snooze(
     await db.snooze_watch(watch_id, int(user["id"]), until.isoformat(timespec="seconds"))
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings, db, metadata)
+        await _render_watch_detail(callback, watch, settings, metadata)
     await answer(
         callback,
         strings.watch_snoozed(_snooze_clock(until.isoformat(), settings) or ""),
@@ -1817,7 +1794,7 @@ async def watch_unsnooze(
     await db.clear_watch_snooze(watch_id)
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings, db, metadata)
+        await _render_watch_detail(callback, watch, settings, metadata)
     await answer(callback, strings.watch_unsnoozed())
 
 
@@ -1936,9 +1913,7 @@ async def send_watch_detail_message(
     if not watch or int(watch["user_id"]) != int(user["id"]) or not watch.get("active"):
         await send(message, strings.error_expired(), back_home_keyboard())
         return
-    text, keyboard = await _watch_detail_payload(
-        watch, settings, metadata, await _watcher_count(db, watch)
-    )
+    text, keyboard = await _watch_detail_payload(watch, settings, metadata)
     await send(message, text, keyboard)
 
 

@@ -236,7 +236,6 @@ BTN_LANGUAGE = "🌐 Language"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
 BTN_ALL_CINEMAS = "🌍 All cinemas"
-BTN_SHARE = "🔗 Share booking"
 BTN_CONSENT_ACCEPT = "✅ I agree, start"
 BTN_CONSENT_DECLINE = "❌ I don't agree"
 BTN_CONSENT_REVIEW = "🔐 Review consent again"
@@ -1025,7 +1024,6 @@ def watch_detail(
     scope: str | None = "showtime",
     provider: str = "vox",
     required_seats: int = 1,
-    watchers: int | None = None,
 ) -> str:
     snooze = (
         f"⏰ Snoozed until {esc(snoozed_until_text)}" if snoozed_until_text else "⏰ Not snoozed"
@@ -1038,7 +1036,6 @@ def watch_detail(
         ticket = f"🎟️ All showtimes{format_text}"
     else:
         ticket = f"🕐 {format_time(time)}{format_text}"
-    crowd = f"{watchers_line(watchers)}\n" if watchers else ""
     return (
         f"⚙️ <b>Watch settings</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
@@ -1046,14 +1043,9 @@ def watch_detail(
         f"{ticket}\n\n"
         f"🔔 Alerts: <b>{watch_mode_label(mode)}</b>\n"
         f"🪑 Alert when: <b>{_needed_seats(required_seats)} or more</b>\n"
-        f"{crowd}"
         f"{snooze}\n\n"
         "Pick the alert type that suits you:"
     )
-
-
-def watchers_line(count: int | None) -> str:
-    return f"👥 {int(count or 0)} people are watching this movie"
 
 
 def watch_reminder(
@@ -1681,15 +1673,6 @@ def admin_limits_applied(users: int, watches: int) -> str:
 
 def admin_unexpected_error(name: str) -> str:
     return f"⚠️ Unexpected error: {esc(name)}"
-
-
-def admin_self_check_failed(error: str) -> str:
-    return (
-        f"⚠️ <b>Post-deploy self-check failed</b>\n{DIVIDER}\n\n"
-        "The bot started, but its first cinema request did not succeed:\n"
-        f"<code>{esc(error)}</code>\n\n"
-        "Check the logs; an incident alert follows automatically if it persists."
-    )
 
 
 REASON_LABELS_EN = {

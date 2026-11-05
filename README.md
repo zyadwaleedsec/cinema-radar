@@ -37,8 +37,6 @@ page.
   English title the cinema actually lists, and Arabic queries fall back to TMDB.
 - 🎬 **Movie cards** with a TMDB poster, duration, rating, language, synopsis and
   trailer. In Arabic, alerts and cards use the Arabic title and overview.
-- 🔗 **Share a showing** — every alert and discovery card has a share button that
-  opens Telegram's share sheet with the booking link.
 - 🌙 **Quiet hours**, per-watch alert modes, and a clean paged watch list.
 - 🔐 **Privacy first** — an explicit consent screen appears before anything is
   stored, `/delete_me` clears the bot's data, no card details are requested and

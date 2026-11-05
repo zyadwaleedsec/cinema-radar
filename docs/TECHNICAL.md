@@ -73,7 +73,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (260 tests)
+├── tests/                  # pytest suite (256 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration

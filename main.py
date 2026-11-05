@@ -245,35 +245,6 @@ async def run() -> None:
                     allow_stale=False,
                 )
 
-    async def startup_self_check() -> None:
-        """One real request after every deploy.
-
-        A successful probe is only logged.  A failure is loud: the HTTP client
-        raises its usual "upstream down" alert, and if the failure was an empty
-        body (no incident raised) we send a dedicated deployment message.
-        """
-
-        provider_name = "vox" if "vox" in settings.providers else settings.providers[0]
-        base = settings.http_base_url if provider_name == "vox" else settings.renaissance_base_url
-        try:
-            result = await http.get(
-                base,
-                "startup:selfcheck",
-                ttl=0,
-                force_refresh=True,
-                conditional=False,
-                allow_stale=False,
-                target_key=f"{provider_name}:startup",
-            )
-            if not result.text:
-                raise RuntimeError("empty response")
-            logger.info("Startup self-check OK: %s -> HTTP %s", base, result.status_code)
-        except Exception as exc:
-            logger.error("Startup self-check failed: %s", exc)
-            if not http.incident_open:
-                detail = str(exc)[:180]
-                await notifier.send_admin(lambda: strings.admin_self_check_failed(detail))
-
     @dp.errors()
     async def on_error(event: ErrorEvent) -> bool:
         logger.exception("Unhandled update error: %s", event.exception)
@@ -358,7 +329,6 @@ async def run() -> None:
             logger.exception("Could not register commands / menu button")
         await broadcaster.start()
         await apply_watch_limits()
-        await startup_self_check()
         tasks.append(asyncio.create_task(watcher_loop(), name="watcher-loop"))
         tasks.append(asyncio.create_task(discovery_loop(), name="discovery-loop"))
         tasks.append(asyncio.create_task(stats_loop(), name="stats-loop"))

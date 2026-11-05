@@ -220,7 +220,7 @@ class Broadcaster:
         events: list[DiscoveryEvent],
         titles: dict[str, str] | None = None,
     ) -> tuple[str, Any]:
-        from keyboards import discovery_keyboard, share_url
+        from keyboards import discovery_keyboard
 
         titles = titles or {}
         first = events[0]
@@ -243,11 +243,10 @@ class Broadcaster:
             first.movie.name,
             first.branch.provider,
         )
-        booking_url = first.booking_url or (first.showtime.booking_url if first.showtime else None)
         keyboard = discovery_keyboard(
             token=token,
-            booking_url=booking_url,
-            share_link=share_url(booking_url, first_title) if booking_url else None,
+            booking_url=first.booking_url
+            or (first.showtime.booking_url if first.showtime else None),
         )
         return text, keyboard
 

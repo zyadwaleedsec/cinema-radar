@@ -23,23 +23,12 @@ the project uses [Semantic Versioning](https://semver.org):
 - Arabic-name search: typing an Arabic movie name finds the English title that
   the cinema actually lists. TMDB is only consulted when the query contains
   Arabic letters, and its suggestions are re-ranked against real listings.
-- A share button on watch alerts and discovery cards opens Telegram's share
-  sheet with the booking link and the movie title.
-- Watch settings show how many people are tracking the same movie, once at
-  least three do.
-- A post-deploy self-check makes one real request to the primary cinema and
-  reports a failure to the admin without waiting for the first poll.
 
 ### Changed
 
 - The format filter only offers formats the selected cinemas actually sell, and
   changing branches clears a filter the new selection cannot serve.
 - Format buttons are laid out two per row, with an explicit all-formats row.
-
-### Fixed
-
-- The self-check sends the failure detail captured before the exception scope
-  closes, so the admin message always renders.
 
 ## [2.7.3] - 2026-11-05
 
