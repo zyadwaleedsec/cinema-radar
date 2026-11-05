@@ -54,18 +54,19 @@ Fly's remote builder.
 
 ## 3. Create the app
 
-App names are global on Fly, so `cinema-radar` may already be taken. Pick a
-unique name and put the same name in `fly.toml` (`app = "..."`).
+App names are global on Fly, so the name is part of the project. This repo uses
+`cinema-radar-eg`; if you rename it, put the same name in `fly.toml`
+(`app = "..."`).
 
 ```powershell
-fly apps create cinema-radar-<something-unique>
+fly apps create cinema-radar-eg
 ```
 
-If you already created an app from the web UI, either reuse it or delete it and
-start clean:
+If you already created an app from the web UI, reuse it (and make sure
+`fly.toml` matches its name). To start completely clean:
 
 ```powershell
-fly apps destroy cinema-radar      # only if you want a fresh start
+fly apps destroy cinema-radar-eg   # only if you want a fresh start
 ```
 
 ---
@@ -157,11 +158,11 @@ The volume is not touched: users, watches and settings survive the deploy.
 | `fly logs` | live logs (startup errors, polling conflicts) |
 | `fly status` | machine state and image |
 | `fly scale count 1` | force a single instance |
-| `fly apps restart cinema-radar` | restart without rebuilding |
+| `fly apps restart cinema-radar-eg` | restart without rebuilding |
 | `fly ssh console` | shell inside the machine |
 | `fly volumes list` | check the volume exists |
 | `fly secrets list` | check configured secrets (values hidden) |
-| `fly apps destroy cinema-radar` | delete everything |
+| `fly apps destroy cinema-radar-eg` | delete everything |
 
 Back up the database:
 

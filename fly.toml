@@ -5,7 +5,7 @@
 #
 # Run exactly ONE machine. Two long-polling processes on the same token fight
 # over getUpdates and Telegram answers both with 409 Conflict.
-app = "cinema-radar"
+app = "cinema-radar-eg"
 primary_region = "cdg"
 
 [build]
