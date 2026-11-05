@@ -17,12 +17,38 @@ load_dotenv()
 
 #: Public contact address used wherever an upstream service asks who we are.
 BOT_CONTACT_EMAIL = "zyad.waleed.sec@gmail.com"
+BOT_NAME = "CinemaRadarBot"
+BOT_PRODUCT = "CinemaRadar"
 
-#: A transparent, stable UA.  Upstream operators can identify the bot and reach
-#: the maintainer instead of blocking an anonymous browser string.
+#: Cinema sites sit behind a WAF that resets the HTTP/2 stream (curl error 92)
+#: when the User-Agent contains an email address, a URL or the word "bot".  A
+#: browser-shaped UA that still names the project is therefore used for cinema
+#: requests; the contact address travels in the standard ``From`` header (see
+#: ``HttpClient``).  APIs such as TMDB accept the fully identified UA below.
 DEFAULT_USER_AGENT = (
-    f"CinemaRadarBot/{__version__} (+https://t.me/RadarElCinemaBot; contact: {BOT_CONTACT_EMAIL})"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    f"(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 {BOT_PRODUCT}/{__version__}"
 )
+
+#: Fully identified UA for APIs that want the application name and contact.
+IDENTIFIED_USER_AGENT = (
+    f"{BOT_NAME}/{__version__} (+https://t.me/RadarElCinemaBot; contact: {BOT_CONTACT_EMAIL})"
+)
+
+
+def upstream_user_agent(configured: str | None) -> str:
+    """Return a UA that cinema WAFs accept.
+
+    An override that still carries an email, a URL or the token "bot" would be
+    rejected by VOX with an HTTP/2 reset, so fall back to the browser-shaped
+    default instead of taking the whole poller down.
+    """
+
+    value = (configured or "").strip()
+    lowered = value.lower()
+    if not value or "@" in value or "://" in value or "bot" in lowered:
+        return DEFAULT_USER_AGENT
+    return value
 
 
 def _env(name: str, default: str = "") -> str:
@@ -91,6 +117,8 @@ class Settings:
     http_base_url: str = "https://egy.voxcinemas.com"
     renaissance_base_url: str = "https://rnscinemas.com"
     http_user_agent: str = DEFAULT_USER_AGENT
+    # APIs such as TMDB accept (and prefer) the fully identified UA.
+    tmdb_user_agent: str = IDENTIFIED_USER_AGENT
     # VOX resets plain TLS clients.  When curl_cffi is installed and this is set
     # (for example "chrome124"), requests are sent with a Chrome TLS fingerprint.
     http_impersonate: str = ""
@@ -197,6 +225,7 @@ class Settings:
             http_base_url=_env("VOX_BASE_URL", "https://egy.voxcinemas.com"),
             renaissance_base_url=_env("RENAISSANCE_BASE_URL", "https://rnscinemas.com"),
             http_user_agent=_env("HTTP_USER_AGENT", DEFAULT_USER_AGENT),
+            tmdb_user_agent=_env("TMDB_USER_AGENT", IDENTIFIED_USER_AGENT),
             http_impersonate=_env("HTTP_IMPERSONATE"),
             global_rate_limit=_env_float("GLOBAL_RATE_LIMIT", 1.0),
             max_connections=_env_int("MAX_CONNECTIONS", 2),

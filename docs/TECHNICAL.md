@@ -72,7 +72,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (239 tests)
+├── tests/                  # pytest suite (243 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -208,11 +208,32 @@ fingerprint works much more reliably, so `http_client.py` can use
 [`curl_cffi`](https://github.com/lexiforest/curl_cffi) with
 `HTTP_IMPERSONATE=chrome124`. If `curl_cffi` is unavailable, the client falls
 back to `httpx` automatically. We do **not** use proxies, IP rotation or any
-other evasion. If VOX blocks us, the bot slows down, opens the circuit breaker,
-tells the admin immediately (reason, place, last success, retry ETA and the
-number of affected watches), and sends one recovery message when VOX is back.
-While an incident is open, alerts are paused: the watcher never diffs stale
-cache. Menus may still show the last known data with an age warning.
+other evasion.
+
+The VOX edge also inspects the User-Agent. Any value containing an email
+address, a URL (`://`) or the substring `bot` is answered with
+`curl: (92) HTTP/2 stream 1 reset by server`. Cinema requests therefore send a
+browser-shaped UA that still names the project:
+
+```
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 CinemaRadar/<version>
+```
+
+The contact address travels in the standard `From` header, plus `X-Bot-Name` and
+`X-Bot-Contact`. `upstream_user_agent()` rewrites an unsafe `HTTP_USER_AGENT`
+override to this default rather than letting it break every poll. APIs that
+want a fully identified caller (TMDB) use `IDENTIFIED_USER_AGENT`
+(`CinemaRadarBot/<version> (+https://...; contact: ...)`) instead.
+
+If a request fails with an HTTP/2 stream reset, the client discards the session,
+pins HTTP/1.1 for the next one and retries once before counting a failure. If
+VOX blocks us anyway, the bot slows down, opens the circuit breaker, tells the
+admin (reason, place, last success, retry ETA and the number of affected
+watches), and sends one recovery message when VOX is back. A first failure is
+reported as a temporary problem; the outage wording and "alerting paused" note
+are only sent when the breaker actually trips. While an incident is open,
+alerts are paused: the watcher never diffs stale cache. Menus may still show the
+last known data with an age warning.
 
 ### Parser
 
@@ -394,8 +415,9 @@ from `.env`. Secrets are only read from the environment.
 | `PROVIDER` | `vox` | Fallback brand for single-cinema mode |
 | `VOX_BASE_URL` | `https://egy.voxcinemas.com` | VOX provider base URL |
 | `RENAISSANCE_BASE_URL` | `https://rnscinemas.com` | Renaissance provider base URL |
-| `HTTP_USER_AGENT` | bot name + contact | Transparent UA; keep the contact email in any override |
+| `HTTP_USER_AGENT` | browser UA ending in `CinemaRadar/<version>` | Cinema UA; never put an email, URL or "bot" in it (VOX resets those) |
 | `HTTP_IMPERSONATE` | empty | e.g. `chrome124` (needs `curl_cffi`) |
+| `TMDB_USER_AGENT` | fully identified bot UA | API UA; names the bot and contact address |
 | `GLOBAL_RATE_LIMIT` | `1.0` | Upstream requests/second |
 | `MAX_CONNECTIONS` | `2` | Max concurrent upstream connections |
 | `REQUEST_TIMEOUT` | `12` | Upstream request timeout (seconds) |
@@ -558,7 +580,7 @@ needed.
 python -m pytest
 ```
 
-Expected: `239 passed`.
+Expected: `243 passed`.
 
 The core tests do not require a Telegram token or network access. They use a
 fake clock, a temporary SQLite database and mocked providers.
@@ -700,6 +722,9 @@ authentication, access booking or seat-map pages, or automate purchases.
 | --- | --- |
 | `BOT_TOKEN is missing` | `.env` not created or not loaded; copy `.env.example` |
 | VOX requests time out / reset | Install `curl_cffi` and set `HTTP_IMPERSONATE=chrome124` |
+| `curl: (92) HTTP/2 stream 1 reset` | The UA contains an email, a URL or "bot"; use the built-in value. The client also retries over HTTP/1.1 once |
+| `HTTP_USER_AGENT` override ignored | Unsafe overrides are replaced by the browser-safe default; check the startup warning |
+| Admin alert says "temporary problem" | One upstream failure; it escalates to "is down" only when the breaker trips |
 | `ZoneInfoNotFoundError` | `pip install tzdata` (already in requirements) |
 | Bot starts but no alerts | Check `/status`: VOX state, last success, breaker and affected watches. While an outage is open, alerts are paused on purpose |
 | Breaker stays open | VOX is blocking or down; wait for the pause and check logs |

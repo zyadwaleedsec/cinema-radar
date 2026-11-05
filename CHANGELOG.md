@@ -11,6 +11,32 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.7.3] - 2026-11-05
+
+### Fixed
+
+- VOX requests failed with `curl: (92) HTTP/2 stream 1 reset by server`. The VOX
+  edge resets any request whose User-Agent contains an email address, a URL or
+  the word "bot", and the transparent UA from 2.7.0 contained all three. Cinema
+  requests now use a browser-shaped UA ending in `CinemaRadar/<version>`, while
+  the contact address travels in the standard `From`, `X-Bot-Name` and
+  `X-Bot-Contact` headers. TMDB keeps the fully identified bot UA.
+- An unsafe `HTTP_USER_AGENT` override (one containing an email, a URL or "bot")
+  is replaced with the safe default instead of breaking every poll.
+- An HTTP/2 stream reset now retries once over HTTP/1.1 with a fresh session, so
+  a single edge quirk does not open the circuit breaker.
+
+### Changed
+
+- A first upstream failure is reported as "temporary problem with …" instead of
+  "… is down". Only a tripped circuit breaker sends the outage wording and says
+  that alerts are paused, which matches what the bot actually does.
+- Outage and recovery admin alerts name the correct provider (`VOX` or
+  `Renaissance`), use explicit RTL marks and blank lines between blocks, and
+  truncate long transport errors.
+- Discovery no longer sends a second raw-error alert for transport failures that
+  the shared HTTP layer already reported.
+
 ## [2.7.2] - 2026-11-05
 
 ### Changed

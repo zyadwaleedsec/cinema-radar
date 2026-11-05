@@ -109,17 +109,21 @@ async def test_outage_alerts_the_admin_once_then_recovery(db, cache, test_settin
                 allow_stale=False,
             )
 
-    assert len(alerts) == 1
-    assert "(فوكس) واقعة" in alerts[0]
+    # First failure is reported as a temporary problem; the third failure
+    # trips the breaker and sends the "alerting paused" escalation.
+    assert len(alerts) == 2
+    assert "مشكلة مؤقتة" in alerts[0]
     assert "403" in alerts[0]
+    assert "(فوكس) واقعة" in alerts[1]
+    assert "وقفت التنبيهات" in alerts[1]
     assert client.incident_open is True
     assert client.circuit_state == "open"
 
     clock.advance(11)
     result = await client.get("https://example.test/showtimes", "k", ttl=1, allow_stale=False)
     assert result.status_code == 200
-    assert len(alerts) == 2
-    assert "(فوكس) رجعت" in alerts[1]
+    assert len(alerts) == 3
+    assert "(فوكس) رجعت" in alerts[2]
     assert client.incident_open is False
     assert client.circuit_state == "closed"
 
@@ -167,10 +171,53 @@ def test_transport_errors_are_classified_for_the_admin():
     class CurlTimeoutError(OSError):
         code = 28
 
+    class CurlHTTP2Reset(OSError):
+        code = 92
+
     assert reason_for_exception(TimeoutError("slow")) == "timeout"
     assert reason_for_exception(CurlTimeout("timed out")) == "timeout"
     assert reason_for_exception(CurlTimeoutError("curl: (28)")) == "timeout"
+    assert reason_for_exception(CurlHTTP2Reset("curl: (92)")) == "http2"
+    assert reason_for_exception(OSError("HTTP/2 stream 1 reset")) == "http2"
     assert reason_for_exception(OSError("connection reset")) == "network"
+
+
+@pytest.mark.asyncio
+async def test_http2_reset_retries_over_http1_without_paging(db, cache, test_settings, clock):
+    alerts: list[str] = []
+
+    async def admin(text: str) -> None:
+        alerts.append(text)
+
+    class CurlHTTP2Reset(OSError):
+        code = 92
+
+    class FlakySession:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def get(self, url, headers=None, timeout=None):
+            self.calls += 1
+            if self.calls == 1:
+                raise CurlHTTP2Reset("Failed to perform, curl: (92)")
+            return Response(200, "<html>ok</html>")
+
+    session = FlakySession()
+    client = HttpClient(
+        test_settings,
+        cache,
+        session=session,
+        clock=clock,
+        sleep=clock.sleep,
+        on_admin_message=admin,
+    )
+
+    result = await client.get("https://example.test/x", "k", ttl=1, allow_stale=False)
+
+    assert result.status_code == 200
+    assert session.calls == 2
+    assert client._force_http1 is True
+    assert alerts == []
 
 
 @pytest.mark.asyncio
@@ -235,7 +282,8 @@ async def test_outage_alert_reports_a_real_wall_clock_last_success(db, cache, te
         with pytest.raises(UpstreamError):
             await client.get("https://example.test/x", "k2", ttl=100, allow_stale=False)
 
-    assert len(alerts) == 1
+    assert len(alerts) == 2
     # The old bug formatted the monotonic clock, producing a 1970/2023 date.
     assert str(datetime.now().year) in alerts[0]
     assert "1970" not in alerts[0]
+    assert "(فوكس) واقعة" in alerts[1]

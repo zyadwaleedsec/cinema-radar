@@ -10,7 +10,14 @@ from aiogram.types import Chat, Message, User
 
 import consent
 import i18n
-from config import BOT_CONTACT_EMAIL, DEFAULT_USER_AGENT, Settings
+from config import (
+    BOT_CONTACT_EMAIL,
+    BOT_NAME,
+    DEFAULT_USER_AGENT,
+    IDENTIFIED_USER_AGENT,
+    Settings,
+    upstream_user_agent,
+)
 from handlers import consent as consent_handler
 from http_client import HttpClient
 from middleware import LanguageMiddleware
@@ -224,23 +231,43 @@ def test_consent_version_gate():
 # ----------------------------------------------------------------- user agent
 
 
-def test_default_user_agent_names_the_bot_and_contact():
-    assert "CinemaRadarBot" in DEFAULT_USER_AGENT
-    assert BOT_CONTACT_EMAIL in DEFAULT_USER_AGENT
-    assert BOT_CONTACT_EMAIL in Settings().http_user_agent
+def test_default_user_agent_is_safe_for_cinema_wafs():
+    # VOX resets any UA containing '@', '://' or 'bot'; keep it browser-shaped.
+    assert Settings().http_user_agent == DEFAULT_USER_AGENT
+    assert "CinemaRadar" in DEFAULT_USER_AGENT
+    assert "@" not in DEFAULT_USER_AGENT
+    assert "://" not in DEFAULT_USER_AGENT
+    assert "bot" not in DEFAULT_USER_AGENT.lower()
+
+
+def test_identified_user_agent_names_the_bot_and_contact():
+    assert BOT_NAME in IDENTIFIED_USER_AGENT
+    assert BOT_CONTACT_EMAIL in IDENTIFIED_USER_AGENT
+    assert Settings().tmdb_user_agent == IDENTIFIED_USER_AGENT
+
+
+def test_unsafe_user_agent_override_falls_back_to_the_safe_default():
+    assert upstream_user_agent(IDENTIFIED_USER_AGENT) == DEFAULT_USER_AGENT
+    assert upstream_user_agent("MyBot/1.0") == DEFAULT_USER_AGENT
+    assert upstream_user_agent(DEFAULT_USER_AGENT) == DEFAULT_USER_AGENT
 
 
 @pytest.mark.asyncio
-async def test_http_client_sends_the_stated_user_agent(cache, test_settings):
+async def test_http_client_sends_safe_headers_and_contact(cache, test_settings):
     client = HttpClient(test_settings, cache)
     try:
-        assert client.session.headers["User-Agent"] == test_settings.http_user_agent
+        headers = client.session.headers
+        assert headers["User-Agent"] == test_settings.http_user_agent
+        # The contact still travels with every request, just not in the UA.
+        assert headers["From"] == BOT_CONTACT_EMAIL
+        assert headers["X-Bot-Name"] == BOT_NAME
+        assert headers["X-Bot-Contact"] == BOT_CONTACT_EMAIL
     finally:
         await client.close()
 
 
 @pytest.mark.asyncio
-async def test_tmdb_client_sends_the_same_user_agent():
+async def test_tmdb_client_sends_the_identified_user_agent():
     sent: dict[str, str] = {}
 
     class _Response:
@@ -266,9 +293,9 @@ async def test_tmdb_client_sends_the_same_user_agent():
             return _Response()
 
     with patch("tmdb.httpx.AsyncClient", _Client):
-        await TmdbClient("token", user_agent=DEFAULT_USER_AGENT).resolve("Dune")
+        await TmdbClient("token", user_agent=IDENTIFIED_USER_AGENT).resolve("Dune")
 
-    assert sent["User-Agent"] == DEFAULT_USER_AGENT
+    assert sent["User-Agent"] == IDENTIFIED_USER_AGENT
 
 
 # --------------------------------------------------------------------- posters

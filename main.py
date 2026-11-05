@@ -106,7 +106,7 @@ async def run() -> None:
     tmdb = TmdbClient(
         settings.tmdb_read_token,
         timeout=settings.tmdb_timeout,
-        user_agent=settings.http_user_agent,
+        user_agent=settings.tmdb_user_agent,
     )
     posters = TmdbPosterService(tmdb, cache, ttl=settings.cache_poster_ttl)
     imax = None

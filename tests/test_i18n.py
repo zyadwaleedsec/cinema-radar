@@ -397,6 +397,44 @@ def test_cinema_name_is_parenthesized_and_localized():
     assert en.format_place("vox / mall-of-egypt") == "(VOX) / mall-of-egypt"
     assert en.format_place("renaissance / madinty") == "(Renaissance) / madinty"
 
+
+def test_admin_alert_does_not_cry_outage_before_the_breaker_opens():
+    ar = i18n.for_language("ar")
+    en = i18n.for_language("en")
+
+    transient = ar.admin_upstream_down(
+        "network", ar.format_place("vox / mall-of-egypt"), "2026-11-04 12:00:00", 60
+    )
+    assert "مشكلة مؤقتة" in transient
+    assert "واقعة" not in transient
+    assert "وقفت التنبيهات" not in transient
+    assert "\n\n" in transient
+
+    opened = ar.admin_upstream_down(
+        "http2",
+        ar.format_place("renaissance / madinty"),
+        "2026-11-04 12:00:00",
+        300,
+        1,
+        True,
+        provider="renaissance",
+    )
+    assert "(رينيسانس) واقعة" in opened
+    assert "وقفت التنبيهات" in opened
+    assert "HTTP/2" in opened
+
+    assert "Temporary problem" in en.admin_upstream_down(
+        "network", en.format_place("vox / mall-of-egypt"), "2026-11-04 12:00:00", 60
+    )
+    assert "is down" in en.admin_upstream_down(
+        "network",
+        en.format_place("vox / mall-of-egypt"),
+        "2026-11-04 12:00:00",
+        300,
+        1,
+        True,
+    )
+
     # Static screens mention both cinemas generically.
     assert "VOX" in ar.onboard_intro("Zyad") and "رينيسانس" in ar.onboard_intro("Zyad")
     assert "VOX" in en.onboard_intro("Zyad") and "Renaissance" in en.onboard_intro("Zyad")

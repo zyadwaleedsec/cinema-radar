@@ -30,7 +30,7 @@ import httpx
 import i18n
 import strings
 from cache import Cache
-from config import Settings
+from config import BOT_CONTACT_EMAIL, BOT_NAME, Settings, upstream_user_agent
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +97,13 @@ def reason_for_exception(exc: BaseException) -> str:
 
     if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
         return "timeout"
-    if type(exc).__name__.endswith("Timeout") or getattr(exc, "code", None) == 28:
+    code = getattr(exc, "code", None)
+    message = str(exc)
+    # curl 92: the edge accepted the connection then reset the HTTP/2 stream.
+    # It is worth a fresh session over HTTP/1.1 instead of reporting an outage.
+    if code == 92 or "HTTP/2 stream" in message:
+        return "http2"
+    if type(exc).__name__.endswith("Timeout") or code == 28:
         return "timeout"
     return "network"
 
@@ -270,30 +276,52 @@ class HttpClient:
         self.incident_started: float | None = None
         self.incident_reason = ""
         self.incident_place = ""
+        self.incident_provider = ""
+        self.incident_breaker_open = False
         self.affected_hint = 0
         self._request_times: list[float] = []
         self._global_slowdown = 1.0
         self._target_slowdown: dict[str, float] = {}
         self._probe_task: asyncio.Task[Any] | None = None
+        # Set after a server-side HTTP/2 stream reset.  The next session pins
+        # HTTP/1.1 so a WAF quirk cannot take the poller down permanently.
+        self._force_http1 = False
 
     # ------------------------------------------------------------------ session
-    def _build_session(self) -> Any:
-        headers = {
-            "User-Agent": self.settings.http_user_agent,
+    def _headers(self) -> dict[str, str]:
+        configured = self.settings.http_user_agent
+        user_agent = upstream_user_agent(configured)
+        if user_agent != configured.strip():
+            logger.warning(
+                "HTTP_USER_AGENT contains an email, URL or 'bot'; cinema WAFs "
+                "reject it. Using a browser-safe UA and sending contact in headers."
+            )
+        return {
+            "User-Agent": user_agent,
+            # Standard header for the human responsible for the request.
+            "From": BOT_CONTACT_EMAIL,
+            "X-Bot-Name": BOT_NAME,
+            "X-Bot-Contact": BOT_CONTACT_EMAIL,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-EG,en;q=0.9,ar;q=0.8",
             "Cache-Control": "no-cache",
         }
+
+    def _build_session(self) -> Any:
+        headers = self._headers()
         if self.settings.http_impersonate:
             try:
                 from curl_cffi.requests import AsyncSession  # type: ignore
 
                 logger.info("Using curl_cffi TLS impersonation: %s", self.settings.http_impersonate)
-                return AsyncSession(
-                    impersonate=self.settings.http_impersonate,
-                    headers=headers,
-                    timeout=self.settings.request_timeout,
-                )
+                options: dict[str, Any] = {
+                    "impersonate": self.settings.http_impersonate,
+                    "headers": headers,
+                    "timeout": self.settings.request_timeout,
+                }
+                if self._force_http1:
+                    options["http_version"] = "v1"
+                return AsyncSession(**options)
             except Exception:  # pragma: no cover - optional dependency
                 logger.exception("curl_cffi unavailable; falling back to httpx")
         return httpx.AsyncClient(
@@ -382,6 +410,31 @@ class HttpClient:
             except Exception:  # pragma: no cover - never let admin delivery break polling
                 logger.exception("Failed to notify admin")
 
+    @staticmethod
+    def _provider_of(target_key: str | None) -> str | None:
+        name = (target_key or "").split(":", 1)[0].strip()
+        return name or None
+
+    async def _send_down_alert(
+        self,
+        reason: str,
+        place: str,
+        provider: str | None,
+        opened: bool,
+    ) -> None:
+        retry_seconds = int(self.breaker.remaining_pause) or self.settings.poll_waiting_for_open
+        with i18n.use(i18n.admin_language()):
+            alert = strings.admin_upstream_down(
+                reason,
+                strings.format_place(place),
+                _clock_text(self.last_success_wall),
+                retry_seconds,
+                self.affected_hint,
+                opened,
+                provider,
+            )
+        await self._notify_admin(alert)
+
     async def _record_failure(
         self,
         target_key: str | None,
@@ -398,23 +451,23 @@ class HttpClient:
                 self.settings.backoff_global_max,
             )
         opened = self.breaker.record_failure()
+        place = _place(target_key, url)
+        provider = self._provider_of(target_key)
         if not self.incident_open:
             self.incident_open = True
             self.incident_started = self._clock()
             self.incident_reason = reason
-            place = _place(target_key, url)
             self.incident_place = place
-            retry_seconds = int(self.breaker.remaining_pause) or self.settings.poll_waiting_for_open
-            with i18n.use(i18n.admin_language()):
-                alert = strings.admin_upstream_down(
-                    reason,
-                    strings.format_place(place),
-                    _clock_text(self.last_success_wall),
-                    retry_seconds,
-                    self.affected_hint,
-                    opened,
-                )
-            await self._notify_admin(alert)
+            self.incident_provider = provider or ""
+            self.incident_breaker_open = opened
+            await self._send_down_alert(reason, place, provider, opened)
+        elif opened and not self.incident_breaker_open:
+            # The breaker finally tripped: tell the admin that alerting is now
+            # paused instead of leaving the first "retrying" note unqualified.
+            self.incident_breaker_open = True
+            self.incident_place = place
+            self.incident_provider = provider or self.incident_provider
+            await self._send_down_alert(reason, place, provider, True)
 
     async def report_failure(
         self, reason: str, target_key: str | None = None, url: str | None = None
@@ -443,14 +496,17 @@ class HttpClient:
         was_open = self.breaker.record_success()
         if self.incident_open:
             started = self.incident_started or self._clock()
+            provider = self.incident_provider or None
             # Do not claim "1 minute" for a blip that recovered in seconds.
             minutes = max(0, int((self._clock() - started) / 60))
             self.incident_open = False
             self.incident_started = None
             self.incident_reason = ""
             self.incident_place = ""
+            self.incident_provider = ""
+            self.incident_breaker_open = False
             with i18n.use(i18n.admin_language()):
-                recovered = strings.admin_upstream_recovered(minutes)
+                recovered = strings.admin_upstream_recovered(minutes, provider)
             await self._notify_admin(recovered)
         elif was_open:
             with i18n.use(i18n.admin_language()):
@@ -510,7 +566,8 @@ class HttpClient:
 
         last_exc: Exception | None = None
         attempts = max(0, self.settings.max_retries) + 1
-        for attempt in range(attempts):
+        # One extra slot is only used by the HTTP/1.1 fallback below.
+        for attempt in range(attempts + 1):
             try:
                 async with self._semaphore:
                     await self._bucket.acquire()
@@ -617,6 +674,14 @@ class HttpClient:
             except (httpx.TimeoutException, httpx.TransportError, OSError) as exc:
                 last_exc = exc
                 reason = reason_for_exception(exc)
+                if reason == "http2" and not self._force_http1:
+                    # The edge accepted the request then reset the HTTP/2
+                    # stream.  A fresh HTTP/1.1 session avoids the reset and
+                    # keeps the poller working even if the WAF changes again.
+                    self._force_http1 = True
+                    logger.warning("Upstream reset HTTP/2; retrying over HTTP/1.1")
+                    await self._discard_session()
+                    continue
                 if attempt + 1 < attempts:
                     await self._discard_session()
                     continue

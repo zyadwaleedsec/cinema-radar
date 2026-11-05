@@ -1712,6 +1712,7 @@ REASON_LABELS_AR = {
     "http_5xx": "سيرفر ({cinema}) بيرجع خطأ (5xx)",
     "timeout": "انتهت مهلة الاتصال بـ ({cinema})",
     "network": "مشكلة شبكة / TLS / DNS",
+    "http2": "اتصال ({cinema}) اتقطع فجأة (HTTP/2 reset)",
     "parse": "صفحة ({cinema}) اتغيرت والبوت مش فاهمها",
     "empty": "({cinema}) رجّع صفحة فاضية",
     "circuit": "قاطع الدائرة مفتوح بعد فشل متكرر",
@@ -1719,9 +1720,9 @@ REASON_LABELS_AR = {
 }
 
 
-def reason_label(reason: str) -> str:
+def reason_label(reason: str, provider: str | None = None) -> str:
     template = REASON_LABELS_AR.get(reason, REASON_LABELS_AR["unknown"])
-    return template.format(cinema=cinema_name())
+    return template.format(cinema=cinema_name(provider))
 
 
 def format_place(place: str) -> str:
@@ -1734,6 +1735,17 @@ def format_place(place: str) -> str:
     return place
 
 
+def _isolate_place(place: str) -> str:
+    """Keep the Latin branch slug from reordering the Arabic label."""
+
+    if not place:
+        return "—"
+    head, separator, tail = place.partition(") ")
+    if separator and tail:
+        return f"{esc(head)}) {_ltr(tail)}"
+    return _ltr(place)
+
+
 def admin_upstream_down(
     reason: str,
     place: str,
@@ -1741,28 +1753,35 @@ def admin_upstream_down(
     retry_seconds: int,
     affected: int = 0,
     opened: bool = False,
+    provider: str | None = None,
 ) -> str:
-    breaker = (
-        f"\n⛔ قاطع الدائرة اتفتح — هنوقف {retry_seconds} ثانية وبعدها نجرب طلب واحد."
-        if opened
-        else f"\n🔁 إعادة المحاولة خلال {retry_seconds} ثانية."
-    )
-    affected_line = f"\nمراقبات متأثرة: <b>{affected}</b>" if affected else ""
-    return (
-        f"⚠️ <b>({cinema_name()}) واقعة</b>\n\n"
-        f"السبب: {esc(reason_label(reason))}\n"
-        f"المكان: {esc(place or '—')}\n"
-        f"آخر نجاح: {esc(last_success or '—')}"
-        f"{affected_line}"
-        f"{breaker}\n\n"
-        "مش هبعت أي تنبيهات مبنية على بيانات قديمة لحد ما ترجع."
-    )
+    cinema = cinema_name(provider)
+    title = f"🚨 <b>({cinema}) واقعة</b>" if opened else f"⚠️ <b>مشكلة مؤقتة مع ({cinema})</b>"
+    blocks = [
+        title,
+        f"🔎 السبب: {esc(reason_label(reason, provider))}",
+        f"📍 المكان: {_isolate_place(place)}",
+        f"🕒 آخر نجاح: {_ltr(last_success) if last_success else '—'}",
+    ]
+    if affected:
+        blocks.append(f"👀 مراقبات متأثرة: <b>{affected}</b>")
+    if opened:
+        blocks.append("🛑 وقفت التنبيهات المؤقتة — مش هبعت أي تنبيه على بيانات قديمة لحد ما ترجع.")
+        blocks.append(f"🔁 هجرب تاني بعد {retry_seconds} ثانية.")
+    else:
+        blocks.append(f"🔁 هجرب تاني خلال {retry_seconds} ثانية.")
+        blocks.append("<i>لو المشكلة كملت، هوقف التنبيهات المؤقتة وأبلغك.</i>")
+    return "\n\n".join(_rtl(block) for block in blocks)
 
 
-def admin_upstream_recovered(minutes: int) -> str:
+def admin_upstream_recovered(minutes: int, provider: str | None = None) -> str:
+    cinema = cinema_name(provider)
     if minutes <= 0:
-        return f"✅ <b>({cinema_name()}) رجعت</b> — البيانات بتتحدث تاني."
-    return f"✅ <b>({cinema_name()}) رجعت</b> بعد {minutes} دقيقة — البيانات بتتحدث تاني."
+        body = f"✅ <b>({cinema}) رجعت</b>\n\nالبيانات بتتحدث تاني."
+    else:
+        label = _plural(minutes, "دقيقة", "دقيقتين", "دقايق", "دقيقة")
+        body = f"✅ <b>({cinema}) رجعت</b> بعد {minutes} {label}\n\nالبيانات بتتحدث تاني."
+    return "\n\n".join(_rtl(line) for line in body.split("\n\n"))
 
 
 def stale_notice(minutes: int, degraded: bool) -> str:
@@ -1811,12 +1830,31 @@ def admin_status_multi(data: dict[str, object]) -> str:
     )
 
 
+def _short_error(error: object) -> str:
+    """Keep an admin alert readable; raw transport errors can be huge."""
+
+    text = esc(error).strip()
+    if len(text) > 280:
+        text = text[:277].rstrip() + "…"
+    return text
+
+
 def admin_discovery_branches_failed(error: object) -> str:
-    return f"⚠️ الاكتشاف مش قادر يجيب الفروع: {esc(error)}"
+    return "\n\n".join(
+        [
+            _rtl("⚠️ <b>الاكتشاف مش قادر يجيب الفروع</b>"),
+            _rtl(f"<i>{_short_error(error)}</i>"),
+        ]
+    )
 
 
 def admin_discovery_branch_failed(branch: object, error: object) -> str:
-    return f"⚠️ الاكتشاف فشل في فرع {esc(branch)}: {esc(error)}"
+    return "\n\n".join(
+        [
+            _rtl(f"⚠️ <b>الاكتشاف فشل في فرع {esc(branch)}</b>"),
+            _rtl(f"<i>{_short_error(error)}</i>"),
+        ]
+    )
 
 
 # ------------------------------------------------------------------ discovery

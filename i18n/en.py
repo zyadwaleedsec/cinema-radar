@@ -1677,6 +1677,7 @@ REASON_LABELS_EN = {
     "http_5xx": "({cinema}) server returned an error (5xx)",
     "timeout": "Timed out connecting to ({cinema})",
     "network": "Network / TLS / DNS problem",
+    "http2": "({cinema}) reset the connection (HTTP/2 stream reset)",
     "parse": "({cinema}) page changed and the bot can't read it",
     "empty": "({cinema}) returned an empty page",
     "circuit": "Circuit breaker open after repeated failures",
@@ -1684,9 +1685,9 @@ REASON_LABELS_EN = {
 }
 
 
-def reason_label(reason: str) -> str:
+def reason_label(reason: str, provider: str | None = None) -> str:
     template = REASON_LABELS_EN.get(reason, REASON_LABELS_EN["unknown"])
-    return template.format(cinema=cinema_name())
+    return template.format(cinema=cinema_name(provider))
 
 
 def format_place(place: str) -> str:
@@ -1706,28 +1707,34 @@ def admin_upstream_down(
     retry_seconds: int,
     affected: int = 0,
     opened: bool = False,
+    provider: str | None = None,
 ) -> str:
-    breaker = (
-        f"\n⛔ Circuit breaker opened — pausing {retry_seconds}s, then trying one request."
-        if opened
-        else f"\n🔁 Retrying in {retry_seconds}s."
+    cinema = cinema_name(provider)
+    title = (
+        f"🚨 <b>({cinema}) is down</b>" if opened else f"⚠️ <b>Temporary problem with ({cinema})</b>"
     )
-    affected_line = f"\nAffected watches: <b>{affected}</b>" if affected else ""
-    return (
-        f"⚠️ <b>({cinema_name()}) is down</b>\n\n"
-        f"Reason: {esc(reason_label(reason))}\n"
-        f"Where: {esc(place or '—')}\n"
-        f"Last success: {esc(last_success or '—')}"
-        f"{affected_line}"
-        f"{breaker}\n\n"
-        "I won't send any alerts based on stale data until it recovers."
-    )
+    blocks = [
+        title,
+        f"🔎 Reason: {esc(reason_label(reason, provider))}",
+        f"📍 Where: {esc(place or '—')}",
+        f"🕒 Last success: {esc(last_success or '—')}",
+    ]
+    if affected:
+        blocks.append(f"👀 Affected watches: <b>{affected}</b>")
+    if opened:
+        blocks.append("🛑 Alerting is paused — no alerts based on stale data until it recovers.")
+        blocks.append(f"🔁 Trying again in {retry_seconds}s.")
+    else:
+        blocks.append(f"🔁 Retrying in {retry_seconds}s.")
+        blocks.append("<i>If this keeps happening, I'll pause alerts and tell you.</i>")
+    return "\n\n".join(blocks)
 
 
-def admin_upstream_recovered(minutes: int) -> str:
+def admin_upstream_recovered(minutes: int, provider: str | None = None) -> str:
+    cinema = cinema_name(provider)
     if minutes <= 0:
-        return f"✅ <b>({cinema_name()}) is back</b> — data is updating again."
-    return f"✅ <b>({cinema_name()}) is back</b> after {minutes} min — data is updating again."
+        return f"✅ <b>({cinema}) is back</b>\n\nData is updating again."
+    return f"✅ <b>({cinema}) is back</b> after {minutes} min\n\nData is updating again."
 
 
 def stale_notice(minutes: int, degraded: bool) -> str:
@@ -1779,12 +1786,21 @@ def admin_status_multi(data: dict[str, object]) -> str:
     )
 
 
+def _short_error(error: object) -> str:
+    """Keep an admin alert readable; raw transport errors can be huge."""
+
+    text = esc(error).strip()
+    if len(text) > 280:
+        text = text[:277].rstrip() + "…"
+    return text
+
+
 def admin_discovery_branches_failed(error: object) -> str:
-    return f"⚠️ Discovery couldn't load branches: {esc(error)}"
+    return f"⚠️ <b>Discovery couldn't load branches</b>\n\n<i>{_short_error(error)}</i>"
 
 
 def admin_discovery_branch_failed(branch: object, error: object) -> str:
-    return f"⚠️ Discovery failed at {esc(branch)}: {esc(error)}"
+    return f"⚠️ <b>Discovery failed at {esc(branch)}</b>\n\n<i>{_short_error(error)}</i>"
 
 
 # ------------------------------------------------------------------ discovery

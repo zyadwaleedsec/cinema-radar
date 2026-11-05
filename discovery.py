@@ -21,7 +21,7 @@ import strings
 from cache import Cache
 from config import Settings
 from db import Database
-from http_client import HttpClient
+from http_client import CircuitOpenError, HttpClient, UpstreamError
 from models import Branch, BranchOverview, DiscoveryEvent, Movie, Showtime
 from providers.base import ProviderRegistry
 
@@ -31,6 +31,17 @@ NEW_MOVIE = "NEW_MOVIE"
 NEW_DATE_OPENED = "NEW_DATE_OPENED"
 NEW_SHOWTIMES = "NEW_SHOWTIMES"
 UPCOMING_MOVIE = "UPCOMING_MOVIE"
+
+
+def _transport_reported(exc: BaseException) -> bool:
+    """True when the shared HTTP layer already sent an admin alert.
+
+    Discovery runs every few minutes; alerting again for the same transport
+    failure would spam the admin with a raw curl/httpx string.
+    """
+
+    return isinstance(exc, (UpstreamError, CircuitOpenError, OSError))
+
 
 # ``known_state`` row used for the Coming Soon list; it is not a real branch.
 COMING_SOON_STATE = "__comingsoon__"
@@ -339,9 +350,10 @@ class DiscoveryJob:
                 self.last_error = f"{type(exc).__name__}: {exc}"
                 self.provider_last_error[provider_name] = self.last_error
                 logger.exception("Discovery could not list branches for %s", provider_name)
-                with i18n.use(i18n.admin_language()):
-                    alert = strings.admin_discovery_branches_failed(exc)
-                await self._admin(alert)
+                if not _transport_reported(exc):
+                    with i18n.use(i18n.admin_language()):
+                        alert = strings.admin_discovery_branches_failed(exc)
+                    await self._admin(alert)
                 continue
             self.provider_last_error.pop(provider_name, None)
             upcoming = await self._upcoming_state(provider, now)
@@ -357,9 +369,10 @@ class DiscoveryJob:
                     self.last_error = f"{type(exc).__name__}: {exc}"
                     self.provider_last_error[provider_name] = self.last_error
                     logger.exception("Discovery failed for %s", branch.id)
-                    with i18n.use(i18n.admin_language()):
-                        alert = strings.admin_discovery_branch_failed(branch.name, exc)
-                    await self._admin(alert)
+                    if not _transport_reported(exc):
+                        with i18n.use(i18n.admin_language()):
+                            alert = strings.admin_discovery_branch_failed(branch.name, exc)
+                        await self._admin(alert)
             self.provider_events[provider_name] = self.provider_events.get(provider_name, 0)
             if upcoming is not None:
                 await self._save_upcoming(upcoming, now, provider)
