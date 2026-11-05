@@ -18,9 +18,9 @@ public port or TLS certificate is needed.
 | `ADMIN_ID` | your numeric id from [@userinfobot](https://t.me/userinfobot) |
 | The repo | `https://github.com/zyadwaleedsec/cinema-radar` |
 
-Cost: a 512 MB machine running 24/7 is roughly **$3–4/month** plus a few cents
-for the volume. Do not use 256 MB: the bot gets OOM-killed during the first
-scrape (`INFO Process appears to have been OOM killed!`). Fly has no permanent free tier for new organisations.
+Cost: a 1 GB machine running 24/7 is roughly **$5–6/month** plus a few cents
+for the volume. Do not go below 1 GB: at 256 MB and 512 MB the bot gets
+OOM-killed while scraping (`INFO Process appears to have been OOM killed!`). Fly has no permanent free tier for new organisations.
 
 ---
 
@@ -218,7 +218,7 @@ fly sftp get /data/backup.sqlite3 .\cinemaradar-backup.sqlite3
 | `Missing or invalid check type` | old `[checks]` block | this repo has no checks; the bot has no HTTP server |
 | `needs volumes with name 'cinema_data'` | volume not created, or in another region | `fly volumes create cinema_data --region cdg --size 1 --yes` |
 | `409 Conflict: terminated by other getUpdates request` | two machines or two machines running the bot | `fly scale count 1`, and stop any local instance |
-| `Process appears to have been OOM killed!` | 256 MB is not enough for Python + lxml + the cache | set `memory = "512mb"` (or `1gb`) in `[[vm]]`, then `fly deploy` |
+| `Process appears to have been OOM killed!` | less than 1 GB is not enough for Python + lxml + the cache | set `memory = "1gb"` in `[[vm]]`, then `fly deploy` |
 | VOX requests time out (`فوكس واقعة`, `ReadTimeout`) | `HTTP_IMPERSONATE` is unset, so plain httpx is used | keep `HTTP_IMPERSONATE = "chrome124"` in `[env]` of `fly.toml` |
 
 ### Check upstream access from the machine

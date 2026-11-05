@@ -25,8 +25,8 @@ the project uses [Semantic Versioning](https://semver.org):
 - Ruff configuration moved to `ruff.toml` so a bare `pyproject.toml` can never
   push Fly.io into its buildpack path again.
 - `fly.toml` pins the app to one worker machine with a `/data` volume and a
-  20-second shutdown timeout. The VM uses **512 MB** of RAM: 256 MB is
-  OOM-killed during the first scrape.
+  20-second shutdown timeout. The VM uses **1 GB** of RAM: 256 MB and 512 MB are
+  OOM-killed while scraping.
 
 ## [2.5.1] - 2026-11-05
 
