@@ -82,6 +82,40 @@ fly volumes create cinema_data --region cdg --size 1 --yes
 
 Create exactly **one** volume: one volume = one machine.
 
+### Keeping the region consistent
+
+An app itself has no region: every **machine** and every **volume** does. Three
+things must agree, or the deploy fails with `needs volumes ... <region>=1`:
+
+| Thing | Value used here |
+| --- | --- |
+| `primary_region` in `fly.toml` | `cdg` (Paris) |
+| the `cinema_data` volume | `cdg` |
+| the single machine | `cdg` |
+
+Check them at any time:
+
+```powershell
+fly volumes list
+fly machines list
+```
+
+Fix a mismatch (volume or machine in the wrong region):
+
+```powershell
+fly volumes list                  # note the id of the wrong-region volume
+fly volumes destroy vol_xxxxxxxx  # delete it
+fly machines list                 # destroy machines in the wrong region
+fly scale count 0                 # or remove them one by one
+fly volumes create cinema_data --region cdg --size 1 --yes
+fly deploy --remote-only
+fly scale count 1 --region cdg
+```
+
+If you prefer another region, change `primary_region` in `fly.toml`, create the
+volume there, and use that region in every command. Pick a region close to
+Egypt: `cdg` (Paris) or `fra` (Frankfurt).
+
 ---
 
 ## 5. Set the secrets
@@ -124,7 +158,7 @@ After the deploy:
 
 ```powershell
 fly status
-fly scale count 1          # must be 1, never 2
+fly scale count 1 --region cdg   # must be 1, never 2
 fly logs
 ```
 
