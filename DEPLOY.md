@@ -18,8 +18,9 @@ public port or TLS certificate is needed.
 | `ADMIN_ID` | your numeric id from [@userinfobot](https://t.me/userinfobot) |
 | The repo | `https://github.com/zyadwaleedsec/cinema-radar` |
 
-Cost: a 256 MB machine running 24/7 is roughly **$2–3/month** plus a few cents
-for the volume. Fly has no permanent free tier for new organisations.
+Cost: a 512 MB machine running 24/7 is roughly **$3–4/month** plus a few cents
+for the volume. Do not use 256 MB: the bot gets OOM-killed during the first
+scrape (`INFO Process appears to have been OOM killed!`). Fly has no permanent free tier for new organisations.
 
 ---
 
@@ -216,6 +217,7 @@ fly sftp get /data/backup.sqlite3 .\cinemaradar-backup.sqlite3
 | `Missing or invalid check type` | old `[checks]` block | this repo has no checks; the bot has no HTTP server |
 | `needs volumes with name 'cinema_data'` | volume not created, or in another region | `fly volumes create cinema_data --region cdg --size 1 --yes` |
 | `409 Conflict: terminated by other getUpdates request` | two machines or two machines running the bot | `fly scale count 1`, and stop any local instance |
+| `Process appears to have been OOM killed!` | 256 MB is not enough for Python + lxml + the cache | set `memory = "512mb"` (or `1gb`) in `[[vm]]`, then `fly deploy` |
 | `database is locked` | bot running twice on the same SQLite file | keep one machine, never share one volume between machines |
 | Machine restarts in a loop | bad token / missing secret | `fly logs`, then re-check `fly secrets list` |
 | `instance refused connection ... :8080` | leftover `[http_service]` from the web launcher | remove it (already removed here) |

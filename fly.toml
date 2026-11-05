@@ -17,7 +17,7 @@ kill_timeout = "20s"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = "512mb"
   cpu_kind = "shared"
 
 # Keeps cinemaradar.sqlite3 alive across deploys.
