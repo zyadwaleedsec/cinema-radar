@@ -803,6 +803,25 @@ class Database:
         )
         return [str(row["movie_name"]) for row in rows if row.get("movie_name")]
 
+    async def count_movie_watchers(self, provider: str, movie_id: str) -> int:
+        """How many distinct users are tracking this movie at a cinema chain.
+
+        Only ``active`` watches count, so the number reflects people who would
+        currently receive an alert.  The same user watching three showtimes of
+        the same movie counts once.
+        """
+
+        return int(
+            await self.scalar(
+                """
+                SELECT COUNT(DISTINCT user_id) FROM watches
+                WHERE active = 1 AND provider = ? AND movie_id = ?
+                """,
+                (provider, movie_id),
+                default=0,
+            )
+        )
+
     async def set_movie_imax_status(self, movie_id: str, status: str) -> int:
         cur = await self.execute(
             "UPDATE watches SET imax_status = ? WHERE movie_id = ? AND active = 1",

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from broadcaster import Broadcaster
-from keyboards import showtime_keyboard
+from keyboards import hall_keyboard, showtime_keyboard
 from models import (
     AVAILABLE,
+    CANONICAL_FORMATS,
     Branch,
     DiscoveryEvent,
     Movie,
@@ -13,6 +14,7 @@ from models import (
     format_key,
     format_label,
 )
+from providers.base import PROVIDER_FORMATS, available_formats
 
 
 def _showtime(hall: str, time: str = "10:45") -> Showtime:
@@ -102,3 +104,49 @@ def test_subscription_hall_filter_is_canonical():
 
     sub["hall_type"] = "*"
     assert Broadcaster._filter_events(None, sub, [event]) == [event]
+
+
+def test_available_formats_unions_only_the_selected_cinemas():
+    renaissance = available_formats(["renaissance:citystars"], ["vox", "renaissance"])
+    assert "STANDARD" in renaissance
+    assert "DBOX" in renaissance
+    assert "IMAX" not in renaissance
+    assert "4DX" not in renaissance
+
+    vox = available_formats(["vox:almaza"], ["vox", "renaissance"])
+    assert "IMAX" in vox
+    assert "DBOX" not in vox
+
+    both = available_formats(["vox:almaza", "renaissance:citystars"], ["vox", "renaissance"])
+    assert "IMAX" in both and "DBOX" in both
+    assert both == tuple(key for key in CANONICAL_FORMATS if key in both)
+
+
+def test_available_formats_falls_back_to_every_enabled_cinema():
+    expected = set(PROVIDER_FORMATS["vox"]) | set(PROVIDER_FORMATS["renaissance"])
+    assert available_formats([], ["vox", "renaissance"]) == tuple(
+        key for key in CANONICAL_FORMATS if key in expected
+    )
+    # A branch prefix that is not enabled is ignored, keeping the result non-empty.
+    assert available_formats(["vox:almaza"], ["renaissance"]) == available_formats(
+        [], ["renaissance"]
+    )
+
+
+def test_hall_keyboard_only_offers_available_formats():
+    keyboard = hall_keyboard(None, ("IMAX", "STANDARD"))
+    callbacks = _callback_data(keyboard)
+    assert "fh:all" in callbacks
+    assert "fh:IMAX" in callbacks
+    assert "fh:STANDARD" in callbacks
+    assert "fh:DBOX" not in callbacks
+
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+    assert any(text.startswith("✅") for text in labels)
+
+
+def test_hall_keyboard_marks_the_current_format():
+    keyboard = hall_keyboard("IMAX", ("IMAX", "STANDARD"))
+    labels = [button.text for row in keyboard.inline_keyboard for button in row]
+    assert "✅ آيماكس IMAX" in labels
+    assert not any("✅ " in text and "كل الفورمات" in text for text in labels)

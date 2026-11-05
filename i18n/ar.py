@@ -236,6 +236,7 @@ BTN_LANGUAGE = "🌐 اللغة"
 BTN_ARABIC = "🇪🇬 العربية"
 BTN_ENGLISH = "🇺🇸 English"
 BTN_ALL_CINEMAS = "🌍 كل السينمات"
+BTN_SHARE = "🔗 شارك الحجز"
 BTN_CONSENT_ACCEPT = "✅ موافق، ابدأ"
 BTN_CONSENT_DECLINE = "❌ مش موافق"
 BTN_CONSENT_REVIEW = "🔐 راجع الموافقة تاني"
@@ -1040,6 +1041,7 @@ def watch_detail(
     scope: str | None = "showtime",
     provider: str = "vox",
     required_seats: int = 1,
+    watchers: int | None = None,
 ) -> str:
     snooze = f"⏰ متأجل لحد {esc(snoozed_until_text)}" if snoozed_until_text else "⏰ مفيش تأجيل"
     scope = scope or "showtime"
@@ -1050,6 +1052,7 @@ def watch_detail(
         ticket = f"🎟️ كل الحفلات{format_text}"
     else:
         ticket = f"🕐 {format_time(time)}{format_text}"
+    crowd = f"{watchers_line(watchers)}\n" if watchers else ""
     return (
         f"⚙️ <b>إعدادات المراقبة</b>\n{DIVIDER}\n\n"
         f"🎬 <b>{esc(movie)}</b>\n"
@@ -1057,9 +1060,14 @@ def watch_detail(
         f"{ticket}\n\n"
         f"🔔 التنبيهات: <b>{watch_mode_label(mode)}</b>\n"
         f"🪑 التنبيه عند: <b>{_needed_seats(required_seats)} أو أكتر</b>\n"
+        f"{crowd}"
         f"{snooze}\n\n"
         "اختار نوع التنبيه اللي يناسبك:"
     )
+
+
+def watchers_line(count: int | None) -> str:
+    return f"👥 {int(count or 0)} أشخاص بيتابعوا الفيلم ده"
 
 
 def watch_reminder(
@@ -1358,7 +1366,11 @@ def choose_event_types_text() -> str:
 
 
 def choose_hall_text() -> str:
-    return "اختار نوع القاعة:"
+    return "اختار نوع القاعة اللي متاح في السينمات اللي اخترتها:"
+
+
+def format_not_offered() -> str:
+    return "النوع ده مش متاح في السينمات اللي اخترتها."
 
 
 def event_type_label(kind: str) -> str:
@@ -1704,6 +1716,15 @@ def admin_limits_applied(users: int, watches: int) -> str:
 
 def admin_unexpected_error(name: str) -> str:
     return f"⚠️ خطأ غير متوقع: {esc(name)}"
+
+
+def admin_self_check_failed(error: str) -> str:
+    return (
+        f"⚠️ <b>فحص ما بعد النشر فشل</b>\n{DIVIDER}\n\n"
+        "البوت اشتغل، لكن أول طلب للسينما مش نجح:\n"
+        f"<code>{esc(error)}</code>\n\n"
+        "راجع السجلات، ولو المشكلة استمرت هيتفتح تنبيه تلقائي."
+    )
 
 
 REASON_LABELS_AR = {

@@ -47,7 +47,8 @@ cinema-radar/
 ├── broadcaster.py          # grouped fan-out queue, quiet hours, daily cap
 ├── notifier.py             # Telegram sender (global + per-chat limits)
 ├── imax.py                 # local IMAX-film matcher (Wikipedia snapshot)
-├── tmdb.py                 # TMDB title/year lookup + official poster URLs
+├── tmdb.py                 # TMDB title/year lookup, posters and localised copy
+├── metadata.py             # cached Arabic titles/overviews + Arabic search aliases
 ├── posters.py              # cached TMDB poster resolution (never scraped URLs)
 ├── consent.py              # explicit first-run consent version + pending choice
 ├── support.py              # one-off manual donations and admin approval
@@ -72,7 +73,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (244 tests)
+├── tests/                  # pytest suite (260 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -148,6 +149,35 @@ limitation; the screens themselves always follow the stored choice.
 3. Run `python -m pytest tests/test_i18n.py`. It checks catalog parity,
    signatures, and that English output contains no Arabic (except the bilingual
    picker and language names).
+
+### Arabic metadata and search
+
+`metadata.py` wraps the TMDB client so display copy can follow the interface
+without touching matching:
+
+- **Matching stays English.** `TmdbClient.resolve()` still searches `en-US`;
+  the IMAX snapshot, dedupe and provider titles therefore behave exactly as
+  before.
+- **Display is localised.** When the reader's language is Arabic, alerts and
+  movie cards ask for `ar-SA` and use the Arabic title and overview. Any
+  failure, missing translation or English interface silently keeps the
+  provider copy.
+- **Caching.** A positive answer is cached for 30 days, a miss for one day, and
+  an in-process memo avoids repeated SQLite reads within one screen or alert
+  batch.
+- **Arabic search.** A query containing Arabic letters asks TMDB for candidate
+  titles, then re-ranks the *original English titles* against the real cinema
+  listing. A loose translation simply produces no match; English queries never
+  call TMDB.
+
+### Format filter
+
+`PROVIDER_FORMATS` in `providers/base.py` lists the formats each cinema chain
+sells. `available_formats(branch_ids, enabled_providers)` unions the selected
+branches' chains (an empty branch filter means every enabled cinema) and orders
+the result by `CANONICAL_FORMATS`. The settings screen only renders those
+buttons; an unknown callback value is rejected, and changing branches clears a
+stored format the new selection cannot serve.
 
 ### Release checklist
 

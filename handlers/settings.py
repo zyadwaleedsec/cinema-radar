@@ -26,7 +26,8 @@ from keyboards import (
     quiet_keyboard,
     settings_keyboard,
 )
-from models import CANONICAL_FORMATS, format_key
+from models import format_key
+from providers.base import available_formats
 
 router = Router(name="settings")
 
@@ -328,7 +329,15 @@ async def save_branches(
     data = await state.get_data()
     selected = list(data.get("selected_branches", []))
     user, sub = await _user_and_sub(db, callback.from_user.id, settings)
-    await db.upsert_subscription(int(user["id"]), **_subscription_values(sub, branch_ids=selected))
+    # A format that the newly selected cinemas do not sell would silently
+    # match nothing, so clear it instead of keeping a dead filter.
+    hall = sub.get("hall_type") if sub else None
+    if hall and format_key(hall) not in available_formats(selected, settings.providers):
+        hall = None
+    await db.upsert_subscription(
+        int(user["id"]),
+        **_subscription_values(sub, branch_ids=selected, hall_type=hall),
+    )
     await state.clear()
     user, sub = await _user_and_sub(db, callback.from_user.id, settings)
     await _render(callback, user, sub, settings)
@@ -383,7 +392,11 @@ async def save_types(
 async def hall_menu(callback: CallbackQuery, db: Database, settings: Settings) -> None:
     _, sub = await _user_and_sub(db, callback.from_user.id, settings)
     current = sub.get("hall_type") if sub else None
-    await edit(callback, strings.choose_hall_text(), hall_keyboard(current))
+    branches = json_list(sub.get("branch_ids")) if sub else []
+    formats = available_formats(branches, settings.providers)
+    if current and format_key(current) not in formats:
+        current = None
+    await edit(callback, strings.choose_hall_text(), hall_keyboard(current, formats))
     await answer(callback)
 
 
@@ -391,10 +404,12 @@ async def hall_menu(callback: CallbackQuery, db: Database, settings: Settings) -
 async def set_hall(callback: CallbackQuery, db: Database, settings: Settings) -> None:
     value = split_cb(callback.data, 2)[1]
     hall = None if value == "all" else format_key(value)
-    if hall is not None and hall not in CANONICAL_FORMATS:
-        await answer(callback, strings.error_generic(), alert=True)
-        return
     user, sub = await _user_and_sub(db, callback.from_user.id, settings)
+    branches = json_list(sub.get("branch_ids")) if sub else []
+    formats = available_formats(branches, settings.providers)
+    if hall is not None and hall not in formats:
+        await answer(callback, strings.format_not_offered(), alert=True)
+        return
     await db.upsert_subscription(int(user["id"]), **_subscription_values(sub, hall_type=hall))
     user, sub = await _user_and_sub(db, callback.from_user.id, settings)
     await _render(callback, user, sub, settings)

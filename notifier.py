@@ -13,7 +13,8 @@ import strings
 from config import Settings
 from db import Database
 from http_client import TokenBucket
-from keyboards import watch_alert_keyboard, watch_expired_keyboard
+from keyboards import share_url, watch_alert_keyboard, watch_expired_keyboard
+from metadata import display_language
 
 logger = logging.getLogger(__name__)
 
@@ -144,10 +145,17 @@ class TelegramSender:
 
 
 class Notifier:
-    def __init__(self, sender: TelegramSender, db: Database, settings: Settings) -> None:
+    def __init__(
+        self,
+        sender: TelegramSender,
+        db: Database,
+        settings: Settings,
+        metadata: Any | None = None,
+    ) -> None:
         self.sender = sender
         self.db = db
         self.settings = settings
+        self.metadata = metadata
         self.bot_username = settings.bot_username
 
     def manage_url(self, watch_id: int) -> str | None:
@@ -155,9 +163,27 @@ class Notifier:
             return None
         return f"https://t.me/{self.bot_username}?start=w{watch_id}"
 
+    async def _localized_title(self, watch: dict[str, Any]) -> str | None:
+        """Arabic title for this recipient, or ``None`` to keep the provider's."""
+
+        if self.metadata is None:
+            return None
+        language = display_language(watch.get("lang"))
+        if not language:
+            return None
+        title = str(watch.get("movie_name") or "").strip()
+        if not title:
+            return None
+        try:
+            movie = await self.metadata.localize(title, language=language)
+        except Exception:
+            return None
+        return movie.title if movie is not None else None
+
     async def send_watch_alert(self, watch: dict[str, Any], event: Any) -> None:
+        title = await self._localized_title(watch)
         with i18n.use(watch.get("lang")):
-            text, keyboard = self._watch_alert_payload(watch, event)
+            text, keyboard = self._watch_alert_payload(watch, event, title_override=title)
             brand = strings.cinema_name(watch.get("provider")) if watch.get("provider") else ""
             if brand:
                 text = f"🎬 ({brand})\n{text}"
@@ -170,13 +196,21 @@ class Notifier:
             logger.info("Deactivated blocked user %s", watch["telegram_id"])
             raise
 
-    def _watch_alert_payload(self, watch: dict[str, Any], event: Any) -> tuple[str, Any]:
+    def _watch_alert_payload(
+        self,
+        watch: dict[str, Any],
+        event: Any,
+        title_override: str | None = None,
+    ) -> tuple[str, Any]:
         showtime = event.showtime
+        movie_title = (
+            title_override or showtime.movie_name or watch.get("movie_name") or ""
+        ).strip()
         movie_scope = (watch.get("scope") or "showtime") in {"movie", "movie_all_dates"}
         times = list(event.times or ())
         if event.kind == "NEW_DATE_OPENED":
             text = strings.alert_new_date(
-                showtime.movie_name,
+                movie_title,
                 watch["branch_name"],
                 showtime.date,
                 times,
@@ -185,7 +219,7 @@ class Notifier:
         elif event.kind == "BOOKING_OPENED":
             if movie_scope and len(times) > 1:
                 text = strings.alert_movie_booking_opened(
-                    showtime.movie_name,
+                    movie_title,
                     watch["branch_name"],
                     showtime.date,
                     times,
@@ -193,7 +227,7 @@ class Notifier:
                 )
             else:
                 text = strings.alert_booking_opened(
-                    showtime.movie_name,
+                    movie_title,
                     showtime.hall_type,
                     showtime.time,
                     watch["branch_name"],
@@ -203,7 +237,7 @@ class Notifier:
         elif event.kind == "SEATS_AVAILABLE":
             if movie_scope and len(times) > 1:
                 text = strings.alert_movie_seats_available(
-                    showtime.movie_name,
+                    movie_title,
                     watch["branch_name"],
                     showtime.date,
                     times,
@@ -211,7 +245,7 @@ class Notifier:
                 )
             else:
                 text = strings.alert_seats_available(
-                    showtime.movie_name,
+                    movie_title,
                     showtime.hall_type,
                     showtime.time,
                     watch["branch_name"],
@@ -220,7 +254,7 @@ class Notifier:
                 )
         else:
             text = strings.alert_new_showtimes(
-                showtime.movie_name,
+                movie_title,
                 watch["branch_name"],
                 showtime.date,
                 list(event.times or (showtime.time,)),
@@ -234,25 +268,32 @@ class Notifier:
         if imax:
             text += f"\n\n{imax}"
         text += f"\n\n<i>{strings.alert_footer()}</i>"
+        booking_url = showtime.booking_url or watch.get("booking_url")
         keyboard = watch_alert_keyboard(
             int(watch["id"]),
-            showtime.booking_url,
+            booking_url,
             watch.get("trailer_url"),
             self.manage_url(int(watch["id"])),
+            share_url(booking_url, movie_title) if booking_url else None,
         )
         return text, keyboard
 
     async def send_watch_reminder(self, watch: dict[str, Any]) -> None:
+        title = await self._localized_title(watch)
         with i18n.use(watch.get("lang")):
-            text = self._watch_reminder_text(watch)
+            text = self._watch_reminder_text(watch, title_override=title)
             brand = strings.cinema_name(watch.get("provider")) if watch.get("provider") else ""
             if brand:
                 text = f"🎬 ({brand})\n{text}"
+            booking_url = watch.get("booking_url")
             keyboard = watch_alert_keyboard(
                 int(watch["id"]),
-                watch.get("booking_url"),
+                booking_url,
                 watch.get("trailer_url"),
                 self.manage_url(int(watch["id"])),
+                share_url(booking_url, title or watch.get("movie_name") or "")
+                if booking_url
+                else None,
             )
         try:
             await self.sender.send(
@@ -266,9 +307,9 @@ class Notifier:
             logger.info("Deactivated blocked user %s", watch["telegram_id"])
             raise
 
-    def _watch_reminder_text(self, watch: dict[str, Any]) -> str:
+    def _watch_reminder_text(self, watch: dict[str, Any], title_override: str | None = None) -> str:
         text = strings.watch_reminder(
-            watch["movie_name"],
+            title_override or watch["movie_name"],
             watch["branch_name"],
             watch["date"],
             watch["showtime"],

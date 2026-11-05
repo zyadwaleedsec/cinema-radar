@@ -26,16 +26,19 @@ page.
 - 🪑 **Seat threshold** — ask for 1–4 seats or a custom count (1–10) and only
   get the seat alert once that many are free.
 - 🎭 **Filter by format** — IMAX, 4DX, VIP, MAX, DBOX, 3D and whatever the
-  provider lists.
+  selected cinemas actually sell; changing branches never leaves a dead filter.
 - 🏢 **Two cinemas** — VOX and Renaissance run together; pick one in-app, or
   limit to a single cinema with `PROVIDERS` in `.env`.
 - 🔔 **Instant alerts** when booking opens, seats come back, or new showtimes appear.
 - 🌍 **All-cinemas watch** — pick a movie, a day and morning/evening, and watch
   every show in that period across VOX and Renaissance at once.
 - 🆕 **Optional release alerts** for new movies, new dates and Coming Soon titles.
-- 🔎 **Search in Arabic or English**, typos included (سبايدر مان → Spider-Man).
+- 🔎 **Search in Arabic or English**, typos included — an Arabic name finds the
+  English title the cinema actually lists, and Arabic queries fall back to TMDB.
 - 🎬 **Movie cards** with a TMDB poster, duration, rating, language, synopsis and
-  trailer.
+  trailer. In Arabic, alerts and cards use the Arabic title and overview.
+- 🔗 **Share a showing** — every alert and discovery card has a share button that
+  opens Telegram's share sheet with the booking link.
 - 🌙 **Quiet hours**, per-watch alert modes, and a clean paged watch list.
 - 🔐 **Privacy first** — an explicit consent screen appears before anything is
   stored, `/delete_me` clears the bot's data, no card details are requested and
@@ -48,7 +51,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v2.7.3** - see [`CHANGELOG.md`](CHANGELOG.md).
+Current release: **v2.8.0** - see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

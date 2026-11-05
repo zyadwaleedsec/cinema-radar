@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -12,6 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
+import i18n
 import search
 import strings
 from cache import branches_key, dates_key, movies_key, showtimes_key
@@ -43,6 +45,7 @@ from keyboards import (
     watches_keyboard,
     window_keyboard,
 )
+from metadata import display_language
 from models import Movie, Showtime, TargetKey, format_key
 from scheduler import Scheduler, expected_opening_for
 from timeutil import day_end_iso, expiry_iso, resolve_timezone, today_iso
@@ -71,6 +74,13 @@ class EditSeats(StatesGroup):
 
 SEAT_MIN = 1
 SEAT_MAX = 10
+
+#: Only mention the audience when enough people watch the same movie, so a
+#: quiet movie never looks lonely.
+WATCHERS_MIN = 3
+
+#: TMDB is only consulted when the query actually contains Arabic letters.
+_ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 
 
 async def _cached(cache: Any, key: str, ttl: float) -> Any:
@@ -649,6 +659,7 @@ async def date_chosen(
     settings: Settings,
     provider: Any,
     providers: Any = None,
+    metadata: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
@@ -688,7 +699,7 @@ async def date_chosen(
         await state.set_state(AddWatch.search)
         pending = (data.get("pending_query") or "").strip()
         if pending:
-            text, keyboard = await _search_movies(pending, state)
+            text, keyboard = await _search_movies(pending, state, metadata)
             await edit(callback, text, keyboard)
         else:
             await edit(
@@ -858,7 +869,33 @@ async def add_back(
     await edit(callback, strings.error_expired(), back_home_keyboard())
 
 
-async def _search_movies(query: str, state: FSMContext) -> tuple[str, Any]:
+async def _arabic_alias_matches(
+    query: str, movies: list[dict[str, Any]], metadata: Any
+) -> list[dict[str, Any]]:
+    """Provider movies whose English title is behind an Arabic query.
+
+    TMDB returns the original English title for the Arabic search; we rank
+    those titles against the real listing instead of trusting the first TMDB
+    hit, so a loose translation simply produces no match.
+    """
+
+    try:
+        aliases = await metadata.aliases(query)
+    except Exception:
+        return []
+    if not aliases:
+        return []
+    key = lambda movie: movie.get("name", "")  # noqa: E731 - tiny local helper
+    matched: set[str] = set()
+    for alias in aliases:
+        for hit in search.rank(alias, movies, key=key, limit=20):
+            matched.add(str(hit.item.get("id") or hit.item.get("name") or ""))
+    if not matched:
+        return []
+    return [movie for movie in movies if str(movie.get("id") or movie.get("name") or "") in matched]
+
+
+async def _search_movies(query: str, state: FSMContext, metadata: Any = None) -> tuple[str, Any]:
     """Search the current day's movies and return the reply text and keyboard."""
 
     query = search.clean_query(query)
@@ -869,8 +906,12 @@ async def _search_movies(query: str, state: FSMContext) -> tuple[str, Any]:
 
     key = lambda movie: movie.get("name", "")  # noqa: E731 - tiny local helper
     hits = search.rank(query, movies, key=key, limit=20)
-    if hits:
-        view = [hit.item for hit in hits]
+    view = [hit.item for hit in hits]
+    if metadata is not None and _ARABIC_RE.search(query):
+        for movie in await _arabic_alias_matches(query, movies, metadata):
+            if movie not in view:
+                view.append(movie)
+    if view:
         await state.update_data(
             movie_view=view,
             search_query=query,
@@ -899,21 +940,38 @@ async def _search_movies(query: str, state: FSMContext) -> tuple[str, Any]:
     return strings.search_no_results(query), search_keyboard()
 
 
-async def _search_and_reply(message: Message, state: FSMContext) -> None:
-    text, keyboard = await _search_movies((message.text or "").strip(), state)
+async def _localized_movie(metadata: Any, title: str) -> Any:
+    """Localised TMDB metadata for the current interface language, if any.
+
+    English keeps the provider copy (and avoids a TMDB call); Arabic asks for
+    the Arabic title and overview and silently falls back on failure.
+    """
+
+    language = display_language(i18n.get_language())
+    if metadata is None or not language or not title:
+        return None
+    try:
+        movie = await metadata.localize(title, language=language)
+    except Exception:
+        return None
+    return movie
+
+
+async def _search_and_reply(message: Message, state: FSMContext, metadata: Any = None) -> None:
+    text, keyboard = await _search_movies((message.text or "").strip(), state, metadata)
     await message.answer(text, reply_markup=keyboard)
 
 
 @router.message(AddWatch.search)
-async def movie_search_query(message: Message, state: FSMContext) -> None:
-    await _search_and_reply(message, state)
+async def movie_search_query(message: Message, state: FSMContext, metadata: Any = None) -> None:
+    await _search_and_reply(message, state, metadata)
 
 
 @router.message(AddWatch.movie)
-async def movie_list_text_search(message: Message, state: FSMContext) -> None:
+async def movie_list_text_search(message: Message, state: FSMContext, metadata: Any = None) -> None:
     """Typing a name on the movie list is treated as a search, no button needed."""
 
-    await _search_and_reply(message, state)
+    await _search_and_reply(message, state, metadata)
 
 
 @router.callback_query(AddWatch.movie, F.data.startswith("mv:"))
@@ -1148,6 +1206,7 @@ async def show_movie_info(
     db: Database,
     imax: Any = None,
     providers: Any = None,
+    metadata: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
@@ -1161,14 +1220,20 @@ async def show_movie_info(
             details = await provider.get_movie_details(movie)
         except Exception:
             details = movie
+    name = details.name
+    synopsis = details.synopsis
+    localized = await _localized_movie(metadata, name)
+    if localized is not None:
+        name = localized.title or name
+        synopsis = localized.overview or synopsis
     facts = strings.movie_facts(details.duration_minutes, details.rating, details.language)
     showtimes = [Showtime.from_dict(item) for item in data.get("showtimes", [])]
     status = movie_data.get("imax_status")
     if not status and provider_name == "vox":
         status = await _imax_status(db, imax, movie_data, showtimes)
     text = strings.movie_info(
-        details.name,
-        details.synopsis,
+        name,
+        synopsis,
         facts,
         extra=strings.imax_line(status),
     )
@@ -1530,12 +1595,33 @@ def _snooze_clock(value: str | None, settings: Settings) -> str | None:
     return strings.format_time(local.strftime("%H:%M"))
 
 
-def _watch_detail_payload(watch: dict[str, Any], settings: Settings) -> tuple[str, Any]:
+async def _watcher_count(db: Any, watch: dict[str, Any]) -> int | None:
+    """Distinct active watchers for this movie, once it is worth mentioning."""
+
+    if db is None:
+        return None
+    try:
+        count = await db.count_movie_watchers(watch.get("provider") or "vox", watch["movie_id"])
+    except Exception:
+        return None
+    return count if count >= WATCHERS_MIN else None
+
+
+async def _watch_detail_payload(
+    watch: dict[str, Any],
+    settings: Settings,
+    metadata: Any = None,
+    watchers: int | None = None,
+) -> tuple[str, Any]:
+    title = watch["movie_name"]
+    localized = await _localized_movie(metadata, title)
+    if localized is not None:
+        title = localized.title or title
     return (
         strings.watch_detail(
             watch["branch_name"],
             watch["date"],
-            watch["movie_name"],
+            title,
             watch["showtime"],
             watch["hall_type"],
             watch.get("alert_mode"),
@@ -1543,21 +1629,32 @@ def _watch_detail_payload(watch: dict[str, Any], settings: Settings) -> tuple[st
             watch.get("scope"),
             watch.get("provider"),
             watch.get("required_seats") or 1,
+            watchers=watchers,
         ),
         watch_detail_keyboard(watch),
     )
 
 
 async def _render_watch_detail(
-    callback: CallbackQuery, watch: dict[str, Any], settings: Settings
+    callback: CallbackQuery,
+    watch: dict[str, Any],
+    settings: Settings,
+    db: Any = None,
+    metadata: Any = None,
 ) -> None:
-    text, keyboard = _watch_detail_payload(watch, settings)
+    text, keyboard = await _watch_detail_payload(
+        watch, settings, metadata, await _watcher_count(db, watch)
+    )
     await edit(callback, text, keyboard)
 
 
 @router.callback_query(F.data.startswith("w:cfg:"))
 async def watch_settings(
-    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
+    callback: CallbackQuery,
+    state: FSMContext,
+    db: Database,
+    settings: Settings,
+    metadata: Any = None,
 ) -> None:
     watch_id = int_part(callback.data, 2, 3)
     if watch_id is None:
@@ -1569,12 +1666,14 @@ async def watch_settings(
         await _render_watches(callback, db, user, settings)
         await answer(callback, strings.error_generic(), alert=True)
         return
-    await _render_watch_detail(callback, watch, settings)
+    await _render_watch_detail(callback, watch, settings, db, metadata)
     await answer(callback)
 
 
 @router.callback_query(F.data.startswith("w:mode:"))
-async def watch_alert_mode(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+async def watch_alert_mode(
+    callback: CallbackQuery, db: Database, settings: Settings, metadata: Any = None
+) -> None:
     watch_id = int_part(callback.data, 2, 4)
     if watch_id is None:
         await answer(callback, strings.error_generic(), alert=True)
@@ -1590,7 +1689,7 @@ async def watch_alert_mode(callback: CallbackQuery, db: Database, settings: Sett
     await db.set_watch_alert_mode(watch_id, int(user["id"]), mode)
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings)
+        await _render_watch_detail(callback, watch, settings, db, metadata)
     await answer(callback, strings.watch_mode_set(mode))
 
 
@@ -1617,7 +1716,11 @@ async def watch_seats(
 
 @router.callback_query(F.data.startswith("ws:"))
 async def watch_seats_chosen(
-    callback: CallbackQuery, state: FSMContext, db: Database, settings: Settings
+    callback: CallbackQuery,
+    state: FSMContext,
+    db: Database,
+    settings: Settings,
+    metadata: Any = None,
 ) -> None:
     watch_id = int_part(callback.data, 1, 3)
     value = split_cb(callback.data, 3)[2]
@@ -1641,13 +1744,13 @@ async def watch_seats_chosen(
     await db.set_watch_required_seats(watch_id, int(user["id"]), seats)
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings)
+        await _render_watch_detail(callback, watch, settings, db, metadata)
     await answer(callback, strings.seats_updated(seats))
 
 
 @router.message(EditSeats.custom)
 async def watch_seats_custom_value(
-    message: Message, state: FSMContext, db: Database, settings: Settings
+    message: Message, state: FSMContext, db: Database, settings: Settings, metadata: Any = None
 ) -> None:
     seats = _required_seats(message.text)
     if seats is None:
@@ -1670,12 +1773,16 @@ async def watch_seats_custom_value(
     await state.clear()
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        text, keyboard = _watch_detail_payload(watch, settings)
+        text, keyboard = await _watch_detail_payload(
+            watch, settings, metadata, await _watcher_count(db, watch)
+        )
         await send(message, text, keyboard)
 
 
 @router.callback_query(F.data.startswith("w:snz:"))
-async def watch_snooze(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+async def watch_snooze(
+    callback: CallbackQuery, db: Database, settings: Settings, metadata: Any = None
+) -> None:
     watch_id = int_part(callback.data, 2, 3)
     if watch_id is None:
         await answer(callback, strings.error_generic(), alert=True)
@@ -1688,7 +1795,7 @@ async def watch_snooze(callback: CallbackQuery, db: Database, settings: Settings
     await db.snooze_watch(watch_id, int(user["id"]), until.isoformat(timespec="seconds"))
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings)
+        await _render_watch_detail(callback, watch, settings, db, metadata)
     await answer(
         callback,
         strings.watch_snoozed(_snooze_clock(until.isoformat(), settings) or ""),
@@ -1696,7 +1803,9 @@ async def watch_snooze(callback: CallbackQuery, db: Database, settings: Settings
 
 
 @router.callback_query(F.data.startswith("w:snz0:"))
-async def watch_unsnooze(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+async def watch_unsnooze(
+    callback: CallbackQuery, db: Database, settings: Settings, metadata: Any = None
+) -> None:
     watch_id = int_part(callback.data, 2, 3)
     if watch_id is None:
         await answer(callback, strings.error_generic(), alert=True)
@@ -1708,7 +1817,7 @@ async def watch_unsnooze(callback: CallbackQuery, db: Database, settings: Settin
     await db.clear_watch_snooze(watch_id)
     watch = await db.get_watch(watch_id)
     if watch is not None:
-        await _render_watch_detail(callback, watch, settings)
+        await _render_watch_detail(callback, watch, settings, db, metadata)
     await answer(callback, strings.watch_unsnoozed())
 
 
@@ -1817,6 +1926,7 @@ async def send_watch_detail_message(
     settings: Settings,
     watch_id: int,
     telegram_id: int | None = None,
+    metadata: Any = None,
 ) -> None:
     """Open one watch from ``t.me/<bot>?start=w<id>`` after checking ownership."""
 
@@ -1826,21 +1936,10 @@ async def send_watch_detail_message(
     if not watch or int(watch["user_id"]) != int(user["id"]) or not watch.get("active"):
         await send(message, strings.error_expired(), back_home_keyboard())
         return
-    await send(
-        message,
-        strings.watch_detail(
-            watch["branch_name"],
-            watch["date"],
-            watch["movie_name"],
-            watch["showtime"],
-            watch["hall_type"],
-            watch.get("alert_mode"),
-            _snooze_clock(watch.get("snoozed_until"), settings),
-            watch.get("scope"),
-            watch.get("provider"),
-        ),
-        watch_detail_keyboard(watch),
+    text, keyboard = await _watch_detail_payload(
+        watch, settings, metadata, await _watcher_count(db, watch)
     )
+    await send(message, text, keyboard)
 
 
 async def start_branch_deeplink(

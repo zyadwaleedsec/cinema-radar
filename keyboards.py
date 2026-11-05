@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import quote
 
 import i18n
 import strings
@@ -477,10 +478,13 @@ def watch_alert_keyboard(
     booking_url: str | None,
     trailer_url: str | None = None,
     manage_url: str | None = None,
+    share_link: str | None = None,
 ) -> Any:
     rows = []
     if booking_url:
         rows.append([_btn(strings.BTN_OPEN_BOOKING, url=booking_url, style="success")])
+    if share_link:
+        rows.append([_btn(strings.BTN_SHARE, url=share_link)])
     if manage_url:
         rows.append([_btn(strings.BTN_MANAGE_WATCH, url=manage_url)])
     if trailer_url:
@@ -593,13 +597,16 @@ def event_types_keyboard(selected: list[str]) -> Any:
     return _markup(rows)
 
 
-def hall_keyboard(current: str | None) -> Any:
-    options = [(None, strings.BTN_ALL_HALLS)]
-    options += [(key, strings.format_label(key)) for key in CANONICAL_FORMATS]
-    rows = [
-        [_btn(("✅ " if current == value else "") + label, f"fh:{value or 'all'}")]
-        for value, label in options
+def hall_keyboard(current: str | None, formats: Iterable[str] | None = None) -> Any:
+    """Only offer formats the selected cinemas actually sell."""
+
+    keys = [key for key in (formats if formats is not None else CANONICAL_FORMATS)]
+    options = [(key, strings.format_label(key)) for key in keys]
+    rows = [[_btn(("✅ " if current is None else "") + strings.BTN_ALL_HALLS, "fh:all")]]
+    buttons = [
+        _btn(("✅ " if current == value else "") + label, f"fh:{value}") for value, label in options
     ]
+    rows.extend(buttons[index : index + 2] for index in range(0, len(buttons), 2))
     rows.append([_btn(strings.BTN_BACK, "menu:settings"), _btn(strings.BTN_HOME, "menu:home")])
     return _markup(rows)
 
@@ -657,13 +664,23 @@ def feedback_waiting_keyboard() -> Any:
     return _markup([[_btn(strings.BTN_CANCEL, "menu:home")]])
 
 
-def discovery_keyboard(token: str, booking_url: str | None) -> Any:
+def discovery_keyboard(token: str, booking_url: str | None, share_link: str | None = None) -> Any:
     rows = []
     if booking_url:
         rows.append([_btn(strings.BTN_OPEN_BOOKING, url=booking_url, style="success")])
+    if share_link:
+        rows.append([_btn(strings.BTN_SHARE, url=share_link)])
     rows.append([_btn(strings.BTN_WATCH_MOVIE, f"dw:{token}")])
     rows.append([_btn(strings.BTN_STOP_ALERTS, "ds:stop")])
     return _markup(rows)
+
+
+def share_url(url: str, text: str = "") -> str:
+    """Telegram's share sheet, pre-filled with a booking link and a caption."""
+
+    target = (url or "").strip()
+    caption = (text or "").strip()
+    return f"https://t.me/share/url?url={quote(target, safe='')}&text={quote(caption, safe='')}"
 
 
 def delete_me_keyboard() -> Any:

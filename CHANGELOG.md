@@ -11,6 +11,36 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-05
+
+### Added
+
+- Arabic movie names in alerts and cards: watch alerts, reminders, discovery
+  cards and the public channel now use the Arabic TMDB title and overview when
+  the reader's interface is Arabic. Matching still runs in English, so IMAX
+  detection, dedupe and provider titles are unchanged, and any lookup failure
+  silently keeps the provider copy.
+- Arabic-name search: typing an Arabic movie name finds the English title that
+  the cinema actually lists. TMDB is only consulted when the query contains
+  Arabic letters, and its suggestions are re-ranked against real listings.
+- A share button on watch alerts and discovery cards opens Telegram's share
+  sheet with the booking link and the movie title.
+- Watch settings show how many people are tracking the same movie, once at
+  least three do.
+- A post-deploy self-check makes one real request to the primary cinema and
+  reports a failure to the admin without waiting for the first poll.
+
+### Changed
+
+- The format filter only offers formats the selected cinemas actually sell, and
+  changing branches clears a filter the new selection cannot serve.
+- Format buttons are laid out two per row, with an explicit all-formats row.
+
+### Fixed
+
+- The self-check sends the failure detail captured before the exception scope
+  closes, so the admin message always renders.
+
 ## [2.7.3] - 2026-11-05
 
 ### Fixed
@@ -409,7 +439,12 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.3...v2.8.0
+[2.7.3]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.2...v2.7.3
+[2.7.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.1...v2.7.2
+[2.7.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.0...v2.7.1
+[2.7.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.2...v2.6.0
 [2.5.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.5.0...v2.5.1

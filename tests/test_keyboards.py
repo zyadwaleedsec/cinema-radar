@@ -11,6 +11,7 @@ from keyboards import (
     search_keyboard,
     search_results_keyboard,
     seat_choice_keyboard,
+    share_url,
     showtime_keyboard,
     watch_alert_keyboard,
     watch_created_keyboard,
@@ -204,3 +205,14 @@ def test_event_types_keyboard_includes_coming_soon_release():
         button.callback_data for row in event_types_keyboard([]).inline_keyboard for button in row
     }
     assert "ft:UPCOMING_MOVIE" in callbacks
+
+
+def test_share_url_encodes_the_booking_link_and_caption():
+    url = share_url("https://vox.com/booking?show=1&x=2", "Avengers — 20:00")
+    assert url.startswith("https://t.me/share/url?url=")
+    assert "https%3A%2F%2Fvox.com%2Fbooking%3Fshow%3D1%26x%3D2" in url
+    assert "Avengers%20%E2%80%94%2020%3A00" in url
+
+
+def test_share_url_handles_empty_input():
+    assert share_url("") == "https://t.me/share/url?url=&text="

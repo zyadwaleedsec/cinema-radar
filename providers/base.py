@@ -6,7 +6,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
-from models import Branch, BranchOverview, Movie, Showtime
+from models import CANONICAL_FORMATS, Branch, BranchOverview, Movie, Showtime
 
 
 class UpstreamFormatError(RuntimeError):
@@ -18,6 +18,72 @@ PROVIDER_DISPLAY = {
     "vox": "VOX",
     "renaissance": "Renaissance",
 }
+
+#: Screening formats each cinema actually sells.  The discovery settings
+#: filter must never offer IMAX to a Renaissance-only subscriber, or 4DX to a
+#: VOX branch that does not have one.  Keys are canonical
+#: :data:`models.CANONICAL_FORMATS` values; the parser in each provider is the
+#: source of truth for this list.
+PROVIDER_FORMATS: dict[str, tuple[str, ...]] = {
+    "vox": (
+        "IMAX",
+        "SCREENX",
+        "PREMIUM",
+        "STANDARD",
+        "DOLBY",
+        "4DX",
+        "GOLD",
+        "KIDS",
+        "ONYX",
+        "MAX",
+        "VIP",
+        "3D",
+        "2D",
+    ),
+    "renaissance": (
+        "STANDARD",
+        "PREMIUM",
+        "SPECIAL",
+        "VIP",
+        "DBOX",
+        "BALCONE",
+        "3D",
+        "2D",
+    ),
+}
+
+
+def providers_for_branches(branch_ids: object, enabled_providers: object) -> set[str]:
+    """Cinemas covered by a subscription's branch filter.
+
+    Empty ``branch_ids`` means "every enabled cinema".  Legacy bare branch ids
+    are treated as the default provider (they predate multi-cinema support).
+    Unknown values fall back to every enabled cinema so the filter is never
+    empty.
+    """
+
+    enabled = {str(name) for name in (enabled_providers or ()) if str(name) in PROVIDER_FORMATS}
+    if not enabled:
+        enabled = set(PROVIDER_FORMATS)
+    values = [str(item).strip() for item in (branch_ids or ()) if str(item).strip()]
+    if not values:
+        return enabled
+    chosen = set()
+    for item in values:
+        prefix = item.split(":", 1)[0] if ":" in item else "vox"
+        if prefix in PROVIDER_FORMATS and prefix in enabled:
+            chosen.add(prefix)
+    return chosen or enabled
+
+
+def available_formats(branch_ids: object, enabled_providers: object) -> tuple[str, ...]:
+    """Canonical formats offered by the selected cinemas, in display order."""
+
+    chosen = providers_for_branches(branch_ids, enabled_providers)
+    allowed: set[str] = set()
+    for name in chosen:
+        allowed.update(PROVIDER_FORMATS.get(name, ()))
+    return tuple(key for key in CANONICAL_FORMATS if key in allowed)
 
 
 class CinemaProvider(ABC):
