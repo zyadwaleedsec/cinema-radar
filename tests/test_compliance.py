@@ -298,6 +298,24 @@ async def test_tmdb_client_sends_the_identified_user_agent():
     assert sent["User-Agent"] == IDENTIFIED_USER_AGENT
 
 
+def test_imax_tmdb_client_uses_the_identified_user_agent(monkeypatch):
+    captured: dict[str, object] = {}
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            captured.update(kwargs)
+
+    import imax
+    import tmdb
+
+    monkeypatch.setattr(tmdb, "TmdbClient", _Client)
+    imax.load_default_service()
+
+    # The IMAX normaliser talks to TMDB, so it must identify the bot and the
+    # contact address; only cinema requests need the browser-shaped UA.
+    assert captured["user_agent"] == Settings().tmdb_user_agent
+
+
 # --------------------------------------------------------------------- posters
 
 

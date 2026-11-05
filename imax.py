@@ -148,6 +148,6 @@ def load_default_service(cache: Any | None = None) -> ImaxService:
     tmdb = TmdbClient(
         settings.tmdb_read_token,
         timeout=settings.tmdb_timeout,
-        user_agent=settings.http_user_agent,
+        user_agent=settings.tmdb_user_agent,
     )
     return ImaxService.from_path(path, tmdb=tmdb, cache=cache)
