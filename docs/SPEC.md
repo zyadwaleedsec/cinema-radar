@@ -48,10 +48,12 @@ unchanged when another cinema is added.
 - `providers/renaissance.py`: Renaissance implementation. It reads the public
   branch/day/movie pages; online booking is available/disabled, and no seat
   counts are exposed.
-- `http_client.py`: one persistent httpx client (keep-alive, gzip, a transparent
-  User-Agent naming the bot and a contact email, optional curl_cffi TLS
-  fingerprint) wrapped with the global rate limiter, adaptive backoff and circuit
-  breaker.
+- `http_client.py`: one persistent httpx client (keep-alive, gzip, a
+  browser-shaped User-Agent ending in `CinemaRadar/<version>` with the contact in
+  `From` / `X-Bot-Name` / `X-Bot-Contact`, optional curl_cffi TLS fingerprint)
+  wrapped with the global rate limiter, adaptive backoff and circuit breaker.
+  Cinema WAFs reset any UA that carries an email, a URL or the word "bot";
+  API clients such as TMDB keep the fully identified bot UA.
 - `tmdb.py` / `posters.py`: optional TMDB title lookup and cached, official
   poster URLs. Cinema-scraped image URLs are never stored or sent.
 - `cache.py`: memory + SQLite cache so a restart does not trigger a request

@@ -1,4 +1,4 @@
-"""Consent gate, transparent User-Agent and TMDB poster behaviour."""
+"""Consent gate, safe/identified User-Agents and TMDB poster behaviour."""
 
 from __future__ import annotations
 
