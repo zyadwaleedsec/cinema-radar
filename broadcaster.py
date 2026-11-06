@@ -16,6 +16,7 @@ import i18n
 import strings
 from config import Settings
 from db import Database
+from links import cinema_page_url, movie_page_url
 from metadata import display_language
 from models import DiscoveryEvent, format_key
 from notifier import TelegramSender, UserBlocked
@@ -259,10 +260,20 @@ class Broadcaster:
                 _watch_choices(events, titles), ensure_ascii=False, separators=(",", ":")
             ),
         )
+        # A single event links straight to the movie; a digest covers several
+        # movies at the same branch, so it links to the cinema page instead.
+        lang = i18n.current_language()
+        page_url = movie_page_url(first.movie, lang) if len(events) == 1 else None
+        page_label = strings.BTN_MOVIE_PAGE
+        if page_url is None:
+            page_url = cinema_page_url(first.branch, lang)
+            page_label = strings.BTN_CINEMA_PAGE
         keyboard = discovery_keyboard(
             token=token,
             booking_url=first.booking_url
             or (first.showtime.booking_url if first.showtime else None),
+            page_url=page_url,
+            page_label=page_label,
         )
         return text, keyboard
 

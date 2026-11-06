@@ -224,15 +224,11 @@ async def _collect_window_showtimes(
             try:
                 # Per-movie providers need the id; branch/day providers filter
                 # by it too, so one shape works everywhere.
-                shows = await selected.get_showtimes(
-                    branch.id, date, movie_id=movie.id
-                )
+                shows = await selected.get_showtimes(branch.id, date, movie_id=movie.id)
             except Exception:
                 continue
             movie_shows = [
-                show
-                for show in shows
-                if show.movie_id == movie.id or show.movie_name == best_name
+                show for show in shows if show.movie_id == movie.id or show.movie_name == best_name
             ]
             if not movie_shows:
                 continue

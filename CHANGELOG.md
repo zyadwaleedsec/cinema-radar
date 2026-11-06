@@ -11,6 +11,15 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-06
+
+### Added
+
+- Discovery alerts now carry a link button next to "watch" and "stop":
+  a single-movie alert opens that movie's public page at VOX, Renaissance or
+  Premiere, while a multi-movie digest opens the branch/cinema page. The links
+  are built locally from data already on hand and are never fetched by the bot.
+
 ## [3.0.0] - 2026-11-06
 
 ### Added
@@ -528,7 +537,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.1...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.0.0...v3.1.0
 [2.8.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.3...v2.8.0
 [2.7.3]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.2...v2.7.3

@@ -258,8 +258,7 @@ def parse_showtimes(payload: Any) -> list[Showtime]:
                 if screen_format.upper().startswith("3D") and "3D" not in hall.upper():
                     hall = f"{hall} 3D"
                 showtime_id = _clean(item.get("ss_id")) or (
-                    f"{branch}:{actual_day}:{time_value}:{hall}:"
-                    f"{_clean(item.get('screen_name'))}"
+                    f"{branch}:{actual_day}:{time_value}:{hall}:{_clean(item.get('screen_name'))}"
                 )
                 key = (branch, showtime_id)
                 found.setdefault(
@@ -269,8 +268,7 @@ def parse_showtimes(payload: Any) -> list[Showtime]:
                         branch_id=branch,
                         date=actual_day,
                         movie_id=_clean(
-                            item.get("movie_unique_identifier")
-                            or item.get("movie_id")
+                            item.get("movie_unique_identifier") or item.get("movie_id")
                         ),
                         movie_name=_clean(item.get("movie_title")) or branch_name,
                         time=time_value,
@@ -289,8 +287,7 @@ def _merge_showtimes(showtimes: Iterable[Showtime]) -> list[Showtime]:
     for showtime in showtimes:
         key = (
             showtime.branch_id,
-            showtime.showtime_id
-            or f"{showtime.date}:{showtime.time}:{showtime.hall_type}",
+            showtime.showtime_id or f"{showtime.date}:{showtime.time}:{showtime.hall_type}",
         )
         found.setdefault(key, showtime)
     return sorted(found.values(), key=lambda s: (s.date, s.time, s.hall_type))
@@ -488,7 +485,9 @@ class PremiereProvider(CinemaProvider):
             cached = await self.cache.get_json(key, ttl=ttl)
             if cached:
                 merged = {**movie.__dict__}
-                merged.update({name: value for name, value in cached.items() if value not in (None, "")})
+                merged.update(
+                    {name: value for name, value in cached.items() if value not in (None, "")}
+                )
                 return await self._official_poster(Movie(**merged))
         try:
             records = await self._listing()
@@ -803,10 +802,7 @@ class PremiereProvider(CinemaProvider):
             await self.cache.put_json(key, [], self.settings.premiere_snapshot_ttl)
             return []
         results = await asyncio.gather(
-            *(
-                self._fetch_movie_showtimes(movie_id, date)
-                for movie_id in movie_ids
-            ),
+            *(self._fetch_movie_showtimes(movie_id, date) for movie_id in movie_ids),
             return_exceptions=True,
         )
         collected: list[Showtime] = []

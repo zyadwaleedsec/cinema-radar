@@ -146,10 +146,7 @@ SHOWTIMES = {
     ],
 }
 
-HOME = (
-    '<html><script src="/_next/static/chunks/app/%5Blang%5D/layout-abc123.js"></script>'
-    "</html>"
-)
+HOME = '<html><script src="/_next/static/chunks/app/%5Blang%5D/layout-abc123.js"></script></html>'
 BUNDLE = 'const token="eyJhbGciOiJIUzI1NiJ9.eyJ0b2tlbiI6ImFiYyJ9.c2lnbmF0dXJl";'
 
 
@@ -252,9 +249,7 @@ async def test_get_showtimes_fetches_once_and_filters_the_branch(cache, test_set
     assert "x-web-security" not in api_calls[0]["headers"]
 
     token_calls = [
-        call
-        for call in http.calls
-        if call["url"].startswith("https://premiere-cinemas.com")
+        call for call in http.calls if call["url"].startswith("https://premiere-cinemas.com")
     ]
     assert token_calls
     assert {call["target_key"] for call in token_calls} == {"premiere:token"}

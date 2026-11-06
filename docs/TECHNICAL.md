@@ -534,7 +534,11 @@ produces several updates for the same branch they ship as a single digest that
 lists every line, one movie per chooser button. The digest stores each movie's
 branch, date, showtime, artwork and booking URL as JSON in
 `discovery_actions.payload`; tapping "watch a movie" therefore creates the
-watch locally instead of fetching showtimes again.
+watch locally instead of fetching showtimes again. Every alert also carries a
+public link button: a single-movie alert points at that movie's page on the
+cinema site, while a digest points at the branch page (Premiere falls back to
+its now-showing listing). The link is assembled from the slug/id we already
+hold and is never fetched by the bot.
 
 The cross-cinema window watch ("All cinemas") stores one `scope="movie"` row
 per branch that has the movie, all sharing a `group_id` so the watch limit

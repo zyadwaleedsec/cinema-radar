@@ -5,6 +5,7 @@ from __future__ import annotations
 import i18n
 import strings
 from broadcaster import Broadcaster, _event_text
+from links import cinema_page_url, movie_page_url
 from models import Branch, DiscoveryEvent, Movie
 
 
@@ -163,3 +164,80 @@ async def test_broadcast_resolves_and_sends_the_tmdb_poster(db, test_settings):
     assert sender.sent[0]["photo_url"] == "https://image.tmdb.org/t/p/w500/Dune.jpg"
     assert "فوكس" in str(sender.sent[0]["text"])
     assert "Madinaty" in str(sender.sent[0]["text"])
+
+
+def _urls(keyboard) -> list[str]:
+    return [button.url for row in keyboard.inline_keyboard for button in row if button.url]
+
+
+def _callbacks(keyboard) -> list[str]:
+    return [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+
+
+def test_movie_page_urls_follow_each_provider():
+    assert (
+        movie_page_url(Movie("m1", "Dune", "dune", "vox"))
+        == "https://egy.voxcinemas.com/movies/dune"
+    )
+    assert (
+        movie_page_url(Movie("dune", "Dune", "dune", "renaissance"))
+        == "https://rnscinemas.com/en/movie/dune"
+    )
+    assert (
+        movie_page_url(Movie("7651.499", "Ramayana", "7651.499", "premiere"), "ar")
+        == "https://www.premiere-cinemas.com/ar/movie-details/7651.499"
+    )
+
+
+def test_cinema_page_falls_back_to_the_provider_listing():
+    branch = Branch("5", "Cima Arkan", "premiere")
+    assert cinema_page_url(branch, "ar") == ("https://www.premiere-cinemas.com/ar/now-showing")
+    vox = Branch("madina", "Madinaty", "vox", "https://egy.voxcinemas.com/cinemas/madina")
+    assert cinema_page_url(vox) == "https://egy.voxcinemas.com/cinemas/madina"
+
+
+async def test_single_event_alert_links_to_the_movie_page(db, test_settings):
+    i18n.set_language("ar")
+    broadcaster = Broadcaster(test_settings, db, _Sender())
+    event = DiscoveryEvent(
+        kind="NEW_MOVIE",
+        branch=Branch("madina", "Madinaty", "vox"),
+        movie=Movie("m1", "Dune", "dune", "vox"),
+        date="2026-12-16",
+    )
+
+    _, keyboard = await broadcaster._build_message(12345, [event])
+
+    assert "https://egy.voxcinemas.com/movies/dune" in _urls(keyboard)
+    assert any(callback.startswith("dw:") for callback in _callbacks(keyboard))
+    assert "ds:stop" in _callbacks(keyboard)
+
+
+async def test_digest_alert_links_to_the_cinema_page(db, test_settings):
+    i18n.set_language("ar")
+    broadcaster = Broadcaster(test_settings, db, _Sender())
+    branch = Branch("madina", "Madinaty", "vox", "https://egy.voxcinemas.com/cinemas/madina")
+    events = [
+        DiscoveryEvent(
+            kind="NEW_MOVIE",
+            branch=branch,
+            movie=Movie("m1", "Dune", "dune", "vox"),
+            date="2026-12-16",
+        ),
+        DiscoveryEvent(
+            kind="NEW_MOVIE",
+            branch=branch,
+            movie=Movie("m2", "Arrival", "arrival", "vox"),
+            date="2026-12-16",
+        ),
+    ]
+
+    _, keyboard = await broadcaster._build_message(12345, events)
+
+    assert "https://egy.voxcinemas.com/cinemas/madina" in _urls(keyboard)
+    assert "https://egy.voxcinemas.com/movies/dune" not in _urls(keyboard)

@@ -677,10 +677,17 @@ def feedback_waiting_keyboard() -> Any:
     return _markup([[_btn(strings.BTN_CANCEL, "menu:home")]])
 
 
-def discovery_keyboard(token: str, booking_url: str | None) -> Any:
+def discovery_keyboard(
+    token: str,
+    booking_url: str | None,
+    page_url: str | None = None,
+    page_label: str | None = None,
+) -> Any:
     rows = []
     if booking_url:
         rows.append([_btn(strings.BTN_OPEN_BOOKING, url=booking_url, style="success")])
+    if page_url:
+        rows.append([_btn(page_label or strings.BTN_MOVIE_PAGE, url=page_url)])
     rows.append([_btn(strings.BTN_WATCH_MOVIE, f"dw:{token}")])
     rows.append([_btn(strings.BTN_STOP_ALERTS, "ds:stop")])
     return _markup(rows)
