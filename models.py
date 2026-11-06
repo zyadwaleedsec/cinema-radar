@@ -90,6 +90,9 @@ class Movie:
     synopsis: str | None = None
     trailer_url: str | None = None
     imax_status: str | None = None
+    #: First day the cinema lists it for a coming-soon title.  ``None`` when the
+    #: provider does not publish a release date on its listing page.
+    release_date: str | None = None
 
 
 @dataclass(frozen=True)

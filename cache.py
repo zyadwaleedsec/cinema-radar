@@ -200,7 +200,9 @@ def snapshot_key(provider: str, branch_id: str, date: str, movie_id: str) -> str
 
 
 def coming_soon_key(provider: str) -> str:
-    return f"{provider}:{_PARSER_VERSION}:comingsoon"
+    # ``v2``: entries gained a ``release_date``, which the add-watch flow needs.
+    release_dates = "v2"
+    return f"{provider}:{_PARSER_VERSION}:comingsoon:{release_dates}"
 
 
 def prebook_dates_key(provider: str) -> str:

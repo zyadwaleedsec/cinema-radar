@@ -142,6 +142,60 @@ async def _all_cinemas_dates(providers: Any, provider: Any) -> list[str]:
     return sorted(dates)
 
 
+async def _coming_soon_release(
+    query: str, providers: Any, provider: Any, metadata: Any = None
+) -> str | None:
+    """First screening day of the coming-soon title a search would match.
+
+    The date strip starts at "today", but a title that is not out yet has no
+    sessions before its release, so the picker must start there instead.  The
+    matching is the same fuzzy rank the movie search uses, with the TMDB
+    Arabic-title bridge on top, so ``dune`` and ``ديون`` both resolve.
+    """
+
+    query = search.clean_query(query)
+    if not query or len(search.normalize(query)) < 2:
+        return None
+    releases: list[dict[str, Any]] = []
+    for name in _provider_names(providers, provider):
+        selected = _selected_provider(providers, provider, {"provider_name": name})
+        try:
+            movies = await selected.get_coming_soon()
+        except Exception:
+            continue
+        for movie in movies:
+            release = getattr(movie, "release_date", None)
+            if not release or not movie.name:
+                continue
+            releases.append(
+                {
+                    "id": f"{name}:{movie.slug or movie.name}",
+                    "name": movie.name,
+                    "release_date": release,
+                }
+            )
+    if not releases:
+        return None
+    key = lambda movie: movie["name"]  # noqa: E731 - tiny local helper
+    matched = [hit.item for hit in search.rank(query, releases, key=key, limit=1)]
+    if not matched and metadata is not None and _ARABIC_RE.search(query):
+        matched = await _arabic_alias_matches(query, releases, metadata)
+    if not matched:
+        return None
+    return str(matched[0].get("release_date") or "") or None
+
+
+async def _dates_from_release(
+    dates: list[str], query: str, providers: Any, provider: Any, metadata: Any = None
+) -> list[str]:
+    """Drop the days before a coming-soon title's first screening day."""
+
+    release = await _coming_soon_release(query, providers, provider, metadata)
+    if not release:
+        return dates
+    return [day for day in dates if day >= release]
+
+
 async def _collect_window_showtimes(
     providers: Any, provider: Any, date: str, query: str
 ) -> list[dict[str, Any]]:
@@ -380,10 +434,11 @@ async def cinema_chosen(
     settings: Settings,
     provider: Any,
     providers: Any = None,
+    metadata: Any = None,
 ) -> None:
     name = split_cb(callback.data, 2)[1]
     if name == "all":
-        await _all_cinemas_chosen(callback, state, settings, provider, providers)
+        await _all_cinemas_chosen(callback, state, settings, provider, providers, metadata)
         return
     if name not in _provider_names(providers, provider):
         await answer(callback, strings.error_expired(), alert=True)
@@ -405,24 +460,36 @@ async def cinema_chosen(
 
 
 async def _all_cinemas_chosen(
-    callback: CallbackQuery, state: FSMContext, settings: Settings, provider: Any, providers: Any
+    callback: CallbackQuery,
+    state: FSMContext,
+    settings: Settings,
+    provider: Any,
+    providers: Any,
+    metadata: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
     query = search.clean_query(data.get("pending_query") or "")
     await state.update_data(all_cinemas=True)
     if len(search.normalize(query)) >= 2:
-        await _all_cinemas_show_date(callback, state, provider, providers)
+        await _all_cinemas_show_date(callback, state, provider, providers, metadata)
         return
     await state.set_state(AddWatch.window_movie)
     await edit(callback, strings.window_movie_prompt(), back_home_keyboard())
 
 
 async def _all_cinemas_show_date(
-    callback: CallbackQuery, state: FSMContext, provider: Any, providers: Any
+    callback: CallbackQuery,
+    state: FSMContext,
+    provider: Any,
+    providers: Any,
+    metadata: Any = None,
 ) -> None:
     await edit(callback, strings.loading_branches(), back_home_keyboard())
+    data = await state.get_data()
+    query = search.clean_query(data.get("pending_query") or "")
     dates = await _all_cinemas_dates(providers, provider)
+    dates = await _dates_from_release(dates, query, providers, provider, metadata)
     if not dates:
         await edit(callback, strings.no_dates(), retry_keyboard("menu:add"))
         return
@@ -435,7 +502,7 @@ async def _all_cinemas_show_date(
 
 @router.message(AddWatch.window_movie)
 async def window_movie_query(
-    message: Message, state: FSMContext, provider: Any, providers: Any = None
+    message: Message, state: FSMContext, provider: Any, providers: Any = None, metadata: Any = None
 ) -> None:
     title = search.clean_query(message.text or "")
     if len(search.normalize(title)) < 2:
@@ -443,6 +510,7 @@ async def window_movie_query(
         return
     await state.update_data(pending_query=title)
     dates = await _all_cinemas_dates(providers, provider)
+    dates = await _dates_from_release(dates, title, providers, provider, metadata)
     if not dates:
         await send(message, strings.no_dates(), retry_keyboard("menu:add"))
         return
@@ -556,6 +624,7 @@ async def branch_chosen(
     settings: Settings,
     provider: Any,
     providers: Any = None,
+    metadata: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
@@ -571,6 +640,12 @@ async def branch_chosen(
     if not dates:
         dates = await _cached(
             cache, dates_key(provider_name, branch["id"]), settings.cache_listings_ttl
+        )
+    # A searched coming-soon title has no sessions before its first screening
+    # day, so the date picker must start there instead of at "today".
+    if data.get("search_first"):
+        dates = await _dates_from_release(
+            dates, data.get("pending_query") or "", providers, provider, metadata
         )
     if not dates:
         await edit(callback, strings.no_dates(), retry_keyboard(f"br:{index}"))

@@ -11,6 +11,16 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.8.1] - 2026-11-06
+
+### Fixed
+
+- The add-watch date picker no longer offers days before a coming-soon movie is
+  out. When the search matches a title on the coming-soon page, the date list
+  starts at the first screening day any cinema publishes for it (Dune: Part
+  Three, for example, now starts on 17 December instead of today). The Arabic
+  title bridge works here too, so an Arabic search gets the same trimming.
+
 ## [2.8.0] - 2026-11-05
 
 ### Added
@@ -428,7 +438,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.1...HEAD
+[2.8.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.3...v2.8.0
 [2.7.3]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.2...v2.7.3
 [2.7.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.1...v2.7.2

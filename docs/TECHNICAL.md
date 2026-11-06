@@ -73,7 +73,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (256 tests)
+├── tests/                  # pytest suite (264 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -317,6 +317,13 @@ enabled, then the existing branch → date → movie → showtime steps. Branch 
 are unique across the shipped providers, so branch filters, discovery state and
 deep links are keyed `provider:<branch>`. Legacy `?start=b<branch>` deep links
 and pre-migration branch filters default to VOX.
+
+When a search term matches a coming-soon title, the date picker starts at that
+title's first screening day instead of "today": the provider's coming-soon page
+publishes a release date per movie (VOX as `Release Date:` on the card), and
+`handlers.watches._dates_from_release` trims every earlier day from the branch
+strip / all-cinemas union. Days the strip has not reached yet yield an honest
+"no dates", and titles without a published date are left untouched.
 
 ### Pages used
 

@@ -72,6 +72,9 @@ _DATE_PARAM = re.compile(r"[?&]d=(\d{8})")
 _TIME_RE = re.compile(r"(\d{1,2}):(\d{2})\s*([ap]\.?m\.?|ص|م)?", re.IGNORECASE)
 _SEATS_RE = re.compile(r"(\d+)\s*(?:seats?|كرسي|كراسي)", re.IGNORECASE)
 _MOVIE_ID_RE = re.compile(r"\bHO\d{6,}\b")
+_RELEASE_DATE_RE = re.compile(
+    r"release\s+date\s*:?\s*(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})", re.IGNORECASE
+)
 _ISO_DURATION_RE = re.compile(r"^P(?:\d+D)?T?(?:(\d+)H)?(?:(\d+)M)?", re.IGNORECASE)
 _RATINGS = ("NC-17", "PG-13", "PG", "G", "R", "15+", "12+", "18+", "TBC")
 
@@ -648,25 +651,61 @@ def parse_coming_soon(html: str) -> list[Movie]:
     poster card is not wrapped in ``article.movie-compare``.
     """
 
-    movies = parse_movies(html)
-    if movies:
-        return movies
     soup = BeautifulSoup(html, "lxml")
-    found: dict[str, Movie] = {}
-    for anchor in soup.find_all("a", href=_MOVIE_HREF):
-        match = _MOVIE_HREF.search(anchor["href"])
-        if not match:
+    movies = parse_movies(soup)
+    if not movies:
+        found: dict[str, Movie] = {}
+        for anchor in soup.find_all("a", href=_MOVIE_HREF):
+            match = _MOVIE_HREF.search(anchor["href"])
+            if not match:
+                continue
+            slug = match.group(1)
+            if not slug or slug.lower() in _NAV_SLUGS:
+                continue
+            container = anchor.find_parent("article") or _nearest_container(anchor)
+            name = _movie_title(container, anchor) or slug.replace("-", " ").title()
+            found.setdefault(
+                slug,
+                Movie(slug, name, slug, "vox", _poster(container)),
+            )
+        movies = list(found.values())
+    return _with_release_dates(movies, soup)
+
+
+def _release_date(container: Any) -> str | None:
+    """The ``Release Date: 17 December 2026`` line on a coming-soon card."""
+
+    if container is None or not hasattr(container, "get_text"):
+        return None
+    match = _RELEASE_DATE_RE.search(container.get_text(" ", strip=True))
+    if not match:
+        return None
+    raw = " ".join(match.group(1).split())
+    for pattern in ("%d %B %Y", "%d %b %Y"):
+        try:
+            return datetime.strptime(raw, pattern).date().isoformat()
+        except ValueError:
             continue
-        slug = match.group(1)
-        if not slug or slug.lower() in _NAV_SLUGS:
+    return None
+
+
+def _with_release_dates(movies: list[Movie], soup: BeautifulSoup) -> list[Movie]:
+    """Attach the release date each coming-soon card publishes."""
+
+    releases: dict[str, str] = {}
+    for article in soup.find_all("article"):
+        slug = _attr(article, "data-slug")
+        if not slug:
             continue
-        container = anchor.find_parent("article") or _nearest_container(anchor)
-        name = _movie_title(container, anchor) or slug.replace("-", " ").title()
-        found.setdefault(
-            slug,
-            Movie(slug, name, slug, "vox", _poster(container)),
-        )
-    return list(found.values())
+        release = _release_date(article)
+        if release:
+            releases[slug] = release
+    if not releases:
+        return movies
+    return [
+        replace(movie, release_date=releases[movie.slug]) if movie.slug in releases else movie
+        for movie in movies
+    ]
 
 
 def parse_movie_details(html: str, fallback: Movie | None = None) -> Movie:
