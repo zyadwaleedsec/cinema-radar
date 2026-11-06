@@ -6,7 +6,10 @@
 # Run exactly ONE machine. Two long-polling processes on the same token fight
 # over getUpdates and Telegram answers both with 409 Conflict.
 app = "cinema-radar-eg"
-primary_region = "cdg"
+# Frankfurt serves all three cinemas.  Premiere's Cloudflare edge answers 403 to
+# the Paris (cdg) address range, so keep the only machine where all providers
+# are reachable.
+primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile"
@@ -20,9 +23,10 @@ kill_timeout = "20s"
   memory = "1gb"
   cpu_kind = "shared"
 
-# Keeps cinemaradar.sqlite3 alive across deploys.
+# Keeps cinemaradar.sqlite3 alive across deploys.  This volume was restored from
+# the original cdg volume when the app moved to fra.
 [[mounts]]
-  source = "cinema_data"
+  source = "cinema_data_fra"
   destination = "/data"
   initial_size = 1
 

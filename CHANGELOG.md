@@ -46,6 +46,10 @@ the project uses [Semantic Versioning](https://semver.org):
   freed-seat total.
 - If Premiere ever returns encrypted responses, the provider stops and alerts
   the admin once instead of reporting empty showtimes.
+- The Fly deployment moved from `cdg` (Paris) to `fra` (Frankfurt): Premiere's
+  Cloudflare edge returns `403` to the Paris address range. The SQLite volume
+  was restored from a consistent backup, and the old `cinema_data` volume is
+  left in `cdg` as a rollback copy.
 
 ## [2.8.4] - 2026-11-06
 

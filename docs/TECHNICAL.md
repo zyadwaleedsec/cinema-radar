@@ -485,6 +485,10 @@ firing a whole-day fan-out; every bot call path supplies the movie.
 - **Public token can rotate.** Re-reading the bundle refreshes it; if the
   bundle URL or token shape changes, the provider reports a parse failure and
   the admin is alerted.
+- **Cloudflare blocks some datacenter ranges.** The site and API answer `403`
+  from Fly's Paris (`cdg`) range and work from Frankfurt (`fra`), so
+  `fly.toml` keeps the bot in `fra`. A fresh deployment must use a region that
+  Premiere serves.
 - Parser tests live in `tests/test_premiere.py`.
 
 ---

@@ -74,12 +74,17 @@ fly apps destroy cinema-radar-eg   # only if you want a fresh start
 
 ## 4. Create the volume
 
-The volume name **must** be `cinema_data` (see `[[mounts]]` in `fly.toml`) and
-it must be in the same region as the machine (`primary_region = "cdg"`).
+The volume name **must** be `cinema_data_fra` (see `[[mounts]]` in `fly.toml`)
+and it must be in the same region as the machine
+(`primary_region = "fra"`).
 
 ```powershell
-fly volumes create cinema_data --region cdg --size 1 --yes
+fly volumes create cinema_data_fra --region fra --size 1 --yes
 ```
+
+> **Region matters for Premiere.** Premiere's Cloudflare edge answers `403` to
+> the Paris (`cdg`) address range but serves Frankfurt (`fra`) normally. Keep
+> the bot in `fra`; Paris cannot fetch Premiere showtimes.
 
 Create exactly **one** volume: one volume = one machine.
 
@@ -90,9 +95,9 @@ things must agree, or the deploy fails with `needs volumes ... <region>=1`:
 
 | Thing | Value used here |
 | --- | --- |
-| `primary_region` in `fly.toml` | `cdg` (Paris) |
-| the `cinema_data` volume | `cdg` |
-| the single machine | `cdg` |
+| `primary_region` in `fly.toml` | `fra` (Frankfurt) |
+| the `cinema_data_fra` volume | `fra` |
+| the single machine | `fra` |
 
 Check them at any time:
 
@@ -108,14 +113,13 @@ fly volumes list                  # note the id of the wrong-region volume
 fly volumes destroy vol_xxxxxxxx  # delete it
 fly machines list                 # destroy machines in the wrong region
 fly scale count 0                 # or remove them one by one
-fly volumes create cinema_data --region cdg --size 1 --yes
+fly volumes create cinema_data_fra --region fra --size 1 --yes
 fly deploy --remote-only
-fly scale count 1 --region cdg
+fly scale count 1 --region fra
 ```
 
-If you prefer another region, change `primary_region` in `fly.toml`, create the
-volume there, and use that region in every command. Pick a region close to
-Egypt: `cdg` (Paris) or `fra` (Frankfurt).
+Do not use `cdg`: it is blocked by Premiere even though it is closer to Egypt.
+`fra` (Frankfurt) is reachable by all three cinemas.
 
 ---
 
@@ -163,7 +167,7 @@ After the deploy:
 
 ```powershell
 fly status
-fly scale count 1 --region cdg   # must be 1, never 2
+fly scale count 1 --region fra   # must be 1, never 2
 fly logs
 ```
 
@@ -219,7 +223,7 @@ fly sftp get /data/backup.sqlite3 .\cinemaradar-backup.sqlite3
 | `bash: gunicorn: command not found` | Fly used a buildpack, not the Dockerfile | `fly.toml` must contain `[build] dockerfile = "Dockerfile"` |
 | `No dependencies found in pyproject.toml` | A `pyproject.toml` without `[project]` made the launcher pick buildpacks | keep only `ruff.toml` (this repo) or add real `[project]` dependencies |
 | `Missing or invalid check type` | old `[checks]` block | this repo has no checks; the bot has no HTTP server |
-| `needs volumes with name 'cinema_data'` | volume not created, or in another region | `fly volumes create cinema_data --region cdg --size 1 --yes` |
+| `needs volumes with name 'cinema_data_fra'` | volume not created, or in another region | `fly volumes create cinema_data_fra --region fra --size 1 --yes` |
 | `409 Conflict: terminated by other getUpdates request` | two machines or two machines running the bot | `fly scale count 1`, and stop any local instance |
 | `Process appears to have been OOM killed!` | less than 1 GB is not enough for Python + lxml + the cache | set `memory = "1gb"` in `[[vm]]`, then `fly deploy` |
 | VOX requests time out (`فوكس واقعة`, `ReadTimeout`) | `HTTP_IMPERSONATE` is unset, so plain httpx is used | keep `HTTP_IMPERSONATE = "chrome124"` in `[env]` of `fly.toml` |
