@@ -11,6 +11,23 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.8.4] - 2026-11-06
+
+### Changed
+
+- Rewrote every user-facing screen in Egyptian Arabic and American English with
+  a consistent editorial layout: emoji and bold title, divider, short separated
+  blocks, and a human closing line. This covers onboarding, the dashboard,
+  adding a watch, the watch list and its settings, alerts, settings, support,
+  feedback, admin screens and error messages.
+- Moved the last hardcoded Arabic labels into the language catalogs: donation
+  amounts, approve/reject, feedback categories, the all-dates label, and the
+  custom-amount prompt and below-minimum warning. English screens no longer fall
+  back to Arabic text.
+- Tightened the visual style: emoji now appear only in titles, buttons and list
+  items, cards use a lighter divider, and every screen closes with one short
+  line. The Egyptian dialect was softened in alerts and support messages.
+
 ## [2.8.3] - 2026-11-06
 
 ### Changed

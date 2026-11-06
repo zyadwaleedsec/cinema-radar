@@ -178,7 +178,7 @@ BTN_ADD_WATCH = "➕ Add a watch"
 BTN_SEARCH = "🔎 Find a movie"
 BTN_SEARCH_MOVIE = "🔎 Search by name"
 BTN_SEARCH_AGAIN = "🔎 Search again"
-BTN_ALL_MOVIES = "📋 All movies"
+BTN_ALL_MOVIES = "🎞️ All movies"
 BTN_MY_WATCHES = "🎟️ My watches"
 BTN_SETTINGS = "⚙️ Settings"
 BTN_SUPPORT = "💛 Support the project"
@@ -201,11 +201,11 @@ BTN_STOP_ALERTS = "🔕 Stop these alerts"
 BTN_REMOVE_WATCH = "❌ Remove watch"
 BTN_CONFIRM_REMOVE_WATCH = "Yes, remove it"
 BTN_SNOOZE = "⏰ Remind me in an hour"
-BTN_UNSNOOZE = "🔕 Resume alerts"
+BTN_UNSNOOZE = "🔔 Turn alerts back on"
 BTN_MODE_ALL = "🔔 Everything"
 BTN_MODE_SEATS = "🪑 Seats came back"
 BTN_MODE_OPENING = "🎟️ Booking opens only"
-BTN_WATCH_SETTINGS = "⚙️ Alert settings"
+BTN_WATCH_SETTINGS = "⚙️ Watch settings"
 BTN_WATCH_ALL_SHOWTIMES = "🔔 Watch every showtime that day"
 BTN_WATCH_ALL_DATES = "📅 Watch every available date"
 BTN_I_PAID = "I paid ✅"
@@ -217,13 +217,13 @@ BTN_ALL_HALLS = "All halls"
 BTN_ALL_FORMATS = "🎭 All formats"
 BTN_MOVIE_INFO = "ℹ️ Movie info"
 BTN_TRAILER = "▶️ Watch trailer"
-BTN_BACK_TO_SHOWTIMES = "🔙 Back to showtimes"
+BTN_BACK_TO_SHOWTIMES = "⬅️ Back to showtimes"
 BTN_VODAFONE_CASH = "Vodafone Cash"
 BTN_INSTAPAY = "InstaPay"
-BTN_CANCELLATIONS = "Seat alerts"
+BTN_CANCELLATIONS = "🪑 Seats back"
 BTN_QUIET_HOURS = "🕰️ Quiet hours"
 BTN_QUIET_CUSTOM = "🕰️ Custom time"
-BTN_DISCOVERY_ALERTS = "New movie alerts"
+BTN_DISCOVERY_ALERTS = "🎬 New-movie alerts"
 BTN_BRANCHES_FILTER = "🎯 Alert branches"
 BTN_TYPES_FILTER = "📌 Alert types"
 BTN_HALL_FILTER = "🎭 Hall type"
@@ -240,19 +240,50 @@ BTN_CONSENT_ACCEPT = "✅ I agree, start"
 BTN_CONSENT_DECLINE = "❌ I don't agree"
 BTN_CONSENT_REVIEW = "🔐 Review consent again"
 
+
+# ------------------------------------------------------------ keyboard labels
+def all_dates_label() -> str:
+    return "📅 Every available date"
+
+
+def donation_amount_label(amount: int) -> str:
+    return f"{amount} EGP"
+
+
+def donation_custom_label() -> str:
+    return "Another amount"
+
+
+def donation_approve_label() -> str:
+    return "✅ Approve"
+
+
+def donation_reject_label() -> str:
+    return "❌ Reject"
+
+
+def feedback_category_button(kind: str) -> str:
+    return {
+        "idea": "💡 Idea",
+        "bug": "🐞 Bug",
+        "movie": "🎬 Missing movie",
+        "other": "💬 Something else",
+    }.get(kind, kind)
+
+
 # Public commands are registered in the default scope.  Admin commands are
 # registered only in the admin's private chat scope, so they never appear in
 # the public menu.
 PUBLIC_COMMANDS: tuple[tuple[str, str], ...] = (
-    ("start", "Main menu"),
-    ("add", "Add a new watch"),
-    ("search", "Search for a movie by name"),
+    ("start", "Home"),
+    ("add", "Add a watch"),
+    ("search", "Find a movie"),
     ("watches", "My watches"),
     ("settings", "Settings"),
     ("help", "Help"),
     ("privacy", "Privacy and data"),
     ("delete_me", "Delete my data"),
-    ("cancel", "Cancel any step"),
+    ("cancel", "Cancel the current step"),
 )
 
 ADMIN_COMMANDS: tuple[tuple[str, str], ...] = (
@@ -273,23 +304,22 @@ def dashboard(
 ) -> str:
     who = f", {esc(name)}" if name else ""
     lines = [
-        "🎬 <b>Cinema Radar</b>",
-        DIVIDER,
+        f"🎬 <b>Cinema Radar</b>\n{DIVIDER}",
+        "<i>Your front-row friend 🍿</i>",
         f"Welcome{who} 👋",
-        "",
     ]
     if active_watches:
         lines.append(
             f"You have <b>{active_watches}</b> active {_plural(active_watches, 'watch', 'watches')}."
         )
     else:
-        lines.append("No active watches yet — start with a tap below.")
+        lines.append("No watches yet — shall we start with one? 🍿")
     if next_watch:
-        lines += ["", "⏭️ <b>Next watch</b>", next_watch]
+        lines += ["⏭️ <b>Next show</b>", next_watch]
     if limit:
-        lines += ["", f"<i>Your current limit is {_count(limit, 'watch', 'watches')}.</i>"]
-    lines += ["", "Pick an option below 👇"]
-    return "\n".join(lines)
+        lines.append(f"<i>🎟️ Your limit: {_count(limit, 'watch', 'watches')}.</i>")
+    lines.append("Pick an option below 👇")
+    return _blocks(*lines)
 
 
 def version_line() -> str:
@@ -334,37 +364,35 @@ def page_label(page: int, pages: int) -> str:
 # ------------------------------------------------------------------ onboarding
 def onboard_intro(name: str = "") -> str:
     who = f", {esc(name)}" if name else ""
-    return (
-        "🎬 <b>Cinema Radar</b>\n"
-        f"{DIVIDER}\n"
-        f"Welcome{who} 👋\n\n"
+    return _blocks(
+        f"🎬 <b>Cinema Radar</b>\n{DIVIDER}",
+        "<i>Your front-row friend 🍿</i>",
+        f"Welcome{who} 👋",
         "I watch VOX and Renaissance showtimes in Egypt,\n"
         "and message you the moment booking opens\n"
-        "or a seat frees up.\n\n"
-        "No more refreshing the site yourself."
+        "or a seat frees up — before the good ones go.",
+        "No more refreshing the site yourself.",
     )
 
 
 def onboard_alerts() -> str:
-    return (
-        "🔔 <b>What you'll get</b>\n\n"
-        "• <b>Booking opened</b> — when a showtime goes on sale.\n"
-        "• <b>Seats came back</b> — when a sold-out show frees up.\n"
-        "• <b>New dates</b> — when a movie opens a new day.\n\n"
-        "Set the alert type for each watch in\n"
-        "⚙️ Alert settings."
+    return _blocks(
+        f"🔔 <b>What you'll get</b>\n{DIVIDER}",
+        "🎟️ <b>Booking opened</b>\nThe moment a showtime goes on sale.",
+        "🪑 <b>Seats came back</b>\nWhen a sold-out show frees up.",
+        "📅 <b>New date</b>\nWhen a movie opens another day.",
+        "⚙️ Set each alert type in <b>Alert settings</b>.",
     )
 
 
 def onboard_safety() -> str:
-    return (
-        "🙏 <b>Before we start</b>\n\n"
-        "• The bot is free and only sends the booking link.\n"
-        "• It never books or pays for you.\n"
-        "• It never asks for your name, phone or payment details.\n"
-        "• It is unofficial and not affiliated with any cinema.\n\n"
-        "Full details: /privacy\n"
-        "Erase your data anytime: /delete_me"
+    return _blocks(
+        f"🙏 <b>Before we start</b>\n{DIVIDER}",
+        "✅ The bot is free and only sends the booking link.",
+        "🙅 It never books or pays for you.",
+        "🔒 It never asks for your name, phone or payment details.",
+        "⚠️ It is unofficial and not affiliated with any cinema.",
+        "📄 Full details: /privacy\n🗑️ Erase your data: /delete_me",
     )
 
 
@@ -374,9 +402,10 @@ def onboard_progress(step: int) -> str:
 
 def help_text() -> str:
     return (
-        f"🎬 <b>How to use Cinema Radar</b>\n{DIVIDER}\n\n"
+        f"🎬 <b>How to use Cinema Radar</b>\n{DIVIDER}\n"
+        "<i>Three steps, then we take it from there.</i>\n\n"
         "<b>1 · Add a watch</b>\n"
-        "Tap <b>➕ Add a watch</b>, then pick:\n"
+        "Tap <b>➕ Add a watch</b> and pick:\n"
         "• Branch\n"
         "• Date\n"
         "• Movie\n"
@@ -386,16 +415,16 @@ def help_text() -> str:
         "<b>2 · Wait for the alert</b>\n"
         "When booking opens or a seat comes back,\n"
         "you get a message with the booking link.\n\n"
-        "<b>3 · Control your alerts</b>\n"
+        "<b>3 · Stay in control</b>\n"
         "From <b>🎟️ My watches</b> you can:\n"
-        "• Choose the alert type\n"
+        "• Change the alert type\n"
         "• Snooze for an hour\n"
         "• Remove the watch\n\n"
         "<b>Can't find a movie?</b>\n"
         "Tap <b>🔎 Search by name</b> and type part of the title\n"
         "in Arabic or English.\n"
         "The bot tolerates typos too.\n\n"
-        "<b>Useful commands</b>\n"
+        "<b>Quick commands</b>\n"
         "/start — Main menu\n"
         "/add — Add a watch\n"
         "/search — Search for a movie\n"
@@ -405,9 +434,9 @@ def help_text() -> str:
         "/privacy — Privacy\n"
         "/delete_me — Delete my data\n"
         "/cancel — Cancel the current step\n\n"
-        "⚠️ The bot is unofficial and not affiliated with VOX or Renaissance Cinemas.\n"
+        "⚠️ <i>The bot is unofficial and not affiliated with VOX or Renaissance Cinemas.\n"
         "Data may be delayed or wrong,\n"
-        "and booking happens on the cinema's own site.\n\n"
+        "and booking happens on the cinema's own site.</i>\n\n"
         f"{version_line()}"
     )
 
@@ -487,10 +516,10 @@ def consent_declined() -> str:
 
 # ------------------------------------------------------------------ add watch
 def choose_cinema() -> str:
-    return (
-        f"🎬 <b>Choose a cinema</b>\n{DIVIDER}\n\n"
-        "Pick the cinema you want to watch at, or «All cinemas» to watch the movie "
-        "across every branch at once."
+    return _blocks(
+        f"🎬 <b>Choose a cinema</b>\n{DIVIDER}",
+        "Where do you want to watch?",
+        "Pick one cinema,\nor <b>All cinemas</b> to watch the movie across every branch at once.",
     )
 
 
@@ -521,11 +550,11 @@ def window_label(window: str, morning_end_hour: int = 17) -> str:
 
 def choose_window(movie: str, date: str, morning_end_hour: int = 17) -> str:
     cutoff = window_cutoff_text(morning_end_hour)
-    return (
-        f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}\n\n"
-        "Choose the period to watch across all cinemas:\n"
-        f"🌅 <b>Morning</b> — shows before {cutoff}\n"
-        f"🌙 <b>Evening</b> — shows from {cutoff}"
+    return _blocks(
+        f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}",
+        "Morning or evening?",
+        f"🌅 <b>Morning</b> — before {cutoff}",
+        f"🌙 <b>Evening</b> — from {cutoff}",
     )
 
 
@@ -537,27 +566,26 @@ def confirm_window(
     morning_end_hour: int = 17,
     required_seats: int = 1,
 ) -> str:
-    return (
-        f"🎬 <b>{esc(movie)}</b>\n{DIVIDER}\n\n"
-        f"📅 {relative_date(date)}\n"
-        f"🕐 {window_label(window, morning_end_hour)}\n"
-        f"🏢 {_count(branch_count, 'branch', 'branches')}\n"
-        f"{required_seats_line(required_seats)}\n\n"
-        "You'll watch every show in this period across all cinemas, and get a ping "
-        "when a new show opens or a seat comes back.\n\n"
-        "Confirm the watch?"
+    return _blocks(
+        f"🎬 <b>{esc(movie)}</b> · 📅 {relative_date(date)}\n{DIVIDER}",
+        f"{window_label(window, morning_end_hour)}\n"
+        f"{_count(branch_count, 'branch', 'branches')}\n"
+        f"{required_seats_line(required_seats)}",
+        "I'll watch every show in this period across all cinemas,\n"
+        "and message you when a new show opens or a seat comes back.",
+        "Confirm the watch?",
     )
 
 
 def watch_created_window(
     movie: str, date: str, window: str, branch_count: int, morning_end_hour: int = 17
 ) -> str:
-    return (
-        "✅ <b>Watch active</b>\n\n"
-        f"🎬 {esc(movie)}\n"
-        f"📅 {relative_date(date)} · 🕐 {window_label(window, morning_end_hour)}\n"
-        f"🏢 All cinemas ({_count(branch_count, 'branch', 'branches')})\n\n"
-        "I'll alert you when a new show opens in this period."
+    return _blocks(
+        f"✅ <b>Watch active</b>\n{DIVIDER}",
+        f"{esc(movie)}\n"
+        f"{relative_date(date)} · 🕐 {window_label(window, morning_end_hour)}\n"
+        f"All cinemas ({_count(branch_count, 'branch', 'branches')})",
+        "I'll message you when a new show opens in this period.",
     )
 
 
@@ -570,36 +598,48 @@ def no_showtimes_window(movie: str, date: str) -> str:
 
 
 def choose_branch() -> str:
-    return f"{step_header(1, 5, 'Branch')}\n\n<b>Pick a branch</b> 🏢"
+    return _blocks(
+        step_header(1, 5, "Branch"),
+        "🏢 <b>Pick a branch</b>",
+        "Where should we start?",
+    )
 
 
 def choose_date(branch: str) -> str:
-    return f"{step_header(2, 5, branch)}\n\n<b>Pick a date</b> 📅"
+    return _blocks(
+        step_header(2, 5, branch),
+        "📅 <b>Pick a date</b>",
+        "Choose the day that works for you.",
+    )
 
 
 def choose_movie(branch: str, date: str) -> str:
     path = f"{branch} › {relative_date(date)}"
-    return (
-        f"{step_header(3, 5, path)}\n\n"
-        "<b>Pick a movie</b> 🎞️\n"
-        "Can't find it? Tap <b>🔎 Search by name</b>."
+    return _blocks(
+        step_header(3, 5, path),
+        "🎞️ <b>Pick a movie</b>",
+        "Can't find it? Tap <b>🔎 Search by name</b>.",
     )
 
 
 def search_choose_branch(query: str = "") -> str:
-    head = f"{step_header(2, 5, 'Search')}\n\n"
+    head = step_header(2, 5, "Search")
     if query:
-        return f"{head}Searching for “<b>{esc(query)}</b>” 🔎\n\nPick the branch first:"
-    return f"{head}<b>Movie search</b> 🔎\n\nPick the branch first:"
+        return _blocks(
+            head,
+            f"🔎 <b>Searching for “{esc(query)}”</b>",
+            "Pick the branch first:",
+        )
+    return _blocks(head, "🔎 <b>Movie search</b>", "Pick the branch first:")
 
 
 def search_prompt(branch: str, date: str) -> str:
     path = f"{branch} › {relative_date(date)}"
-    return (
-        f"{step_header(3, 5, path)}\n\n"
-        "<b>Type the movie name</b> 🔎\n"
-        "In Arabic or English.\n"
-        "Typos are fine — part of the name is enough."
+    return _blocks(
+        step_header(3, 5, path),
+        "🔎 <b>Type the movie name</b>",
+        "In Arabic or English.",
+        "Typos are fine — part of the name is enough.",
     )
 
 
@@ -608,41 +648,39 @@ def search_too_short() -> str:
 
 
 def search_results(query: str, count: int, total: int) -> str:
-    return (
-        f"🔎 <b>Search results</b>\n\n"
-        f"“<b>{esc(query)}</b>”\n"
-        f"<b>{count}</b> of {_count(total, 'movie')}\n\n"
-        "Pick the movie you want:"
+    return _blocks(
+        "🔎 <b>Search results</b>",
+        f"“<b>{esc(query)}</b>”",
+        f"Found <b>{count}</b> of {_count(total, 'movie')}.",
+        "Pick the movie you want:",
     )
 
 
 def search_no_results(query: str, suggestions: list[str] | None = None) -> str:
-    lines = [f"🍿 <b>No results</b>\n\nNo movie close to “<b>{esc(query)}</b>” on that date."]
+    lines = [
+        "🍿 <b>No results</b>",
+        f"No movie close to “<b>{esc(query)}</b>” on that date.",
+    ]
     if suggestions:
-        lines += ["", "Did you mean one of these? Tap it 👇"]
+        lines.append("Did you mean one of these? Tap it 👇")
     else:
-        lines += [
-            "",
-            "Try part of the name,\nthe English title,\nor browse all movies.",
-        ]
-    return "\n".join(lines)
+        lines.append("Try part of the name,\nthe English title,\nor browse all movies.")
+    return _blocks(*lines)
 
 
 def choose_showtime(movie: str, date: str, extra: str = "") -> str:
     path = f"{relative_date(date)} › {movie}"
-    lines = [step_header(4, 5, path), ""]
+    lines = [step_header(4, 5, path)]
     if extra:
-        lines += [extra, ""]
+        lines.append(extra)
     lines += [
-        "<b>Pick the showtime you want to watch</b> 🎟️",
-        "",
-        "🟢 Available — you can book now",
-        "🔴 Sold out — fully booked",
+        "🎟️ <b>Pick the showtime you want to watch</b>",
+        "🟢 Available — book now\n"
+        "🔴 Sold out — fully booked\n"
         "⚪ Not on sale yet — wait for the alert",
-        "",
         "Want a specific format (IMAX, 4DX, VIP…)?\nPick it from the buttons above.",
     ]
-    return "\n".join(lines)
+    return _blocks(*lines)
 
 
 def format_label(value: object) -> str:
@@ -692,66 +730,74 @@ def confirm_watch(
         note = "This show is available now — you can book right away, and I'll watch it if seats run out."
     else:
         note = "I'll watch this show and message you when anything changes."
-    return (
-        f"{step_header(6, 6, 'Confirm')}\n\n"
-        "<b>Confirm watch</b>\n\n"
-        f"🎬 {esc(movie)}\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)} ({format_date(date)})\n"
-        f"🕐 {format_time(time)} · {esc(hall)}\n"
-        f"{required_seats_line(required_seats)}\n\n"
-        f"{note}"
+    return _blocks(
+        step_header(6, 6, "Confirm"),
+        "🎬 <b>Review your watch</b>",
+        f"{esc(movie)}\n"
+        f"{esc(branch)}\n"
+        f"{relative_date(date)} ({format_date(date)})\n"
+        f"{format_time(time)} · {esc(hall)}\n"
+        f"{required_seats_line(required_seats)}",
+        note,
+        "Looks good? Confirm below ✅",
     )
 
 
 def no_data() -> str:
-    return (
-        "⏳ <b>Still fetching data</b>\n\n"
-        "The cinema isn't responding right now.\n"
-        "Try again in a minute 🙏\n\n"
+    return _blocks(
+        f"⏳ <b>Still fetching data</b>\n{DIVIDER}",
+        "The cinema isn't responding right now.\nTry again in a minute 🙏",
         "<i>I don't send requests to the cinema site while you browse,\n"
-        "so the bot stays reliable.</i>"
+        "so the bot stays reliable.</i>",
     )
 
 
 def loading_branches() -> str:
-    return "⏳ <b>Loading branches…</b>\n\nOne moment."
+    return _blocks("⏳ <b>Loading branches…</b>", "One moment 🙏")
 
 
 def loading_showtimes() -> str:
-    return "⏳ <b>Loading shows from all cinemas…</b>\n\nThis can take a few seconds."
+    return _blocks(
+        "⏳ <b>Loading shows from all cinemas…</b>",
+        "This can take a few seconds 🙏",
+    )
 
 
 def window_movie_prompt() -> str:
-    return "🔎 <b>Type the movie name</b>\n\nType the movie you want to watch across all cinemas (Arabic or English)."
+    return _blocks(
+        "🔎 <b>Type the movie name</b>",
+        "Type the movie you want to watch across all cinemas (Arabic or English).",
+    )
 
 
 def choose_date_all_cinemas() -> str:
-    return "📅 <b>Pick a day</b>\n\nPick the day you want to watch across all cinemas."
+    return _blocks(
+        "📅 <b>Pick a day</b>",
+        "Pick the day you want to watch across all cinemas.",
+    )
 
 
 def no_dates() -> str:
-    return (
-        "📅 <b>No dates available</b>\n\n"
-        "This branch hasn't opened any dates yet.\n\n"
-        "Try another branch, or wait a bit."
+    return _blocks(
+        f"📅 <b>No dates available</b>\n{DIVIDER}",
+        "This branch hasn't opened any dates yet.",
+        "Try another branch, or wait a bit.",
     )
 
 
 def no_movies() -> str:
-    return (
-        "🎬 <b>Booking isn't open yet</b>\n\n"
-        "No movies are available on that date right now.\n\n"
-        "Try another date,\n"
-        "and when showtimes appear they'll be right here."
+    return _blocks(
+        f"🎬 <b>Booking isn't open yet</b>\n{DIVIDER}",
+        "No movies are available on that date right now.",
+        "Try another date,\nand when showtimes appear they'll be right here.",
     )
 
 
 def no_showtimes() -> str:
-    return (
-        "🎟️ <b>No showtimes</b>\n\n"
-        "Booking isn't open for this movie on that date yet.\n\n"
-        "Try another movie or date."
+    return _blocks(
+        f"🎟️ <b>No showtimes</b>\n{DIVIDER}",
+        "Booking isn't open for this movie on that date yet.",
+        "Try another movie or date.",
     )
 
 
@@ -773,18 +819,16 @@ def imax_line(status: str | None) -> str:
 
 
 def movie_info(name: str, synopsis: str | None, facts: str = "", extra: str = "") -> str:
-    lines = [f"🎬 <b>{esc(name)}</b>"]
+    lines = [f"🎬 <b>{esc(name)}</b>\n{DIVIDER}"]
     if facts:
         lines.append(facts)
     if extra:
         lines.append(extra)
     if synopsis:
-        lines.append("")
-        lines.append(esc(synopsis))
+        lines.append(f"<i>{esc(synopsis)}</i>")
     else:
-        lines.append("")
-        lines.append("No synopsis is available for this movie yet.")
-    return "\n".join(lines)
+        lines.append("<i>No synopsis is available for this movie yet.</i>")
+    return _blocks(*lines)
 
 
 def confirm_movie_watch(
@@ -806,15 +850,16 @@ def confirm_movie_watch(
     ticket = f"🎟️ All showtimes ({_count(count, 'showtime')})"
     if hall:
         ticket = f"🎭 {esc(hall)} — all showtimes ({_count(count, 'showtime')})"
-    return (
-        f"{step_header(6, 6, 'Confirm')}\n\n"
-        "<b>Confirm full-day watch</b>\n\n"
-        f"🎬 {esc(movie)}\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)} ({format_date(date)})\n"
+    return _blocks(
+        step_header(6, 6, "Confirm"),
+        "🎬 <b>Review your full-day watch</b>",
+        f"{esc(movie)}\n"
+        f"{esc(branch)}\n"
+        f"{relative_date(date)} ({format_date(date)})\n"
         f"{ticket}\n"
-        f"{required_seats_line(required_seats)}\n\n"
-        f"{note}"
+        f"{required_seats_line(required_seats)}",
+        note,
+        "Looks good? Confirm below ✅",
     )
 
 
@@ -822,27 +867,26 @@ def watch_created_movie(
     branch: str, date: str, movie: str, count: int, hall: str | None = None
 ) -> str:
     format_text = f"\n🎭 {esc(hall)}" if hall else ""
-    return (
-        "✅ <b>Watch added</b>\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)}{format_text}\n"
-        f"🎟️ Every showtime ({_count(count, 'showtime')})\n\n"
-        "As soon as any booking opens or seats come back,\n"
-        "you'll get a message.\n\n"
-        "Set the alert type in <b>⚙️ Alert settings</b>."
+    return _blocks(
+        f"✅ <b>Watch active</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n"
+        f"{esc(branch)}\n"
+        f"{relative_date(date)}{format_text}\n"
+        f"🎟️ Every showtime ({_count(count, 'showtime')})",
+        "As soon as any booking opens or seats come back,\nyou'll get a message.",
+        "Set the alert type in <b>⚙️ Alert settings</b>.",
     )
 
 
 def watch_created(branch: str, date: str, movie: str, time: str, hall: str) -> str:
-    return (
-        "✅ <b>Watch added</b>\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)} · {format_time(time)}\n"
-        f"🎭 {esc(hall)}\n\n"
-        "You'll get a message when anything changes.\n\n"
-        "Set the alert type in <b>⚙️ Alert settings</b>."
+    return _blocks(
+        f"✅ <b>Watch active</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n"
+        f"{esc(branch)}\n"
+        f"{relative_date(date)} · {format_time(time)}\n"
+        f"{esc(hall)}",
+        "You'll get a message when anything changes.",
+        "Set the alert type in <b>⚙️ Alert settings</b>.",
     )
 
 
@@ -854,37 +898,37 @@ def confirm_all_dates(
     required_seats: int = 1,
 ) -> str:
     format_text = f"\n🎭 {esc(hall)}" if hall else ""
-    return (
-        f"{step_header(6, 6, 'Confirm')}\n\n"
-        "<b>Confirm watch on every date</b>\n\n"
-        f"🏢 {esc(branch)}\n"
-        f"🎬 {esc(movie)}\n"
-        f"📅 Every date available now ({_count(count, 'day')}){format_text}\n"
-        f"{required_seats_line(required_seats)}\n\n"
-        "I'll watch every day this movie plays at this branch, plus any new date that opens.\n"
-        "When booking opens or seats come back, you'll get a message."
+    return _blocks(
+        step_header(6, 6, "Confirm"),
+        "🎬 <b>Review your every-date watch</b>",
+        f"{esc(branch)}\n"
+        f"{esc(movie)}\n"
+        f"Every date available now ({_count(count, 'day')}){format_text}\n"
+        f"{required_seats_line(required_seats)}",
+        "I'll watch every day this movie plays at this branch,\n"
+        "plus any new date that opens.\n"
+        "When booking opens or seats come back, you'll get a message.",
+        "Looks good? Confirm below ✅",
     )
 
 
 def watch_created_all_dates(branch: str, movie: str, count: int, hall: str | None = None) -> str:
     format_text = f"\n🎭 {esc(hall)}" if hall else ""
-    return (
-        "✅ <b>Watch added</b>\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}{format_text}\n"
-        f"📅 Every available date ({_count(count, 'day')})\n\n"
-        "If a new date opens or seats come back,\n"
-        "you'll get a message.\n\n"
-        "Set the alert type in <b>⚙️ Alert settings</b>."
+    return _blocks(
+        f"✅ <b>Watch active</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n"
+        f"{esc(branch)}{format_text}\n"
+        f"Every available date ({_count(count, 'day')})",
+        "If a new date opens or seats come back,\nyou'll get a message.",
+        "Set the alert type in <b>⚙️ Alert settings</b>.",
     )
 
 
 def all_dates_unavailable() -> str:
-    return (
-        "📅 <b>No dates available</b>\n\n"
-        "This branch hasn't opened any dates yet.\n\n"
-        "Try a specific date,\n"
-        "or wait for booking to open."
+    return _blocks(
+        f"📅 <b>No dates available</b>\n{DIVIDER}",
+        "This branch hasn't opened any dates yet.",
+        "Try a specific date,\nor wait for booking to open.",
     )
 
 
@@ -895,49 +939,50 @@ def watch_limit_reached(
     is_supporter: bool = False,
 ) -> str:
     if is_supporter:
-        return (
-            "⚠️ <b>You've reached the maximum</b>\n\n"
-            f"You have <b>{_count(limit, 'watch', 'watches')}</b>.\n\n"
-            "Remove an old watch from <b>My watches</b>\n"
-            "to add a new one."
+        return _blocks(
+            f"⚠️ <b>You've reached the maximum</b>\n{DIVIDER}",
+            f"You have <b>{_count(limit, 'watch', 'watches')}</b>.",
+            "Remove an old watch from <b>My watches</b>\nto add a new one.",
         )
-    return (
-        "⚠️ <b>You've reached the free limit</b>\n\n"
-        f"You have <b>{_count(limit, 'watch', 'watches')}</b>, which is the free limit.\n\n"
+    return _blocks(
+        f"⚠️ <b>You've reached the free limit</b>\n{DIVIDER}",
+        f"You have <b>{_count(limit, 'watch', 'watches')}</b>, which is the free limit.",
         f"To reach <b>{_count(supporter_limit, 'watch', 'watches')}</b>,\n"
         "you can support the project <b>once</b>\n"
-        f"with a minimum of <b>{min_amount} EGP</b> from <b>Support the project</b> 💛\n\n"
-        "Or remove an old watch from <b>My watches</b>."
+        f"with a minimum of <b>{min_amount} EGP</b> from <b>Support the project</b> 💛",
+        "Or remove an old watch from <b>My watches</b>.",
     )
 
 
 def watches_trimmed(removed: int, limit: int) -> str:
-    return (
-        f"I trimmed {removed} of your watches because the new limit is "
-        f"<b>{_count(limit, 'watch', 'watches')}</b>.\n"
-        "The watches with the nearest dates stayed with you; you can add more from "
-        "<b>Support the project</b> or remove and add again."
+    return _blocks(
+        f"✂️ <b>Your watches were trimmed</b>\n{DIVIDER}",
+        f"I removed {removed} watch{'es' if removed != 1 else ''} "
+        f"because the new limit is <b>{_count(limit, 'watch', 'watches')}</b>.",
+        "The watches with the nearest dates stayed with you;\n"
+        "you can add more from <b>Support the project</b> or remove and add again.",
     )
 
 
 def duplicate_watch() -> str:
-    return "You already have this watch 👌"
+    return "You already have this watch 👌 I'll message you when something changes."
 
 
 # ------------------------------------------------------------------- my watches
 def no_watches() -> str:
-    return (
-        "🍿 <b>No watches yet</b>\n\n"
-        "Start with one movie,\n"
-        "and I'll message you when booking opens\n"
-        "or a seat comes back.\n\n"
-        "Tap <b>➕ Add a watch</b> below."
+    return _blocks(
+        f"🍿 <b>No watches yet</b>\n{DIVIDER}",
+        "Shall we start with one?",
+        "Pick a movie and a showtime,\nand we'll keep an eye on them.",
+        "When booking opens or a seat comes back,\nyou'll get a message right away.",
+        "Tap <b>➕ Add a watch</b> below.",
     )
 
 
 def watches_retention_note(days: int) -> str:
     return (
-        f"<i>Watches are removed automatically {_count(days, 'day')} after their show starts.</i>"
+        f"<i>🧹 Watches are removed automatically "
+        f"{_count(days, 'day')} after their show starts.</i>"
     )
 
 
@@ -948,19 +993,19 @@ def watches_group(date: str) -> str:
 
 
 def confirm_delete_all(count: int) -> str:
-    return (
-        "🗑️ <b>Are you sure?</b>\n\n"
-        f"I'll delete <b>{_count(count, 'active watch', 'active watches')}</b>. "
-        "This can't be undone, and you'd start over to watch them again."
+    return _blocks(
+        f"🗑️ <b>Are you sure?</b>\n{DIVIDER}",
+        f"I'll delete <b>{_count(count, 'active watch', 'active watches')}</b> — "
+        "and they can't be restored.",
+        "If you want them back, you'd start from scratch.",
     )
 
 
 def confirm_remove_watch(movie: str, when: str) -> str:
-    return (
-        "❌ <b>Remove this watch?</b>\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"📅 {esc(when)}\n\n"
-        "You won't get alerts about it anymore."
+    return _blocks(
+        f"❌ <b>Remove this watch?</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n{esc(when)}",
+        "You won't get alerts about it anymore.",
     )
 
 
@@ -1002,7 +1047,7 @@ def watch_row(
         ticket = f"🕐 {format_time(time)}{format_text} · {esc(state)}"
     lines = [
         f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}",
+        f"🏢 {cinema_name(provider)} · {esc(branch)} · {relative_date(date)}",
         ticket,
         f"🔔 {watch_mode_label(mode)}",
     ]
@@ -1025,9 +1070,7 @@ def watch_detail(
     provider: str = "vox",
     required_seats: int = 1,
 ) -> str:
-    snooze = (
-        f"⏰ Snoozed until {esc(snoozed_until_text)}" if snoozed_until_text else "⏰ Not snoozed"
-    )
+    snooze = f"Snoozed until {esc(snoozed_until_text)}" if snoozed_until_text else "Not snoozed"
     scope = scope or "showtime"
     format_text = f" · {esc(hall)}" if hall and hall != "*" else ""
     if scope == "movie_all_dates":
@@ -1036,15 +1079,15 @@ def watch_detail(
         ticket = f"🎟️ All showtimes{format_text}"
     else:
         ticket = f"🕐 {format_time(time)}{format_text}"
-    return (
-        f"⚙️ <b>Watch settings</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 ({cinema_name(provider)}) · {esc(branch)} · {relative_date(date)}\n"
-        f"{ticket}\n\n"
-        f"🔔 Alerts: <b>{watch_mode_label(mode)}</b>\n"
-        f"🪑 Alert when: <b>{_needed_seats(required_seats)} or more</b>\n"
-        f"{snooze}\n\n"
-        "Pick the alert type that suits you:"
+    return _blocks(
+        f"⚙️ <b>Watch settings</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n"
+        f"{cinema_name(provider)} · {esc(branch)} · {relative_date(date)}\n"
+        f"{ticket}",
+        f"Alerts: <b>{watch_mode_label(mode)}</b>\n"
+        f"Alert me at: <b>{_needed_seats(required_seats)} or more</b>\n"
+        f"{snooze}",
+        "Pick the alert type that suits you:",
     )
 
 
@@ -1070,24 +1113,21 @@ def watch_reminder(
     else:
         ticket = f"🕐 {format_time(time)}{format_text}"
     lines = [
-        "⏰ <b>Here's the watch you asked about</b>",
-        "",
-        f"🎬 <b>{esc(movie)}</b>",
-        f"🏢 {esc(branch)} · {relative_date(date)}",
-        ticket,
+        f"⏰ <b>Here's the watch you asked about</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n{esc(branch)} · {relative_date(date)}\n{ticket}",
     ]
     if scope != "movie_all_dates":
-        lines.append(f"Status now: {esc(state)}")
-    lines += ["", "Open the booking page and see what's available."]
-    return "\n".join(lines)
+        lines.append(f"📊 Status now: {esc(state)}")
+    lines.append("Open the booking page and see what's available.")
+    return _blocks(*lines)
 
 
 def watch_snoozed(until_text: str) -> str:
-    return f"Done ⏰ I'll hold alerts until {esc(until_text)}, then remind you."
+    return f"Done ⏰ I'll hold alerts until <b>{esc(until_text)}</b>, then remind you."
 
 
 def watch_unsnoozed() -> str:
-    return "Alerts are back ✅"
+    return "✅ Alerts are back on."
 
 
 def watch_removed_from_alert() -> str:
@@ -1095,29 +1135,28 @@ def watch_removed_from_alert() -> str:
 
 
 def watch_mode_set(mode: str | None) -> str:
-    return f"Done ✅ Alerts are now: {watch_mode_label(mode)}"
+    return f"✅ Alerts are now: <b>{watch_mode_label(mode)}</b>"
 
 
 def watch_removed() -> str:
-    return "Watch removed ✅"
+    return "✅ Watch removed."
 
 
 def all_watches_removed() -> str:
-    return "All watches deleted ✅"
+    return "✅ All watches deleted."
 
 
 def watch_expired_summary(items: list[str], more: int = 0) -> str:
     total = len(items) + more
-    lines = [f"🧹 <b>Removed {_count(total, 'finished watch', 'finished watches')}</b>", ""]
+    lines = [f"🧹 <b>Removed {_count(total, 'finished watch', 'finished watches')}</b>\n{DIVIDER}"]
     lines.extend(f"• {item}" for item in items)
     if more:
         lines.append(f"• and {_count(more, 'more watch', 'more watches')}")
     lines += [
-        "",
         "Their shows have already started, so I can't send alerts about them anymore.",
-        "To watch a new show, tap “Add a watch”.",
+        "To watch a new show, tap <b>➕ Add a watch</b>.",
     ]
-    return "\n".join(lines)
+    return _blocks(*lines)
 
 
 def watch_expired_row(movie: str, branch: str, date: str, showtime: str) -> str:
@@ -1132,14 +1171,13 @@ def alert_booking_opened(
     movie: str, hall: str, time: str, branch: str, seats: int | None, date: str
 ) -> str:
     seat_text = f"\n🪑 {_seats(seats)} available" if seats else ""
-    return (
-        f"🎟️ <b>Booking opened</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)} · {format_time(time)}\n"
-        f"🎭 {esc(hall)}"
-        f"{seat_text}\n\n"
-        "Book before it fills up."
+    return _blocks(
+        f"🎟️ <b>Booking opened</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n"
+        f"{esc(branch)}\n"
+        f"{relative_date(date)} · {format_time(time)}\n"
+        f"{esc(hall)}{seat_text}",
+        "Book before it fills up.",
     )
 
 
@@ -1147,14 +1185,14 @@ def alert_seats_available(
     movie: str, hall: str, time: str, branch: str, seats: int | None, date: str
 ) -> str:
     seat_text = f"<b>{_seats(seats)}</b> available now." if seats else "Seats are available now."
-    return (
-        f"🪑 <b>Seats are back</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)} · {format_time(time)}\n"
-        f"🎭 {esc(hall)}\n\n"
-        f"{seat_text}\n\n"
-        "Go grab them 🏃"
+    return _blocks(
+        f"🪑 <b>Seats are back</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n"
+        f"{esc(branch)}\n"
+        f"{relative_date(date)} · {format_time(time)}\n"
+        f"{esc(hall)}",
+        f"{seat_text}",
+        "Go grab them.",
     )
 
 
@@ -1168,14 +1206,10 @@ def alert_movie_booking_opened(
     joined = ", ".join(format_time(t) for t in times[:8])
     more = " and more" if len(times) > 8 else ""
     seat_text = f"\n🪑 {_seats(seats)} available" if seats else ""
-    return (
-        f"🎟️ <b>Booking opened for this movie</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)}\n"
-        f"🕐 {joined}{more}"
-        f"{seat_text}\n\n"
-        "Book before it fills up."
+    return _blocks(
+        f"🎟️ <b>Booking opened for this movie</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n{esc(branch)}\n{relative_date(date)}\n{joined}{more}{seat_text}",
+        "Book before it fills up.",
     )
 
 
@@ -1189,14 +1223,10 @@ def alert_movie_seats_available(
     joined = ", ".join(format_time(t) for t in times[:8])
     more = " and more" if len(times) > 8 else ""
     seat_text = f"\n🪑 {_seats(seats)} now available" if seats else ""
-    return (
-        f"🪑 <b>Seats are back for this movie</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)}\n"
-        f"🕐 {joined}{more}"
-        f"{seat_text}\n\n"
-        "Go grab them 🏃"
+    return _blocks(
+        f"🪑 <b>Seats are back for this movie</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n{esc(branch)}\n{relative_date(date)}\n{joined}{more}{seat_text}",
+        "Go grab them.",
     )
 
 
@@ -1210,27 +1240,20 @@ def alert_new_date(
     joined = ", ".join(format_time(t) for t in times[:8])
     more = " and more" if len(times) > 8 else ""
     hall_text = f"\n🎭 {esc(hall)}" if hall else ""
-    return (
-        f"📅 <b>A new date just opened</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)}"
-        f"{hall_text}\n"
-        f"🕐 {joined}{more}\n\n"
-        "Open the booking page and see what's available."
+    return _blocks(
+        f"📅 <b>A new date just opened</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n{esc(branch)}\n{relative_date(date)}{hall_text}\n{joined}{more}",
+        "Open the booking page and see what's available.",
     )
 
 
 def alert_new_showtimes(movie: str, branch: str, date: str, times: list[str]) -> str:
     joined = ", ".join(format_time(t) for t in times[:8])
     more = " and more" if len(times) > 8 else ""
-    return (
-        f"🕐 <b>New showtimes appeared</b>\n{DIVIDER}\n\n"
-        f"🎬 <b>{esc(movie)}</b>\n"
-        f"🏢 {esc(branch)}\n"
-        f"📅 {relative_date(date)}\n"
-        f"🕐 {joined}{more}\n\n"
-        "Open the booking page and see what's available."
+    return _blocks(
+        f"🕐 <b>New showtimes appeared</b>\n{DIVIDER}",
+        f"<b>{esc(movie)}</b>\n{esc(branch)}\n{relative_date(date)}\n{joined}{more}",
+        "Open the booking page and see what's available.",
     )
 
 
@@ -1268,7 +1291,7 @@ def movie_facts(
 
 
 def alert_footer() -> str:
-    return "Cinema Radar — alerts only, booking happens on the cinema site."
+    return "Cinema Radar · we only alert — booking happens on the cinema site."
 
 
 # ------------------------------------------------------------------- settings
@@ -1286,65 +1309,73 @@ def settings_text(
     types = ", ".join(event_type_label(t) for t in event_types) or "All types"
     branches = "All branches" if branch_count == 0 else _count(branch_count, "branch", "branches")
     hall = hall_type or "All halls"
-    watch_quiet = "includes watches ✅" if quiet_watches else "watches always alert 🔔"
-    return (
-        f"⚙️ <b>Settings</b>\n{DIVIDER}\n\n"
-        "<b>Notifications</b>\n"
+    watch_quiet = "and watches are included ✅" if quiet_watches else "watches always alert 🔔"
+    return _blocks(
+        f"⚙️ <b>Settings</b>\n{DIVIDER}",
+        "<b>🔔 Notifications</b>\n"
         f"• Seats back: {'on ✅' if notify_cancellations else 'off ⛔'}\n"
-        f"• Quiet hours: {format_time(f'{quiet_start}:00')} to {format_time(f'{quiet_end}:00')}\n"
+        f"• Quiet hours: {format_time(f'{quiet_start}:00')} → {format_time(f'{quiet_end}:00')}\n"
         f"  <i>{watch_quiet}</i>\n"
-        f"• New movies and bookings: {'on ✅' if discovery_enabled else 'off ⛔'}\n\n"
-        "<b>New-alert filters</b>\n"
+        f"• New movies and bookings: {'on ✅' if discovery_enabled else 'off ⛔'}",
+        "<b>🎯 New-alert filters</b>\n"
         f"• Branches: {esc(branches)}\n"
         f"• Types: {esc(types)}\n"
         f"• Hall: {esc(hall)}\n"
-        f"• Language: {'العربية' if (language or 'en') == 'ar' else 'English'}\n\n"
-        f"{version_line()}"
+        f"• Language: {'العربية' if (language or 'en') == 'ar' else 'English'}",
+        version_line(),
     )
 
 
 def quiet_hours_text(start: int, end: int, quiet_watches: bool = True) -> str:
     watches = (
-        "and watch alerts respect these hours too ✅"
+        "Watch alerts respect these hours too ✅"
         if quiet_watches
-        else "but watch alerts still arrive during these hours 🔔"
+        else "Watch alerts still arrive during these hours 🔔"
     )
-    return (
-        "<b>🕰️ Quiet hours</b>\n\n"
-        f"From <b>{format_time(f'{start}:00')}</b> to <b>{format_time(f'{end}:00')}</b>.\n"
-        "No alerts during these hours, unless the show is today or tomorrow.\n"
-        f"{watches}\n\n"
-        "Pick a preset, or tap <b>Custom time</b> and send something like <code>23-8</code>."
+    return _blocks(
+        f"🕰️ <b>Quiet hours</b>\n{DIVIDER}",
+        f"From <b>{format_time(f'{start}:00')}</b> to <b>{format_time(f'{end}:00')}</b>.",
+        "No alerts during these hours,\nunless the show is today or tomorrow.",
+        watches,
+        "Pick a preset, or tap <b>Custom time</b> and send something like <code>23-8</code>.",
     )
 
 
 def quiet_custom_prompt() -> str:
-    return (
-        "<b>🕰️ Custom time</b>\n\n"
-        "Send the start and end hours only, for example: <code>23-8</code> "
-        "(11 PM to 8 AM).\n"
-        "24-hour clock (0 = midnight)."
+    return _blocks(
+        f"🕰️ <b>Custom time</b>\n{DIVIDER}",
+        "Send the start and end hours only,\nfor example: <code>23-8</code> (11 PM to 8 AM).",
+        "24-hour clock (0 = midnight).",
     )
 
 
 def quiet_custom_invalid() -> str:
-    return "I didn't catch that time. Send something like <code>23-8</code> (11 PM to 8 AM)."
+    return "I didn't catch that time 🤔 Send something like <code>23-8</code> (11 PM to 8 AM)."
 
 
 def choose_branches_text() -> str:
-    return "Pick the branches you want alerts from (you can pick more than one):"
+    return _blocks(
+        "🏢 <b>Pick your branches</b>",
+        "Where should the alerts come from?\nYou can pick more than one.",
+    )
 
 
 def choose_event_types_text() -> str:
-    return "Pick the alert types:"
+    return _blocks(
+        "🎯 <b>Pick your alert types</b>",
+        "What do you want to hear about first?",
+    )
 
 
 def choose_hall_text() -> str:
-    return "Pick a hall type that your selected cinemas actually offer:"
+    return _blocks(
+        "🎭 <b>Pick a hall type</b>",
+        "I'll only show formats your\nselected cinemas actually offer.",
+    )
 
 
 def format_not_offered() -> str:
-    return "That format isn't offered by your selected cinemas."
+    return "That format isn't offered by your selected cinemas 🙏"
 
 
 def event_type_label(kind: str) -> str:
@@ -1358,73 +1389,86 @@ def event_type_label(kind: str) -> str:
 
 # -------------------------------------------------------------------- support
 def support_text(limit: int = 10, min_amount: int = 50) -> str:
-    return (
-        f"💛 <b>Support the project</b>\n{DIVIDER}\n\n"
-        "Cinema Radar is free for everyone,\n"
-        "and every user gets <b>2 watches</b> for free.\n\n"
-        "If you want more, you can support the project <b>once</b>\n"
+    return _blocks(
+        f"💛 <b>Support the project</b>\n{DIVIDER}",
+        "Cinema Radar is free for everyone,\nand every user gets <b>2 watches</b> for free.",
+        "Want more? You can support the project <b>once</b>\n"
         f"with a minimum of <b>{min_amount} EGP</b>,\n"
         f"and your limit becomes <b>{limit} watches</b> for good.\n"
-        "Not a monthly subscription.\n\n"
+        "Not a monthly subscription.",
         "Pay with Vodafone Cash or InstaPay,\n"
         "then send a screenshot of the transfer.\n"
-        "The admin reviews the proof and approves it.\n\n"
-        "Pick how you'd like to support:"
+        "The admin reviews the proof and approves it.",
+        "How would you like to support?",
     )
 
 
 def support_manual_text(method: str, phone: str, min_amount: int = 50) -> str:
     name = "Vodafone Cash" if method == "vodafone_cash" else "InstaPay"
-    return (
-        f"💛 <b>Support via {name}</b>\n\n"
-        "Send to this number:\n"
-        f"<code>{esc(phone)}</code>\n\n"
-        f"Minimum <b>{min_amount} EGP</b> — one time, not a subscription.\n\n"
+    return _blocks(
+        f"💛 <b>Support via {name}</b>\n{DIVIDER}",
+        f"Send to this number:\n<code>{esc(phone)}</code>",
+        f"Minimum <b>{min_amount} EGP</b> — one time, not a subscription.",
         "After paying, tap <b>I paid ✅</b>,\n"
         "then send the transfer screenshot or transaction ID.\n"
         "The admin reviews it,\n"
-        "and once approved your limit becomes <b>10 watches</b>.\n\n"
-        "⚠️ Transfers are not activated automatically."
+        "and once approved your limit becomes <b>10 watches</b>.",
+        "⚠️ <i>Transfers are not activated automatically.</i>",
     )
 
 
 def support_ask_amount(min_amount: int = 50) -> str:
-    return (
-        "💰 <b>How much did you send?</b>\n\n"
-        f"The minimum is <b>{min_amount} EGP</b>.\n"
-        "Pick an amount below,\n"
-        "or type it in digits (example: 75)."
+    return _blocks(
+        f"💰 <b>How much did you send?</b>\n{DIVIDER}",
+        f"The minimum is <b>{min_amount} EGP</b>.",
+        "Pick an amount below,\nor type it in digits (example: 75).",
     )
 
 
 def support_amount_invalid() -> str:
-    return "Type a valid amount in digits, for example: 50"
+    return "Type a valid amount in digits, for example: 50 🙏"
+
+
+def support_custom_amount_prompt() -> str:
+    return _blocks(
+        "✍️ <b>Type the amount</b>",
+        "How much did you send? Just the number (example: 75) 💰",
+    )
+
+
+def support_below_minimum_warning() -> str:
+    return "⚠️ That's below the minimum — it goes to the admin, who decides."
 
 
 def support_ask_proof(method: str) -> str:
     name = "Vodafone Cash" if method == "vodafone_cash" else "InstaPay"
-    return (
-        f"Send a screenshot of your {name} transfer, or type the transaction ID 📸\n"
-        "If you'd rather stop, tap Cancel."
+    return _blocks(
+        f"📸 <b>{name} transfer proof</b>",
+        "Send the transfer screenshot or the transaction ID.",
+        "If you'd rather stop, tap <b>Cancel</b>.",
     )
 
 
 def support_proof_received() -> str:
-    return (
-        "Proof sent to the admin ✅\n"
-        "Waiting for review — you'll get a message as soon as it's checked."
+    return _blocks(
+        "✅ <b>Proof received</b>",
+        "It's with the admin for review.\nYou'll get a message as soon as it's checked.",
     )
 
 
 def support_approved(amount: float | None = None, limit: int = 10) -> str:
     amount_text = f" ({amount:g} EGP)" if amount else ""
-    return f"Your support is confirmed{amount_text} ✅\nThank you so much 💛 Your limit is now <b>{limit}</b>."
+    return _blocks(
+        f"✅ <b>Your support is confirmed{amount_text}</b>",
+        f"Thank you so much 💛\nYour limit is now <b>{_count(limit, 'watch', 'watches')}</b>.",
+    )
 
 
 def support_rejected() -> str:
-    return (
-        "Sorry, the transfer proof isn't clear or the transfer isn't complete ❌\n"
-        "You can send it again from <b>Support the project</b>."
+    return _blocks(
+        f"❌ <b>The proof isn't clear</b>\n{DIVIDER}",
+        "The transfer isn't complete,\nor the screenshot is hard to read.",
+        "You can send it again from <b>Support the project</b>.",
     )
 
 
@@ -1444,13 +1488,13 @@ def support_admin_new(
     name = "Vodafone Cash" if method == "vodafone_cash" else "InstaPay"
     amount_text = f"{amount:g} EGP" if amount else "Not specified"
     warning = f"\n⚠️ <b>Below the minimum ({min_amount} EGP)</b>" if below_minimum else ""
-    return (
-        f"<b>New support proof #{donation_id}</b>{warning}\n"
+    return _blocks(
+        f"<b>New support proof #{donation_id}</b>{warning}\n{DIVIDER}",
         f"User: <code>{user_id}</code>\n"
         f"Method: {name}\n"
         f"Amount: {esc(amount_text)}\n"
-        f"Note: {esc(note or '—')}\n\n"
-        "Review the proof, then decide:"
+        f"Note: {esc(note or '—')}",
+        "Review the proof, then decide:",
     )
 
 
@@ -1465,10 +1509,10 @@ def support_not_configured() -> str:
 
 # ------------------------------------------------------------------- feedback
 def feedback_categories_text() -> str:
-    return (
-        "✍️ <b>Send us feedback</b>\n\n"
-        "Pick the type first, then write the details in one message.\n"
-        "Every message reaches the admin and helps us improve the bot."
+    return _blocks(
+        f"✍️ <b>Send us feedback</b>\n{DIVIDER}",
+        "Pick the type first,\nthen write the details in one message.",
+        "Every message reaches the admin\nand helps us improve the bot.",
     )
 
 
@@ -1483,20 +1527,23 @@ def feedback_category_label(category: str) -> str:
 
 def feedback_text(category: str | None = None) -> str:
     label = feedback_category_label(category) if category else "Feedback"
-    return (
-        "✍️ <b>Send feedback</b>\n\n"
-        f"Type: <b>{esc(label)}</b>\n\n"
-        "Write your feedback or idea in one message.\n"
-        "Every message reaches the admin and helps us improve the bot."
+    return _blocks(
+        f"✍️ <b>Send feedback</b>\n{DIVIDER}",
+        f"Type: <b>{esc(label)}</b>",
+        "Write your feedback or idea in one message.",
+        "Every message reaches the admin\nand helps us improve the bot.",
     )
 
 
 def feedback_thanks() -> str:
-    return "Thanks! We got your feedback ✅"
+    return _blocks(
+        "✅ <b>We got your feedback</b>",
+        "Thanks for helping us improve the bot 💛",
+    )
 
 
 def feedback_too_soon() -> str:
-    return "We got feedback from you recently. Try again in an hour 🙏"
+    return "We got feedback from you recently 🙏 Try again in an hour."
 
 
 def feedback_admin(
@@ -1509,7 +1556,7 @@ def feedback_admin(
     else:
         who = f"<code>{user_id}</code>"
     reference = f"\n\n<i>ID: <code>{user_id}</code></i>" if username or first_name else ""
-    return f"<b>New feedback</b> from {who}:\n\n{esc(text)}{reference}"
+    return f"<b>✍️ New feedback</b>\n{DIVIDER}\n\nFrom {who}:\n\n{esc(text)}{reference}"
 
 
 # ------------------------------------------------------------------ discovery
@@ -1543,7 +1590,7 @@ def discovery_new_movie(
         "🍿 <b>A new movie just opened</b>",
         DIVIDER,
         _place(movie, branch, provider),
-        f"📅 from {relative_date(date)}" if date else "",
+        f"📅 From {relative_date(date)}" if date else "",
         f"🎭 {esc(hall)}" if hall else "",
         "✨ <i>First showtimes are live — book early.</i>",
     )
@@ -1559,7 +1606,7 @@ def discovery_new_date(
         "📅 <b>A new date just opened</b>",
         DIVIDER,
         _place(movie, branch, provider),
-        f"📅 from {relative_date(date)}",
+        f"📅 From {relative_date(date)}",
         "🗓️ <i>The new dates are bookable now — pick your slot.</i>",
     )
 
@@ -1594,7 +1641,7 @@ def discovery_upcoming_released(
         "🍿 <b>Finally — the movie you were waiting for is here</b>",
         DIVIDER,
         _place(movie, branch, provider),
-        f"📅 from {relative_date(date)}" if date else "",
+        f"📅 From {relative_date(date)}" if date else "",
         f"🎭 {esc(hall)}" if hall else "",
         "🎬 <i>Book before it fills up.</i>",
     )
@@ -1630,56 +1677,56 @@ def discovery_channel(event_text: str) -> str:
 
 # ---------------------------------------------------------------------- admin
 def admin_text(data: dict[str, object]) -> str:
-    return (
-        f"🛠️ <b>Admin panel</b>\n{DIVIDER}\n\n"
-        "<b>People</b>\n"
+    return _blocks(
+        f"🛠️ <b>Admin panel</b>\n{DIVIDER}",
+        "<b>👥 People</b>\n"
         f"• Active users: <b>{data.get('active_users', 0)}</b>\n"
         f"• Supporters: <b>{data.get('supporters', 0)}</b>\n"
-        f"• Active watches: <b>{data.get('active_watches', 0)}</b>\n\n"
-        "<b>Network</b>\n"
+        f"• Active watches: <b>{data.get('active_watches', 0)}</b>",
+        "<b>🌐 Network</b>\n"
         f"• Requests/min: <b>{data.get('requests_per_minute', 0):.1f}</b>\n"
         f"• Cache hit ratio: <b>{data.get('cache_hit_ratio', 0):.0%}</b>\n"
         f"• Active targets: <b>{data.get('active_targets', 0)}</b>\n"
         f"• Slowdown factor: <b>{data.get('slowdown_factor', 1):.2f}</b>\n"
         f"• Circuit breaker: <b>{esc(data.get('circuit_state', 'closed'))}</b>\n"
-        f"• Last request: <b>{esc(data.get('last_poll_status', '—'))}</b>\n\n"
-        "<b>Discovery and broadcast</b>\n"
+        f"• Last request: <b>{esc(data.get('last_poll_status', '—'))}</b>",
+        "<b>🛰️ Discovery and broadcast</b>\n"
         f"• Last discovery: <b>{esc(data.get('discovery_last_run', '—'))}</b>\n"
         f"• Events today: <b>{data.get('events_today', 0)}</b>\n"
         f"• Broadcasts: <b>{data.get('broadcasts_sent', 0)}</b>\n"
-        f"• Queue length: <b>{data.get('queue_length', 0)}</b>\n\n"
-        f"{version_line()}"
+        f"• Queue length: <b>{data.get('queue_length', 0)}</b>",
+        version_line(),
     )
 
 
 def admin_only() -> str:
-    return "This command is for the admin only."
+    return "🔒 This command is for the admin only."
 
 
 def grant_done(telegram_id: int, limit: int) -> str:
-    return f"Supporter access granted to <code>{telegram_id}</code> — limit {limit}."
+    return f"✅ Supporter access granted to <code>{telegram_id}</code> — limit <b>{limit}</b>."
 
 
 def revoke_done(telegram_id: int, limit: int) -> str:
-    return f"Supporter access revoked for <code>{telegram_id}</code> — limit {limit}."
+    return f"✅ Supporter access revoked for <code>{telegram_id}</code> — limit <b>{limit}</b>."
 
 
 # ------------------------------------------------------------ admin / system
 def admin_started() -> str:
-    return f"✅ Cinema Radar is running (v{esc(__version__)})."
+    return f"✅ <b>Cinema Radar is running</b> (v{esc(__version__)})."
 
 
 def admin_limits_applied(users: int, watches: int) -> str:
     if not users:
         return "✅ Watch limits applied (2 free / 10 supporters)."
-    return (
-        "✅ Watch limits applied (2 free / 10 supporters).\n"
-        f"{users} users affected, {watches} extra watches removed."
+    return _blocks(
+        "✅ Watch limits applied (2 free / 10 supporters).",
+        f"<b>{users}</b> users affected,\nand <b>{watches}</b> extra watches removed.",
     )
 
 
 def admin_unexpected_error(name: str) -> str:
-    return f"⚠️ Unexpected error: {esc(name)}"
+    return f"⚠️ <b>Unexpected error</b>\n<i>{esc(name)}</i>"
 
 
 REASON_LABELS_EN = {
@@ -1726,26 +1773,27 @@ def admin_upstream_down(
     )
     blocks = [
         title,
-        f"🔎 Reason: {esc(reason_label(reason, provider))}",
-        f"📍 Where: {esc(place or '—')}",
-        f"🕒 Last success: {esc(last_success or '—')}",
+        f"<b>Reason</b>\n{esc(reason_label(reason, provider))}",
+        f"<b>Where</b>\n{esc(place or '—')}",
+        f"<b>Last success</b>\n{esc(last_success or '—')}",
     ]
     if affected:
-        blocks.append(f"👀 Affected watches: <b>{affected}</b>")
+        blocks.append(f"👀 <b>Affected watches</b>\n{affected}")
     if opened:
-        blocks.append("🛑 Alerting is paused — no alerts based on stale data until it recovers.")
+        blocks.append("🛑 <b>Alerts are paused</b>\nNo alerts from stale data until it recovers.")
         blocks.append(f"🔁 Trying again in {retry_seconds}s.")
     else:
         blocks.append(f"🔁 Retrying in {retry_seconds}s.")
         blocks.append("<i>If this keeps happening, I'll pause alerts and tell you.</i>")
-    return "\n\n".join(blocks)
+    return _blocks(*blocks)
 
 
 def admin_upstream_recovered(minutes: int, provider: str | None = None) -> str:
     cinema = cinema_name(provider)
-    if minutes <= 0:
-        return f"✅ <b>({cinema}) is back</b>\n\nData is updating again."
-    return f"✅ <b>({cinema}) is back</b> after {minutes} min\n\nData is updating again."
+    title = f"✅ <b>({cinema}) is back</b>"
+    if minutes > 0:
+        title += f" after {minutes} min"
+    return _blocks(title, "Data is updating again ✅")
 
 
 def stale_notice(minutes: int, degraded: bool) -> str:
@@ -1762,14 +1810,14 @@ def stale_notice(minutes: int, degraded: bool) -> str:
 
 
 def admin_status(data: dict[str, object]) -> str:
-    return (
-        "📡 <b>Connection status</b>\n{DIVIDER}\n\n"
+    return _blocks(
+        f"📡 <b>Connection status</b>\n{DIVIDER}",
         f"• State: <b>{esc(data.get('state', '—'))}</b>\n"
         f"• Last success: {esc(data.get('last_success', '—'))}\n"
         f"• Last error: {esc(data.get('last_error', '—'))}\n"
-        f"• Circuit breaker: <b>{esc(data.get('breaker', 'closed'))}</b>\n\n"
+        f"• Circuit breaker: <b>{esc(data.get('breaker', 'closed'))}</b>",
         f"• Active targets: <b>{data.get('targets', 0)}</b>\n"
-        f"• Affected watches: <b>{data.get('affected', 0)}</b>"
+        f"• Affected watches: <b>{data.get('affected', 0)}</b>",
     )
 
 
@@ -1789,11 +1837,10 @@ def admin_status_multi(data: dict[str, object]) -> str:
         f"• Active targets: <b>{data.get('targets', 0)}</b>\n"
         f"• Affected watches: <b>{data.get('affected', 0)}</b>"
     )
-    return (
-        "📡 <b>Connection status</b>\n{DIVIDER}\n\n"
-        + "\n\n".join(blocks)
-        + f"\n\n{DIVIDER}\n"
-        + footer
+    return _blocks(
+        f"📡 <b>Connection status</b>\n{DIVIDER}",
+        *blocks,
+        f"{DIVIDER}\n{footer}",
     )
 
 
@@ -1834,11 +1881,17 @@ def discovery_line_new_showtimes(name: object, times: tuple[str, ...]) -> str:
 
 # ---------------------------------------------------------------------- errors
 def error_expired() -> str:
-    return "This screen is out of date or the show changed. Tap /start and begin again."
+    return _blocks(
+        "⌛ <b>This screen is out of date</b>",
+        "The show changed or the page expired.\nTap /start and begin again.",
+    )
 
 
 def error_generic() -> str:
-    return "Something went wrong. Please try again in a moment 🙏"
+    return _blocks(
+        "😅 <b>A small hiccup</b>",
+        "Please try again in a moment 🙏",
+    )
 
 
 def rate_limited() -> str:
@@ -1846,23 +1899,32 @@ def rate_limited() -> str:
 
 
 def cancelled() -> str:
-    return "Cancelled. To go back to the menu, tap /start."
+    return _blocks(
+        "Cancelled ✅",
+        "To go back to the menu, tap /start.",
+    )
 
 
 def delete_me_confirm() -> str:
-    return (
-        "<b>Are you sure?</b>\n\n"
-        "I'll delete all your data: watches, alerts, feedback and support proofs. "
-        "This can't be undone."
+    return _blocks(
+        f"🗑️ <b>Are you sure?</b>\n{DIVIDER}",
+        "I'll delete everything:\nyour watches, alerts, feedback and support proofs.",
+        "This can't be undone.",
     )
 
 
 def delete_me_done() -> str:
-    return "All your data is deleted ✅\nYou can come back anytime with /start."
+    return _blocks(
+        "✅ <b>All your data is deleted</b>",
+        "You can come back anytime with /start.",
+    )
 
 
 def quiet_hours_set(start: int, end: int) -> str:
-    return f"Quiet hours set from {format_time(f'{start}:00')} to {format_time(f'{end}:00')} ✅"
+    return (
+        f"✅ <b>Quiet hours set</b>\n"
+        f"From {format_time(f'{start}:00')} to {format_time(f'{end}:00')}"
+    )
 
 
 def setting_saved() -> str:
@@ -1888,4 +1950,4 @@ def imax_override_done(movie_id: str, status: str, updated: int) -> str:
 
 
 def user_not_found() -> str:
-    return "User not found."
+    return "That user doesn't exist."

@@ -90,7 +90,7 @@ async def amount_custom(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(SupportFlow.waiting_amount)
     await edit(
         callback,
-        "اكتب المبلغ اللي حوّلته بالأرقام (مثال: 75) 💰",
+        strings.support_custom_amount_prompt(),
         proof_cancel_keyboard(),
     )
     await answer(callback)
@@ -113,7 +113,7 @@ async def amount_typed(message: Message, state: FSMContext, settings: Settings) 
     data = await state.get_data()
     warning = ""
     if amount < settings.donation_min_amount:
-        warning = "\n\n⚠️ المبلغ أقل من الحد الأدنى — هيتحول للأدمن وهو يقرر."
+        warning = "\n\n" + strings.support_below_minimum_warning()
     await send(
         message,
         strings.support_ask_proof(_method(data)) + warning,

@@ -365,7 +365,7 @@ def watches_keyboard(watches: list[dict[str, Any]], page: int = 0) -> Any:
     def label(watch: dict[str, Any]) -> str:
         scope = watch.get("scope") or "showtime"
         if scope == "movie_all_dates":
-            when = "📅 كل الأيام المتاحة"
+            when = strings.all_dates_label()
         else:
             detail = (
                 strings.BTN_ALL_SHOWTIMES
@@ -617,8 +617,10 @@ def support_keyboard() -> Any:
 
 def donation_amount_keyboard(min_amount: int = 50) -> Any:
     presets = [min_amount, min_amount * 2, min_amount * 4]
-    rows = [[_btn(f"{amount} جنيه", f"sup:amt:{amount}")] for amount in presets]
-    rows.append([_btn("مبلغ تاني", "sup:amtc")])
+    rows = [
+        [_btn(strings.donation_amount_label(amount), f"sup:amt:{amount}")] for amount in presets
+    ]
+    rows.append([_btn(strings.donation_custom_label(), "sup:amtc")])
     rows.append([_btn(strings.BTN_BACK, "menu:support"), _btn(strings.BTN_HOME, "menu:home")])
     return _markup(rows)
 
@@ -627,8 +629,16 @@ def donation_admin_keyboard(donation_id: int) -> Any:
     return _markup(
         [
             [
-                _btn("✅ موافقة", f"dn:a:{donation_id}", style="success"),
-                _btn("❌ رفض", f"dn:r:{donation_id}", style="danger"),
+                _btn(
+                    strings.donation_approve_label(),
+                    f"dn:a:{donation_id}",
+                    style="success",
+                ),
+                _btn(
+                    strings.donation_reject_label(),
+                    f"dn:r:{donation_id}",
+                    style="danger",
+                ),
             ]
         ]
     )
@@ -650,8 +660,14 @@ def proof_cancel_keyboard() -> Any:
 def feedback_categories_keyboard() -> Any:
     return _markup(
         [
-            [_btn("💡 اقتراح", "fc:idea"), _btn("🐞 مشكلة", "fc:bug")],
-            [_btn("🎬 فيلم ناقص", "fc:movie"), _btn("💬 حاجة تانية", "fc:other")],
+            [
+                _btn(strings.feedback_category_button("idea"), "fc:idea"),
+                _btn(strings.feedback_category_button("bug"), "fc:bug"),
+            ],
+            [
+                _btn(strings.feedback_category_button("movie"), "fc:movie"),
+                _btn(strings.feedback_category_button("other"), "fc:other"),
+            ],
             [_btn(strings.BTN_CANCEL, "menu:home")],
         ]
     )

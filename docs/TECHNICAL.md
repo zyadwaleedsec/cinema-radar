@@ -150,6 +150,21 @@ limitation; the screens themselves always follow the stored choice.
    signatures, and that English output contains no Arabic (except the bilingual
    picker and language names).
 
+Copy uses one editorial shape everywhere:
+
+- **Title** — one emoji and a bold headline, followed by the light `DIVIDER`.
+- **Blocks** — facts on their own lines, separated by blank lines. Emoji are
+  reserved for titles, buttons and list items, not for every fact row. Use the
+  private `_blocks(...)` helper instead of manual
+  `"\n\n".join(...)`; it drops empty blocks.
+- **Close** — one short, human line, with no emoji except the `👇` hint on
+  chooser screens. Confirmation screens can stop at their `✅` title.
+- **Arabic** — warm Egyptian dialect, short lines, no heavy MSA phrasing.
+- **English** — concise American English and sentence case.
+- **Stability** — copy changes must not alter flows, callback data or dynamic
+  values. Tests pin a few phrases (seat and watch counts, digest wording, times
+  and the English welcome line), so keep those anchors intact.
+
 ### Arabic metadata and search
 
 `metadata.py` wraps the TMDB client so display copy can follow the interface

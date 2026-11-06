@@ -7,7 +7,7 @@ look the same in rich messages and in the classic HTML fallback.
 from __future__ import annotations
 
 #: A thin rule used under titles and between cards.
-DIVIDER = "──────────"
+DIVIDER = "┈┈┈┈┈"
 
 _FILLED = "▰"
 _EMPTY = "▱"
