@@ -196,7 +196,7 @@ BTN_CONFIRM = "Confirm watch ✅"
 BTN_DELETE_ALL = "🗑️ Delete all"
 BTN_CONFIRM_DELETE_ALL = "Yes, delete all"
 BTN_OPEN_BOOKING = "🎟️ Open booking"
-BTN_WATCH_MOVIE = "🔔 Watch this movie"
+BTN_WATCH_MOVIE = "🔔 Watch a movie from these updates"
 BTN_STOP_ALERTS = "🔕 Stop these alerts"
 BTN_REMOVE_WATCH = "❌ Remove watch"
 BTN_CONFIRM_REMOVE_WATCH = "Yes, remove it"
@@ -1606,14 +1606,21 @@ def discovery_digest(
     lines: list[str],
     provider: str | None = None,
 ) -> str:
-    body = "\n".join(f"• {line}" for line in lines[:6])
-    more = f"\n<i>and {_count(count - 6, 'more update', 'more updates')}</i>" if count > 6 else ""
+    body = "\n".join(f"• {line}" for line in lines)
     return _blocks(
         f"🍿 <b>{_count(count, 'new update', 'new updates')} at "
         f"{cinema_name(provider)} · {esc(branch)}</b>",
         DIVIDER,
-        body + more,
+        body,
         "👀 <i>Take a look and pick your favourite.</i>",
+    )
+
+
+def discovery_watch_prompt() -> str:
+    return _blocks(
+        "🔔 <b>Which movie do you want to watch?</b>",
+        DIVIDER,
+        "Pick a movie from the updates above:",
     )
 
 
@@ -1809,20 +1816,20 @@ def admin_discovery_branch_failed(branch: object, error: object) -> str:
 
 # ------------------------------------------------------------------ discovery
 def discovery_line_upcoming(name: object) -> str:
-    return f"Just released: {esc(name)}"
+    return f"🏁 Just released: {esc(name)}"
 
 
 def discovery_line_new_movie(name: object) -> str:
-    return f"New movie: {esc(name)}"
+    return f"🆕 New movie: {esc(name)}"
 
 
 def discovery_line_new_date(name: object, date_text: str) -> str:
-    return f"New date open: {esc(name)} — {format_date(date_text)}"
+    return f"📅 New date open: {esc(name)} — {format_date(date_text)}"
 
 
 def discovery_line_new_showtimes(name: object, times: tuple[str, ...]) -> str:
     formatted = ", ".join(format_time(value) for value in times)
-    return f"New showtimes: {esc(name)} — {formatted}"
+    return f"🕐 New showtimes: {esc(name)} — {formatted}"
 
 
 # ---------------------------------------------------------------------- errors

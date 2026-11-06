@@ -73,7 +73,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (264 tests)
+├── tests/                  # pytest suite (272 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -408,7 +408,12 @@ Discovery reuses the same client, cache and breaker, and by default confirms a
 change by re-reading the provider cache
 (`DISCOVERY_CONFIRM_NETWORK=false`), so it does not create a second upstream
 request. Coming Soon is refreshed at most once per `COMING_SOON_INTERVAL`
-(default one hour), and movie details are cached for a week.
+(default one hour), and movie details are cached for a week. When one cycle
+produces several updates for the same branch they ship as a single digest that
+lists every line, one movie per chooser button. The digest stores each movie's
+branch, date, showtime, artwork and booking URL as JSON in
+`discovery_actions.payload`; tapping "watch a movie" therefore creates the
+watch locally instead of fetching showtimes again.
 
 The cross-cinema window watch ("All cinemas") stores one `scope="movie"` row
 per branch that has the movie, all sharing a `group_id` so the watch limit

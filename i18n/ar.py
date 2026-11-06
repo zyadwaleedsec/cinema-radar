@@ -196,7 +196,7 @@ BTN_CONFIRM = "أكد المراقبة ✅"
 BTN_DELETE_ALL = "🗑️ امسح الكل"
 BTN_CONFIRM_DELETE_ALL = "أيوه امسح الكل"
 BTN_OPEN_BOOKING = "🎟️ افتح الحجز"
-BTN_WATCH_MOVIE = "🔔 راقب الفيلم ده"
+BTN_WATCH_MOVIE = "🔔 راقب فيلم من التحديثات"
 BTN_STOP_ALERTS = "🔕 إيقاف التنبيهات دي"
 BTN_REMOVE_WATCH = "❌ شيل المراقبة"
 BTN_CONFIRM_REMOVE_WATCH = "أيوه شيلها"
@@ -1642,13 +1642,20 @@ def discovery_digest(
     lines: list[str],
     provider: str | None = None,
 ) -> str:
-    body = "\n".join(_rtl(f"• {line}") for line in lines[:6])
-    more = f"\n{_rtl(f'<i>وكمان {_updates(count - 6)}</i>')}" if count > 6 else ""
+    body = "\n".join(_rtl(f"• {line}") for line in lines)
     return _blocks(
         _rtl(f"🍿 <b>عندك {_updates(count)} في {cinema_name(provider)} · {_ltr(branch)}</b>"),
         _rtl(DIVIDER),
-        body + more,
+        body,
         _rtl("👀 <i>بص عليهم واختار اللي يعجبك.</i>"),
+    )
+
+
+def discovery_watch_prompt() -> str:
+    return _blocks(
+        _rtl("🔔 <b>تحب تراقب أنهي فيلم؟</b>"),
+        _rtl(DIVIDER),
+        _rtl("اختار الفيلم اللي عايز تراقبه من التحديثات اللي فوق:"),
     )
 
 
@@ -1863,20 +1870,20 @@ def admin_discovery_branch_failed(branch: object, error: object) -> str:
 
 # ------------------------------------------------------------------ discovery
 def discovery_line_upcoming(name: object) -> str:
-    return f"نزل أخيراً: {esc(name)}"
+    return f"🏁 نزل أخيراً: {esc(name)}"
 
 
 def discovery_line_new_movie(name: object) -> str:
-    return f"فيلم جديد: {esc(name)}"
+    return f"🆕 فيلم جديد: {esc(name)}"
 
 
 def discovery_line_new_date(name: object, date_text: str) -> str:
-    return f"حجز يوم جديد: {esc(name)} — {format_date(date_text)}"
+    return f"📅 حجز يوم جديد: {esc(name)} — {format_date(date_text)}"
 
 
 def discovery_line_new_showtimes(name: object, times: tuple[str, ...]) -> str:
     formatted = "، ".join(format_time(value) for value in times)
-    return f"حفلات جديدة: {esc(name)} — {formatted}"
+    return f"🕐 حفلات جديدة: {esc(name)} — {formatted}"
 
 
 # ---------------------------------------------------------------------- errors

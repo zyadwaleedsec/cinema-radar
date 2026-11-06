@@ -11,6 +11,21 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.8.2] - 2026-11-06
+
+### Fixed
+
+- Discovery alerts that bundle several updates now list every one of them. The
+  digest no longer stops at six lines with an "and N more updates" note, and
+  each line carries a small icon for its type (released, new movie, new date or
+  new showtimes).
+- The "watch a movie" button on a discovery alert works again. It now asks which
+  movie you mean and shows one button per movie from that alert; the watch is
+  created from the alert data with no extra cinema request, so an upstream
+  hiccup can no longer turn the button into an error.
+- The alert now stores the Telegram user id with its action, so the person who
+  received the alert is recognised when they tap its buttons.
+
 ## [2.8.1] - 2026-11-06
 
 ### Fixed

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from collections.abc import Iterable
 from typing import Any
 
@@ -666,6 +667,17 @@ def discovery_keyboard(token: str, booking_url: str | None) -> Any:
         rows.append([_btn(strings.BTN_OPEN_BOOKING, url=booking_url, style="success")])
     rows.append([_btn(strings.BTN_WATCH_MOVIE, f"dw:{token}")])
     rows.append([_btn(strings.BTN_STOP_ALERTS, "ds:stop")])
+    return _markup(rows)
+
+
+def discovery_movie_keyboard(token: str, choices: list[dict[str, Any]]) -> Any:
+    """One button per movie in a digest, so the user picks what to watch."""
+
+    rows = []
+    for index, choice in enumerate(choices):
+        label = str(choice.get("line") or choice.get("title") or choice.get("movie_name") or "")
+        # Button labels are plain text, so undo the HTML escaping used in the alert.
+        rows.append([_btn(html.unescape(label)[:60], f"dwm:{token}:{index}")])
     return _markup(rows)
 
 

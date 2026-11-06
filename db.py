@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS discovery_actions (
     movie_id TEXT NOT NULL,
     movie_name TEXT NOT NULL,
     provider TEXT NOT NULL DEFAULT 'vox',
+    payload TEXT,
     created_at TEXT NOT NULL
 );
 """
@@ -263,6 +264,7 @@ class Database:
         )
         await self._ensure_column("discovery_actions", "user_id", "INTEGER")
         await self._ensure_column("discovery_actions", "provider", "TEXT NOT NULL DEFAULT 'vox'")
+        await self._ensure_column("discovery_actions", "payload", "TEXT")
         await self._ensure_column("donations", "approved_at", "TEXT")
         await self._ensure_column("donations", "approved_by", "INTEGER")
         await self._ensure_column("donations", "below_minimum", "INTEGER NOT NULL DEFAULT 0")
@@ -1256,14 +1258,15 @@ class Database:
         movie_id: str,
         movie_name: str,
         provider: str = "vox",
+        payload: str | None = None,
     ) -> None:
         cutoff = (datetime.now(UTC) - timedelta(days=7)).isoformat(timespec="seconds")
         await self.execute("DELETE FROM discovery_actions WHERE created_at < ?", (cutoff,))
         await self.execute(
             """
             INSERT OR REPLACE INTO discovery_actions
-                (token, user_id, branch_id, branch_name, date, movie_id, movie_name, provider, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (token, user_id, branch_id, branch_name, date, movie_id, movie_name, provider, payload, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 token,
@@ -1274,6 +1277,7 @@ class Database:
                 movie_id,
                 movie_name,
                 provider,
+                payload,
                 utc_now_iso(),
             ),
         )

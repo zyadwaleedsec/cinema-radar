@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import secrets
 import time
@@ -112,7 +113,7 @@ class Broadcaster:
                 titles = await self._localized_titles(branch_events, sub.get("lang"))
                 with i18n.use(sub.get("lang")):
                     text, keyboard = await self._build_message(
-                        int(sub["user_id"]), branch_events, titles=titles
+                        int(sub["telegram_id"]), branch_events, titles=titles
                     )
                 # The overview strips cinema-scraped artwork, so every alert
                 # resolves official artwork from TMDB (cached for a month).
@@ -216,7 +217,7 @@ class Broadcaster:
 
     async def _build_message(
         self,
-        user_id: int,
+        telegram_id: int,
         events: list[DiscoveryEvent],
         titles: dict[str, str] | None = None,
     ) -> tuple[str, Any]:
@@ -235,13 +236,16 @@ class Broadcaster:
         token = secrets.token_urlsafe(16)
         await self.db.add_discovery_action(
             token,
-            user_id,
+            telegram_id,
             first.branch.id,
             first.branch.name,
             first.date or today_iso(self.settings.timezone),
             first.movie.id,
             first.movie.name,
             first.branch.provider,
+            payload=json.dumps(
+                _watch_choices(events, titles), ensure_ascii=False, separators=(",", ":")
+            ),
         )
         keyboard = discovery_keyboard(
             token=token,
@@ -263,6 +267,50 @@ class Broadcaster:
                 await self.sender.send(channel, text, photo_url=photo)
             except Exception:
                 logger.exception("Could not post to public channel")
+
+
+def _watch_choices(events: list[DiscoveryEvent], titles: dict[str, str]) -> list[dict[str, Any]]:
+    """One row per movie in this digest, with everything a watch needs.
+
+    The callback used to fetch showtimes again, which could fail upstream and
+    broke the button.  Storing the event payload makes the follow-up purely
+    local: the user picks a movie and the watch is created from this data.
+    """
+
+    choices: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for event in events:
+        key = (event.branch.provider, event.branch.id, event.movie.id)
+        if key in seen:
+            continue
+        seen.add(key)
+        showtime = event.showtime
+        movie = event.movie
+        choices.append(
+            {
+                "provider": event.branch.provider,
+                "branch_id": event.branch.id,
+                "branch_name": event.branch.name,
+                "date": event.date or "",
+                "movie_id": movie.id,
+                "movie_name": movie.name,
+                "title": titles.get(movie.name) or movie.name,
+                "line": _event_line(event, titles.get(movie.name)),
+                "showtime": showtime.time if showtime else "",
+                "hall_type": showtime.hall_type if showtime else "",
+                "booking_url": event.booking_url
+                or (showtime.booking_url if showtime else None)
+                or "",
+                "poster_url": movie.poster_url or "",
+                "duration_minutes": movie.duration_minutes,
+                "rating": movie.rating,
+                "language": movie.language,
+                "synopsis": movie.synopsis,
+                "trailer_url": movie.trailer_url,
+                "imax_status": movie.imax_status,
+            }
+        )
+    return choices
 
 
 def _event_text(event: DiscoveryEvent, title_override: str | None = None) -> str:
