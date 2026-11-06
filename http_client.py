@@ -523,6 +523,7 @@ class HttpClient:
         conditional: bool = True,
         target_key: str | None = None,
         allow_stale: bool = True,
+        headers: dict[str, str] | None = None,
     ) -> FetchResult:
         cached = await self.cache.get(cache_key, allow_stale=True)
 
@@ -557,12 +558,12 @@ class HttpClient:
                 + ("" if cached is None else " and stale data is not allowed here")
             )
 
-        headers: dict[str, str] = {}
+        request_headers: dict[str, str] = dict(headers or {})
         if cached is not None and conditional:
             if cached.etag:
-                headers["If-None-Match"] = cached.etag
+                request_headers.setdefault("If-None-Match", cached.etag)
             if cached.last_modified:
-                headers["If-Modified-Since"] = cached.last_modified
+                request_headers.setdefault("If-Modified-Since", cached.last_modified)
 
         last_exc: Exception | None = None
         attempts = max(0, self.settings.max_retries) + 1
@@ -576,7 +577,7 @@ class HttpClient:
                     self.last_request_at = now
                     self._request_times.append(now)
                     response = await self.session.get(
-                        url, headers=headers, timeout=self.settings.request_timeout
+                        url, headers=request_headers, timeout=self.settings.request_timeout
                     )
                 status = int(getattr(response, "status_code", 0))
                 self.last_status = status

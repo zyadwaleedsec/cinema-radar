@@ -20,9 +20,10 @@ bot watches that target and sends an alert with a button that opens the cinema's
 own booking page. The bot **never books, pays or logs in to the cinema site**;
 it only sends a link.
 
-VOX and Renaissance are supported. The active cinema is selected with
-`PROVIDER`; the provider contract keeps the watcher, discovery and bot layers
-unchanged when another cinema is added.
+VOX, Renaissance and Premiere are supported. The enabled cinemas are selected
+with `PROVIDERS`, with `PROVIDER` as the fallback brand; the provider contract
+keeps the watcher, discovery and bot layers unchanged when another cinema is
+added.
 
 ## Stack
 
@@ -323,17 +324,17 @@ is `vX.Y.Z`.
   due targets); 429 storms and the circuit breaker; stale-data suppression;
   watch expiry and retention; donation approval/rejection idempotency;
   free vs supporter limits; `/delete_me`; discovery baseline, one-shot events,
-  flapping and the daily cap; the VOX and Renaissance parsers; keyboards and UI
-  copy; catalog parity and English purity; the language gate and persistence;
-  and version / changelog consistency.
+  flapping and the daily cap; the VOX, Renaissance and Premiere parsers;
+  keyboards and UI copy; catalog parity and English purity; the language gate
+  and persistence; and version / changelog consistency.
 - `ruff check` and `ruff format --check` are clean; the suite runs without a
   Telegram token or network access.
 
 ## Future (not built)
 
-A cinema picker so one bot can serve VOX and Renaissance side by side. The
-provider contract and the `provider` columns already isolate them from the
-watcher, discovery and bot layers.
+More cinemas can be added without touching the watcher, discovery or bot
+layers: the provider contract and the `provider` columns already isolate them.
+The in-app cinema picker (VOX, Renaissance and Premiere side by side) is built.
 
 ## Deliverables
 

@@ -33,7 +33,12 @@ from metadata import TmdbMetadataService
 from middleware import LanguageMiddleware, RateLimitMiddleware
 from notifier import Notifier, TelegramSender
 from posters import TmdbPosterService
-from providers import ProviderRegistry, RenaissanceProvider, VoxProvider
+from providers import (
+    PremiereProvider,
+    ProviderRegistry,
+    RenaissanceProvider,
+    VoxProvider,
+)
 from scheduler import Scheduler
 from stats import StatsService
 from support import SupportService
@@ -120,11 +125,11 @@ async def run() -> None:
             imax = None
 
     def _provider(name: str) -> Any:
-        return (
-            RenaissanceProvider(http, cache, settings, posters=posters)
-            if name == "renaissance"
-            else VoxProvider(http, cache, settings, posters=posters)
-        )
+        if name == "renaissance":
+            return RenaissanceProvider(http, cache, settings, posters=posters)
+        if name == "premiere":
+            return PremiereProvider(http, cache, settings, posters=posters)
+        return VoxProvider(http, cache, settings, posters=posters)
 
     provider_objs = [_provider(name) for name in settings.providers]
     provider = provider_objs[0]

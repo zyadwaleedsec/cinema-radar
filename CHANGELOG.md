@@ -11,6 +11,42 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-06
+
+### Added
+
+- **Premiere Cinemas** is now a third cinema: Nile Cinema, Premiere Plaza,
+  Galaxy elManial, Premiere Point90 and Cima Arkan. Showtimes come from
+  Premiere's own public JSON API, including after-midnight sessions and the
+  exact experience names it sells (`PREMIUM`, `LUXE`, `CineComfort`, `Plus`,
+  `MAX`, `MX4D`, `Standard`).
+- Premiere appears in the cinema picker, all-cinemas watches, discovery,
+  coming-soon dates, search, format filters, alerts and onboarding.
+- Coming-soon titles from Premiere start their date picker at the first
+  screening day supplied by the API, not the marketing release date.
+- `PROVIDERS` now defaults to `vox,renaissance,premiere`. A pinned deployment
+  value must include `premiere` to enable the new cinema.
+- New settings: `PREMIERE_BASE_URL`, `PREMIERE_API_URL`,
+  `PREMIERE_TOKEN_TTL`, `PREMIERE_SHOWTIMES_TTL` and `PREMIERE_SNAPSHOT_TTL`.
+
+### Changed
+
+- The provider contract gained `showtimes_per_movie`. For Premiere one
+  movie+date request covers all five branches, so requests are coalesced and
+  cached per movie and day instead of per branch. Discovery shares a daily
+  snapshot so five branch overviews cost one batch rather than five times the
+  traffic.
+- `HttpClient.get()` accepts per-request headers, used for the bearer token and
+  the API's `Accept` header.
+
+### Notes
+
+- Premiere publishes no seat counts and no sold-out flag, so its sessions are
+  listed as available and watch alerts fire on new sessions rather than a
+  freed-seat total.
+- If Premiere ever returns encrypted responses, the provider stops and alerts
+  the admin once instead of reporting empty showtimes.
+
 ## [2.8.4] - 2026-11-06
 
 ### Changed

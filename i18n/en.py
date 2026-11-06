@@ -26,7 +26,11 @@ RTL = False
 
 def cinema_name(provider: str | None = None) -> str:
     code = (provider or get_provider() or _app_settings.provider).lower()
-    return "Renaissance" if code == "renaissance" else "VOX"
+    if code == "renaissance":
+        return "Renaissance"
+    if code == "premiere":
+        return "Premiere"
+    return "VOX"
 
 
 STATUS_LABELS_EN = {
@@ -52,6 +56,10 @@ FORMAT_LABELS_EN = {
     "BALCONE": "Balcone",
     "SPECIAL": "Special",
     "THEATRE": "Theatre",
+    "LUXE": "LUXE",
+    "CINECOMFORT": "CineComfort",
+    "PLUS": "Plus",
+    "MX4D": "MX4D",
     "3D": "3D",
     "2D": "2D",
 }
@@ -368,7 +376,7 @@ def onboard_intro(name: str = "") -> str:
         f"🎬 <b>Cinema Radar</b>\n{DIVIDER}",
         "<i>Your front-row friend 🍿</i>",
         f"Welcome{who} 👋",
-        "I watch VOX and Renaissance showtimes in Egypt,\n"
+        "I watch VOX, Renaissance and Premiere showtimes in Egypt,\n"
         "and message you the moment booking opens\n"
         "or a seat frees up — before the good ones go.",
         "No more refreshing the site yourself.",
@@ -434,7 +442,7 @@ def help_text() -> str:
         "/privacy — Privacy\n"
         "/delete_me — Delete my data\n"
         "/cancel — Cancel the current step\n\n"
-        "⚠️ <i>The bot is unofficial and not affiliated with VOX or Renaissance Cinemas.\n"
+        "⚠️ <i>The bot is unofficial and not affiliated with VOX, Renaissance or Premiere Cinemas.\n"
         "Data may be delayed or wrong,\n"
         "and booking happens on the cinema's own site.</i>\n\n"
         f"{version_line()}"
@@ -1755,6 +1763,8 @@ def format_place(place: str) -> str:
         return f"({cinema_name('vox')})" + place[3:]
     if place.startswith("renaissance"):
         return f"({cinema_name('renaissance')})" + place[len("renaissance") :]
+    if place.startswith("premiere"):
+        return f"({cinema_name('premiere')})" + place[len("premiere") :]
     return place
 
 

@@ -104,7 +104,11 @@ def _updates(value: int) -> str:
 
 def cinema_name(provider: str | None = None) -> str:
     code = (provider or get_provider() or _app_settings.provider).lower()
-    return "رينيسانس" if code == "renaissance" else "فوكس"
+    if code == "renaissance":
+        return "رينيسانس"
+    if code == "premiere":
+        return "بريمير"
+    return "فوكس"
 
 
 def format_time(value: str) -> str:
@@ -368,7 +372,7 @@ def onboard_intro(name: str = "") -> str:
         f"🎬 <b>سينما رادار</b>\n{DIVIDER}",
         "<i>رفيقك لحجز أول كرسي 🍿</i>",
         f"أهلاً بيك{who} 👋",
-        "بتابع حفلات VOX ورينيسانس في مصر،\n"
+        "بتابع حفلات VOX ورينيسانس وبريمير في مصر،\n"
         "وأبعتلك أول ما الحجز يفتح\n"
         "أو كرسي يرجع متاح — قبل ما الكراسي تطير.",
         "من غير ما تفضل تفتح الموقع كل شوية.",
@@ -434,7 +438,7 @@ def help_text() -> str:
         "/privacy — الخصوصية\n"
         "/delete_me — امسح بياناتي\n"
         "/cancel — إلغاء الخطوة\n\n"
-        "⚠️ <i>البوت غير رسمي وغير تابع لـ VOX أو Renaissance Cinemas.\n"
+        "⚠️ <i>البوت غير رسمي وغير تابع لـ VOX أو Renaissance أو Premiere Cinemas.\n"
         "البيانات ممكن تتأخر أو تكون غلط،\n"
         "والحجز بيتم على موقع السينما نفسه.</i>\n\n"
         f"{version_line()}"
@@ -1797,6 +1801,8 @@ def format_place(place: str) -> str:
         return f"({cinema_name('vox')})" + place[3:]
     if place.startswith("renaissance"):
         return f"({cinema_name('renaissance')})" + place[len("renaissance") :]
+    if place.startswith("premiere"):
+        return f"({cinema_name('premiere')})" + place[len("premiere") :]
     return place
 
 

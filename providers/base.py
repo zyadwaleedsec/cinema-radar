@@ -17,6 +17,7 @@ class UpstreamFormatError(RuntimeError):
 PROVIDER_DISPLAY = {
     "vox": "VOX",
     "renaissance": "Renaissance",
+    "premiere": "Premiere",
 }
 
 #: Screening formats each cinema actually sells.  The discovery settings
@@ -47,6 +48,20 @@ PROVIDER_FORMATS: dict[str, tuple[str, ...]] = {
         "VIP",
         "DBOX",
         "BALCONE",
+        "3D",
+        "2D",
+    ),
+    # Premiere publishes the experience exactly as the cinema names it.  Its
+    # LUXE / CineComfort / Plus rooms are not VOX concepts, so they are never
+    # mapped to VIP or PREMIUM.
+    "premiere": (
+        "PREMIUM",
+        "LUXE",
+        "MAX",
+        "MX4D",
+        "STANDARD",
+        "CINECOMFORT",
+        "PLUS",
         "3D",
         "2D",
     ),
@@ -88,6 +103,11 @@ def available_formats(branch_ids: object, enabled_providers: object) -> tuple[st
 
 class CinemaProvider(ABC):
     name: str = "base"
+
+    #: True when the upstream showtimes endpoint is per movie rather than a
+    #: whole branch/day page.  The watcher then passes ``movie_id`` and does
+    #: not coalesce two different movies into the same in-flight request.
+    showtimes_per_movie: bool = False
 
     @abstractmethod
     async def get_branches(self, force_refresh: bool = False) -> list[Branch]: ...

@@ -39,6 +39,10 @@ FORMAT_LABELS_AR = {
     "BALCONE": "Balcone",
     "SPECIAL": "Special",
     "THEATRE": "Theatre",
+    "LUXE": "LUXE",
+    "CINECOMFORT": "CineComfort",
+    "PLUS": "Plus",
+    "MX4D": "MX4D",
     "3D": "3D",
     "2D": "2D",
 }

@@ -137,7 +137,10 @@ fly secrets set CHANNEL_ID="-100xxxxxxxxxx"
 `DB_PATH` is already set in `fly.toml` to `/data/cinemaradar.sqlite3`, together
 with `HTTP_IMPERSONATE=chrome124` (VOX Egypt resets plain TLS clients).
 Everything else (providers, cache TTLs, quiet hours defaults) has a safe
-default in `config.py` and can stay unset.
+default in `config.py` and can stay unset. The default
+`PROVIDERS=vox,renaissance,premiere` includes Premiere: if you pin `PROVIDERS`
+in a Fly secret or env var, add `premiere` to that list or the new cinema stays
+hidden.
 
 Check what is configured:
 

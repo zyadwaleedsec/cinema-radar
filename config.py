@@ -88,10 +88,10 @@ def _env_choice(name: str, default: str, allowed: set[str]) -> str:
 
 
 def _parse_providers(raw: str) -> tuple[str, ...]:
-    """Parse the comma-separated ``PROVIDERS`` list; both cinemas by default."""
+    """Parse the comma-separated ``PROVIDERS`` list; every cinema by default."""
 
     values = tuple(item.strip().lower() for item in raw.split(",") if item.strip())
-    return values or ("vox", "renaissance")
+    return values or ("vox", "renaissance", "premiere")
 
 
 @dataclass(frozen=True)
@@ -108,7 +108,7 @@ class Settings:
     log_level: str = "INFO"
     timezone: str = "Africa/Cairo"
     provider: str = "vox"
-    providers: tuple[str, ...] = ("vox", "renaissance")
+    providers: tuple[str, ...] = ("vox", "renaissance", "premiere")
     # auto: rich messages with automatic classic fallback; rich: always try;
     # classic: HTML + inline keyboards only.
     ui_renderer: str = "auto"
@@ -116,6 +116,8 @@ class Settings:
     # ------------------------------------------------------------------ upstream
     http_base_url: str = "https://egy.voxcinemas.com"
     renaissance_base_url: str = "https://rnscinemas.com"
+    premiere_base_url: str = "https://premiere-cinemas.com"
+    premiere_api_url: str = "https://mifcentral-api.premiere-cinemas.com"
     http_user_agent: str = DEFAULT_USER_AGENT
     # APIs such as TMDB accept (and prefer) the fully identified UA.
     tmdb_user_agent: str = IDENTIFIED_USER_AGENT
@@ -139,6 +141,13 @@ class Settings:
     # branch page's ten-day strip.  Refreshed in the background, not per request.
     prebook_dates_ttl: int = 3 * 3600  # how often we re-scan movie pages
     prebook_dates_max_days: int = 120  # horizon for bookable Coming Soon dates
+    # Premiere's public API needs a bearer token embedded in its layout bundle.
+    premiere_token_ttl: int = 12 * 3600  # re-read the public bundle this often
+    # One movie+date response covers every branch, so it is cached per movie
+    # rather than per branch.  Ten minutes keeps upstream traffic low.
+    premiere_showtimes_ttl: int = 600
+    # Discovery's whole-day snapshot (all movies for one date, every branch).
+    premiere_snapshot_ttl: int = 600
 
     # ------------------------------------------------------------------ polling
     poll_open_with_seats: int = 100
@@ -228,6 +237,10 @@ class Settings:
             ui_renderer=_env_choice("UI_RENDERER", "auto", {"auto", "rich", "classic"}),
             http_base_url=_env("VOX_BASE_URL", "https://egy.voxcinemas.com"),
             renaissance_base_url=_env("RENAISSANCE_BASE_URL", "https://rnscinemas.com"),
+            premiere_base_url=_env("PREMIERE_BASE_URL", "https://premiere-cinemas.com"),
+            premiere_api_url=_env(
+                "PREMIERE_API_URL", "https://mifcentral-api.premiere-cinemas.com"
+            ),
             http_user_agent=_env("HTTP_USER_AGENT", DEFAULT_USER_AGENT),
             tmdb_user_agent=_env("TMDB_USER_AGENT", IDENTIFIED_USER_AGENT),
             http_impersonate=_env("HTTP_IMPERSONATE"),
@@ -244,6 +257,9 @@ class Settings:
             cache_stale_ttl=_env_int("CACHE_STALE_TTL", 7 * 24 * 3600),
             prebook_dates_ttl=_env_int("PREBOOK_DATES_TTL", 3 * 3600),
             prebook_dates_max_days=_env_int("PREBOOK_DATES_MAX_DAYS", 120),
+            premiere_token_ttl=_env_int("PREMIERE_TOKEN_TTL", 12 * 3600),
+            premiere_showtimes_ttl=_env_int("PREMIERE_SHOWTIMES_TTL", 600),
+            premiere_snapshot_ttl=_env_int("PREMIERE_SNAPSHOT_TTL", 600),
             poll_open_with_seats=_env_int("POLL_OPEN_WITH_SEATS", 100),
             poll_waiting_for_open=_env_int("POLL_WAITING_FOR_OPEN", 60),
             poll_sold_out=_env_int("POLL_SOLD_OUT", 120),

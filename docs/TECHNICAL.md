@@ -10,17 +10,18 @@ Implementation notes for developers and operators. For a friendly overview, see
 3. [Languages and versioning](#languages-and-versioning)
 4. [VOX Cinemas Egypt: what we found](#vox-cinemas-egypt-what-we-found)
 5. [Renaissance Cinemas provider](#renaissance-cinemas-provider)
-6. [Low-volume design](#low-volume-design)
-7. [Configuration](#configuration)
-8. [IMAX data](#imax-data)
-9. [Watch retention](#watch-retention)
-10. [Local setup](#local-setup)
-11. [Tests, lint and audit](#tests-lint-and-audit)
-12. [UI QA checklist](#ui-qa-checklist)
-13. [Deployment on a local laptop](#deployment-on-a-local-laptop)
-14. [Security and privacy](#security-and-privacy)
-15. [Terms of use of the source site](#terms-of-use-of-the-source-site)
-16. [Troubleshooting](#troubleshooting)
+6. [Premiere Cinemas provider](#premiere-cinemas-provider)
+7. [Low-volume design](#low-volume-design)
+8. [Configuration](#configuration)
+9. [IMAX data](#imax-data)
+10. [Watch retention](#watch-retention)
+11. [Local setup](#local-setup)
+12. [Tests, lint and audit](#tests-lint-and-audit)
+13. [UI QA checklist](#ui-qa-checklist)
+14. [Deployment on a local laptop](#deployment-on-a-local-laptop)
+15. [Security and privacy](#security-and-privacy)
+16. [Terms of use of the source site](#terms-of-use-of-the-source-site)
+17. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -64,6 +65,7 @@ cinema-radar/
 │   └── theme.py            # dividers, progress bars and shared visual tokens
 ├── providers/
 │   ├── base.py             # CinemaProvider abstraction + registry
+│   ├── premiere.py         # Premiere Cinemas JSON API provider
 │   ├── renaissance.py      # Renaissance Cinemas provider and parsers
 │   └── vox.py              # VOX Egypt provider and pure HTML parsers
 ├── data/imax_films.json    # generated IMAX snapshot (CC BY-SA 4.0, see below)
@@ -318,8 +320,9 @@ silently hammering the site.
 
 ## Renaissance Cinemas provider
 
-Both cinemas run together by default (`PROVIDERS=vox,renaissance`). Set
-`PROVIDERS=renaissance` to run the same bot against only
+Renaissance runs alongside VOX and Premiere by default
+(`PROVIDERS=vox,renaissance,premiere`). Set `PROVIDERS=renaissance` to run the
+same bot against only
 [`rnscinemas.com`](https://rnscinemas.com). The provider lives in
 `providers/renaissance.py` and implements the same `CinemaProvider` contract,
 so the watcher, scheduler, cache, alerts and discovery need no changes.
@@ -388,6 +391,104 @@ dates into `get_dates`.
 
 ---
 
+## Premiere Cinemas provider
+
+Premiere ([`premiere-cinemas.com`](https://premiere-cinemas.com)) is a Next.js
+site backed by its own public JSON API. The provider lives in
+`providers/premiere.py`; it implements the `CinemaProvider` contract and only
+adds the `showtimes_per_movie` capability described below. The five branches
+are Nile Cinema, Premiere Plaza, Galaxy elManial, Premiere Point90 and Cima
+Arkan (API ids `1`–`5`).
+
+### Endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/v1/hybrid/get-now-showing-movies?lang_id=1` | Every film with its playable dates and branch list |
+| `GET /api/v1/hybrid/get-movie-show-times/<unique>?fromDate=YYYY-MM-DD&lang_id=1` | Every branch's sessions for one film and day |
+| `GET /api/v1/hybrid/get-movie-show-dates/<unique>?cinema_id=N` | One film's sellable days at one branch |
+
+The identifier in the showtimes path is the listing's
+`movie_unique_identifier` (for example `6901.192`), not the numeric
+`movie_id`. Older watches stored the numeric id, so the provider resolves it
+through the listing before fetching. `Movie.id` and `Movie.slug` are the
+unique identifier.
+
+### Token and headers
+
+The API expects `Authorization: Bearer <jwt>`. That token is public: it is
+embedded in the site's layout bundle
+(`/_next/static/chunks/app/[lang]/layout-<hash>.js`). The provider reads the
+home page once, extracts the layout URL from the HTML (or the home document
+itself), then extracts the JWT; it is cached for `PREMIERE_TOKEN_TTL` and
+shared behind an `asyncio.Lock` so a burst of snapshot requests does not
+re-download the bundle. A `401`/`403` triggers one forced token refresh.
+
+Requests deliberately omit the `x-web-security` header. Without it the API
+answers plain JSON; with it the response is `{"encryptedData": ...}`. The
+provider also does **not** send the shared browser-shaped `Accept` header
+(it contains `application/xml` and `*/*`, which the Premiere edge tarpits);
+token requests use `Accept: text/html` for the home page and `*/*` for the
+bundle, while API calls send `Accept: application/json`.
+
+If the API ever starts returning `encryptedData` regardless of headers, the
+contract has changed: the provider latches off (`_encrypted`), reports one
+parse failure so the admin is alerted once, and raises instead of returning
+empty showtimes. An empty day would otherwise look like every session
+disappeared and create false alerts.
+
+### One request per movie, not per branch
+
+`PremiereProvider.showtimes_per_movie = True`. A movie+date response is
+grouped by cinema and already contains all five branches, so:
+
+- the watcher passes `movie_id` to `get_showtimes()` and keys request
+  coalescing by `provider:date:movie`, not `provider:branch:date:movie`;
+- the response is cached by movie+date (`movie_showtimes_key`) and the
+  branch filter is applied in memory;
+- discovery's branch overview shares a single daily snapshot
+  (`day_snapshot_key`): one request per movie playing that day (~19),
+  cached for `PREMIERE_SNAPSHOT_TTL` (10 minutes). A partial snapshot raises
+  rather than committing half a day, which would trigger false "session
+  disappeared" alerts. Branch overviews read this snapshot instead of
+  refetching per branch.
+
+`get_showtimes()` without a `movie_id` returns an empty list instead of
+firing a whole-day fan-out; every bot call path supplies the movie.
+
+### Parsing rules
+
+- Branch and time: `cinema_id` and `ss_start_time` (`15:30`, 24-hour).
+- Date: `ss_actual_start_date` is the real calendar day, so a `00:30`
+  session listed under the previous day's schedule moves to the next day.
+  `ss_start_date` is the fallback.
+- Title: `movie_title`; `movie_experience` is the hall/experience (`PREMIUM`,
+  `LUXE`, `CineComfort`, `Plus`, `MAX`, `MX4D`, `Standard`).
+- `mf_name` `3D` appends `3D` to the experience when it is not already there.
+- Duration/language/rating/synopsis from `movie_runtime`, `lang_name`,
+  `ratings[0].rating`, `movie_plot`; posters come from TMDB only.
+- Coming Soon: a title whose first `show_dates` entry is later than today.
+  The date picker starts at that first screening day, not
+  `movie_release_date`.
+- Sessions are `AVAILABLE` with `seats_available = None`; there is no
+  sold-out flag.
+
+### Known limitations
+
+- **No seat counts or sold-out state.** Watches alert on new sessions and
+  availability changes, never a specific freed seat.
+- **Listing dates are a union across branches.** A title's `show_dates` may
+  include a day a specific branch does not actually play, so that branch can
+  offer a day with no sessions.
+- **Experience names are kept verbatim.** `LUXE`, `CineComfort`, `Plus` and
+  `MX4D` are Premiere concepts and are never mapped to VOX's VIP/Premium.
+- **Public token can rotate.** Re-reading the bundle refreshes it; if the
+  bundle URL or token shape changes, the provider reports a parse failure and
+  the admin is alerted.
+- Parser tests live in `tests/test_premiere.py`.
+
+---
+
 ## Low-volume design
 
 1. **Per-target heap scheduler** — no global polling cycle. Each
@@ -396,7 +497,8 @@ dates into `get_dates`.
 2. **Adaptive intervals** — 100 s open-with-seats, 60 s waiting, 120 s sold
    out, 480–720 s for dates more than 7 days away, 12 s burst near opening.
 3. **Request coalescing** — one in-flight fetch per
-   `provider:branch:date`; all watchers of that target await the same future.
+   `provider:branch:date`, or `provider:date:movie` for per-movie providers
+   such as Premiere; all watchers of that target await the same future.
 4. **Two-level cache** — memory + SQLite, with stale-while-revalidate and
    persistence across restarts. Menus read only from cache and label old data.
    Alerting paths pass `allow_stale=False`, so an outage can never produce a
@@ -468,10 +570,15 @@ from `.env`. Secrets are only read from the environment.
 | `UI_RENDERER` | `auto` | `auto` = rich with classic fallback, `rich`, or `classic` |
 | `DB_PATH` | `cinemaradar.sqlite3` | SQLite file |
 | `TIMEZONE` | `Africa/Cairo` | Quiet hours, daily caps, stats |
-| `PROVIDERS` | `vox,renaissance` | Comma-separated enabled cinemas |
+| `PROVIDERS` | `vox,renaissance,premiere` | Comma-separated enabled cinemas |
 | `PROVIDER` | `vox` | Fallback brand for single-cinema mode |
 | `VOX_BASE_URL` | `https://egy.voxcinemas.com` | VOX provider base URL |
 | `RENAISSANCE_BASE_URL` | `https://rnscinemas.com` | Renaissance provider base URL |
+| `PREMIERE_BASE_URL` | `https://premiere-cinemas.com` | Premiere site (public layout bundle) |
+| `PREMIERE_API_URL` | `https://mifcentral-api.premiere-cinemas.com` | Premiere JSON API base |
+| `PREMIERE_TOKEN_TTL` | `43200` | Seconds before the public bearer token is re-read |
+| `PREMIERE_SHOWTIMES_TTL` | `600` | Seconds a movie+date response is reused |
+| `PREMIERE_SNAPSHOT_TTL` | `600` | Seconds a whole-day snapshot is reused |
 | `HTTP_USER_AGENT` | browser UA ending in `CinemaRadar/<version>` | Cinema UA; never put an email, URL or "bot" in it (VOX resets those) |
 | `HTTP_IMPERSONATE` | empty | e.g. `chrome124` (needs `curl_cffi`) |
 | `TMDB_USER_AGENT` | fully identified bot UA | API UA; names the bot and contact address |

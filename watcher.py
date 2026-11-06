@@ -557,10 +557,21 @@ class Watcher:
             return 0
 
         provider = self.providers.get(target.provider)
+        per_movie = bool(getattr(provider, "showtimes_per_movie", False))
+        movie_id = target.movie_id if per_movie else None
+        # A per-movie endpoint serves every branch with one response, so the
+        # in-flight key must not include the branch (or a different movie).
+        fetch_key = (
+            f"{target.provider}:{target.date}:{target.movie_id}"
+            if per_movie
+            else target.fetch_key
+        )
         try:
             showtimes = await self._coalescer.run(
-                target.fetch_key,
-                lambda: provider.get_showtimes(target.branch_id, target.date, force_refresh=True),
+                fetch_key,
+                lambda: provider.get_showtimes(
+                    target.branch_id, target.date, movie_id, force_refresh=True
+                ),
             )
         except Exception as exc:
             self.last_error = f"{type(exc).__name__}: {exc}"
@@ -692,9 +703,14 @@ class Watcher:
     async def _confirm_showtimes(self, target: TargetKey) -> list[Showtime] | None:
         await self._sleep(self.settings.watch_confirm_delay)
         provider = self.providers.get(target.provider)
+        movie_id = (
+            target.movie_id
+            if getattr(provider, "showtimes_per_movie", False)
+            else None
+        )
         try:
             showtimes = await provider.get_showtimes(
-                target.branch_id, target.date, force_refresh=True
+                target.branch_id, target.date, movie_id, force_refresh=True
             )
         except Exception:
             logger.warning("Confirmation fetch failed for %s", target.key)

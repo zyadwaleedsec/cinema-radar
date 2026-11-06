@@ -4,8 +4,8 @@
 
 <h1 align="center">Cinema Radar</h1>
 
-A Telegram bot that watches **VOX Cinemas** and **Renaissance Cinemas** showtimes
-in Egypt for you.
+A Telegram bot that watches **VOX Cinemas**, **Renaissance Cinemas** and
+**Premiere Cinemas** showtimes in Egypt for you.
 
 Pick a branch, date, movie and showtime. Cinema Radar checks it quietly in the
 background and messages you the moment booking opens — or when a sold-out show
@@ -27,11 +27,11 @@ page.
   get the seat alert once that many are free.
 - 🎭 **Filter by format** — IMAX, 4DX, VIP, MAX, DBOX, 3D and whatever the
   selected cinemas actually sell; changing branches never leaves a dead filter.
-- 🏢 **Two cinemas** — VOX and Renaissance run together; pick one in-app, or
-  limit to a single cinema with `PROVIDERS` in `.env`.
+- 🏢 **Three cinemas** — VOX, Renaissance and Premiere run together; pick one
+  in-app, or limit to a single cinema with `PROVIDERS` in `.env`.
 - 🔔 **Instant alerts** when booking opens, seats come back, or new showtimes appear.
 - 🌍 **All-cinemas watch** — pick a movie, a day and morning/evening, and watch
-  every show in that period across VOX and Renaissance at once.
+  every show in that period across VOX, Renaissance and Premiere at once.
 - 🆕 **Optional release alerts** for new movies, new dates and Coming Soon titles.
 - 🔎 **Search in Arabic or English**, typos included — an Arabic name finds the
   English title the cinema actually lists, and Arabic queries fall back to TMDB.
@@ -49,7 +49,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-Current release: **v2.8.4** - see [`CHANGELOG.md`](CHANGELOG.md).
+  Current release: **v3.0.0** - see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -88,7 +88,7 @@ Open `.env` and set these values:
 | `BOT_TOKEN` | the token from @BotFather (required) |
 | `ADMIN_ID` | your numeric Telegram id (from @userinfobot) |
 | `DONATION_PHONE` | optional; the Vodafone Cash / InstaPay number users see |
-| `PROVIDERS` | comma-separated cinemas, default `vox,renaissance` |
+| `PROVIDERS` | comma-separated cinemas, default `vox,renaissance,premiere` |
 | `PROVIDER` | fallback brand for single-cinema mode |
 | `TMDB_READ_TOKEN` | optional TMDB API read token; enables posters |
 
@@ -174,9 +174,9 @@ the chat.
 ## Disclaimer
 
 Cinema Radar is **not affiliated with, endorsed by or sponsored by VOX
-Cinemas or Renaissance Cinemas**. Showtime data can be delayed, incomplete or
-wrong — always confirm on the cinema's official website. Booking, payment and
-tickets happen entirely on the cinema's site.
+Cinemas, Renaissance Cinemas or Premiere Cinemas**. Showtime data can be
+delayed, incomplete or wrong — always confirm on the cinema's official website.
+Booking, payment and tickets happen entirely on the cinema's site.
 
 The IMAX snapshot in `data/imax_films.json` is derived from Wikipedia and is
 licensed **CC BY-SA 4.0**.

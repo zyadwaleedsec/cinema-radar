@@ -191,6 +191,18 @@ def showtimes_key(provider: str, branch_id: str, date: str) -> str:
     return f"{provider}:{_PARSER_VERSION}:showtimes:{branch_id}:{date}"
 
 
+def movie_showtimes_key(provider: str, date: str, movie_id: str) -> str:
+    """A response that covers every branch for one movie and day."""
+
+    return f"{provider}:{_PARSER_VERSION}:movie-showtimes:{date}:{movie_id}"
+
+
+def day_snapshot_key(provider: str, date: str) -> str:
+    """Every movie's sessions for one day, across all branches."""
+
+    return f"{provider}:{_PARSER_VERSION}:day-snapshot:{date}"
+
+
 def overview_key(provider: str, branch_id: str) -> str:
     return f"{provider}:{_PARSER_VERSION}:overview:{branch_id}"
 

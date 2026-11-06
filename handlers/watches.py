@@ -210,16 +210,30 @@ async def _collect_window_showtimes(
             continue
         for branch in branches:
             try:
-                shows = await selected.get_showtimes(branch.id, date)
+                movies = await selected.get_movies(branch.id, date)
             except Exception:
                 continue
-            if not shows:
+            if not movies:
                 continue
-            hits = search.rank(query, sorted({s.movie_name for s in shows if s.movie_name}))
+            by_name = {movie.name: movie for movie in movies if movie.name}
+            hits = search.rank(query, sorted(by_name))
             if not hits:
                 continue
             best_name = hits[0].item
-            movie_shows = [s for s in shows if s.movie_name == best_name]
+            movie = by_name[best_name]
+            try:
+                # Per-movie providers need the id; branch/day providers filter
+                # by it too, so one shape works everywhere.
+                shows = await selected.get_showtimes(
+                    branch.id, date, movie_id=movie.id
+                )
+            except Exception:
+                continue
+            movie_shows = [
+                show
+                for show in shows
+                if show.movie_id == movie.id or show.movie_name == best_name
+            ]
             if not movie_shows:
                 continue
             results.append(
@@ -227,7 +241,7 @@ async def _collect_window_showtimes(
                     "branch_id": branch.id,
                     "branch_name": branch.name,
                     "provider": name,
-                    "movie_id": movie_shows[0].movie_id,
+                    "movie_id": movie.id,
                     "movie_name": best_name,
                     "showtimes": movie_shows,
                 }
