@@ -170,7 +170,13 @@ class FakeHttp:
         allow_stale=True,
         headers=None,
     ):
-        self.calls.append({"url": url, "headers": dict(headers or {})})
+        self.calls.append(
+            {
+                "url": url,
+                "headers": dict(headers or {}),
+                "target_key": target_key,
+            }
+        )
         if url == "https://premiere-cinemas.com/":
             text = HOME
         elif "layout-abc123.js" in url:
@@ -244,6 +250,14 @@ async def test_get_showtimes_fetches_once_and_filters_the_branch(cache, test_set
     assert len(api_calls) == 1
     assert api_calls[0]["headers"]["Authorization"].startswith("Bearer ")
     assert "x-web-security" not in api_calls[0]["headers"]
+
+    token_calls = [
+        call
+        for call in http.calls
+        if call["url"].startswith("https://premiere-cinemas.com")
+    ]
+    assert token_calls
+    assert {call["target_key"] for call in token_calls} == {"premiere:token"}
 
     # The second branch is served from the same all-branch response.
     other = await provider.get_showtimes("3", "2026-11-06", "6901.192")

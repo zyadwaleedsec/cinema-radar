@@ -550,12 +550,14 @@ class PremiereProvider(CinemaProvider):
 
     async def _download_token(self, force_refresh: bool, ttl: float) -> str:
         home_url = f"{self.base_url}/"
+        token_key = f"{self.name}:token"
         try:
             home = await self.http.get(
                 home_url,
                 f"{self.name}:token-home",
                 ttl,
                 force_refresh=force_refresh,
+                target_key=token_key,
                 allow_stale=not force_refresh,
                 # Premiere's edge tarpits the shared client's browser-shaped
                 # Accept header (it contains application/xml + */*); a plain
@@ -572,15 +574,20 @@ class PremiereProvider(CinemaProvider):
                 f"{self.name}:token-bundle",
                 ttl,
                 force_refresh=force_refresh,
+                target_key=token_key,
                 allow_stale=not force_refresh,
                 headers={"Accept": "*/*"},
             )
             match = JWT_RE.search(bundle.text or "")
             if not match:
                 raise ValueError("bearer token not found in layout bundle")
+        except UpstreamError:
+            # The HTTP layer already recorded this failure against
+            # ``premiere:token``, so the admin alert names Premiere correctly.
+            raise
         except Exception as exc:
             logger.exception("Could not read the Premiere bearer token")
-            await self.http.report_failure("parse", f"{self.name}:token", home_url)
+            await self.http.report_failure("parse", token_key, home_url)
             raise UpstreamError(
                 f"Premiere token unavailable: {exc}", reason="parse", url=home_url
             ) from exc
