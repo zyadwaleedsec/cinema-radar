@@ -107,6 +107,38 @@ def test_event_text_uses_the_branch_provider():
     assert "رينيسانس" in _event_text(event)
 
 
+async def test_one_broken_subscriber_does_not_block_the_rest(db, test_settings):
+    for telegram_id in (961, 962):
+        user = await db.get_or_create_user(telegram_id, watch_limit=test_settings.free_watch_limit)
+        await db.set_user_language(telegram_id, "ar")
+        await db.upsert_subscription(int(user["id"]), [], ["NEW_SHOWTIMES"], None, True)
+
+    sender = _Sender()
+    broadcaster = Broadcaster(test_settings, db, sender)
+    original = broadcaster._build_message
+
+    async def flaky(telegram_id, events, titles=None):
+        if telegram_id == 961:
+            raise RuntimeError("broken preference row")
+        return await original(telegram_id, events, titles=titles)
+
+    broadcaster._build_message = flaky
+    event = DiscoveryEvent(
+        kind="NEW_SHOWTIMES",
+        branch=Branch("madina", "Madinaty", "vox"),
+        movie=Movie("m1", "Dune", "dune"),
+        date="2026-12-16",
+        times=("21:30",),
+        event_key="NEW_SHOWTIMES:madina:m1:2026-12-16",
+    )
+
+    sent = await broadcaster.process([event])
+
+    assert sent == 1
+    assert len(sender.sent) == 1
+    assert sender.sent[0]["chat_id"] == 962
+
+
 async def test_broadcast_resolves_and_sends_the_tmdb_poster(db, test_settings):
     user = await db.get_or_create_user(950, watch_limit=test_settings.free_watch_limit)
     await db.set_user_language(950, "ar")

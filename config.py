@@ -152,6 +152,10 @@ class Settings:
     watch_confirm_delay: float = 3.0
     watch_alert_cooldown: int = 600
     watcher_tick: float = 1.0
+    #: Reconcile watches, expire finished ones and prune old rows this often.
+    #: New watches are scheduled as soon as they are created, so this is only a
+    #: safety net and does not need to run on every one-second tick.
+    watcher_sync_interval: float = 120.0
     far_date_days: int = 7
     all_dates_max: int = 21
     all_dates_refresh: int = 1200
@@ -251,6 +255,7 @@ class Settings:
             watch_confirm_delay=_env_float("WATCH_CONFIRM_DELAY", 3.0),
             watch_alert_cooldown=_env_int("WATCH_ALERT_COOLDOWN", 600),
             watcher_tick=_env_float("WATCHER_TICK", 1.0),
+            watcher_sync_interval=_env_float("WATCHER_SYNC_INTERVAL", 120.0),
             far_date_days=_env_int("FAR_DATE_DAYS", 7),
             all_dates_max=_env_int("ALL_DATES_MAX", 21),
             all_dates_refresh=_env_int("ALL_DATES_REFRESH", 1200),

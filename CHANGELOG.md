@@ -11,6 +11,24 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [2.8.3] - 2026-11-06
+
+### Changed
+
+- The watcher no longer rescans and rewrites the whole watch table on every
+  one-second tick. Reconciliation, expiry sweeps and retention cleanup now run
+  at most once per `WATCHER_SYNC_INTERVAL` (120 seconds by default); newly
+  created watches are still scheduled immediately.
+- Discovery broadcasts are isolated per subscriber: a broken or unexpected row
+  is logged and skipped instead of stopping delivery for everyone else.
+- Branch date caches and discovery scheduling keys are scoped by provider, so
+  two cinemas that share a branch id can never read each other's data.
+
+### Performance
+
+- Added a partial index for snoozed watches and an index on discovery action
+  timestamps to keep the maintenance queries cheap as data grows.
+
 ## [2.8.2] - 2026-11-06
 
 ### Fixed

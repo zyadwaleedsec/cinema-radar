@@ -95,44 +95,56 @@ class Broadcaster:
         subscriptions = await self.db.list_active_subscriptions()
         sent = 0
         for sub in subscriptions:
-            matching = self._filter_events(sub, events)
-            if not matching:
-                continue
-            if self._is_quiet(sub, matching, now):
-                continue
-            day = self._local_day(now)
-            count = await self.db.get_discovery_count(int(sub["user_id"]), day)
+            try:
+                sent += await self._send_subscriber(sub, events, now)
+            except Exception:
+                # One broken row (bad preference, database hiccup, unexpected
+                # payload) must not stop the rest of the fan-out.
+                logger.exception("Discovery broadcast failed for %s", sub.get("telegram_id"))
+        return sent
+
+    async def _send_subscriber(
+        self, sub: dict[str, Any], events: list[DiscoveryEvent], now: float
+    ) -> int:
+        matching = self._filter_events(sub, events)
+        if not matching:
+            return 0
+        if self._is_quiet(sub, matching, now):
+            return 0
+        day = self._local_day(now)
+        count = await self.db.get_discovery_count(int(sub["user_id"]), day)
+        if count >= self.settings.discovery_daily_cap:
+            return 0
+        by_branch: dict[str, list[DiscoveryEvent]] = {}
+        for event in matching:
+            by_branch.setdefault(event.branch.id, []).append(event)
+        sent = 0
+        for branch_events in by_branch.values():
             if count >= self.settings.discovery_daily_cap:
+                break
+            titles = await self._localized_titles(branch_events, sub.get("lang"))
+            with i18n.use(sub.get("lang")):
+                text, keyboard = await self._build_message(
+                    int(sub["telegram_id"]), branch_events, titles=titles
+                )
+            # The overview strips cinema-scraped artwork, so every alert
+            # resolves official artwork from TMDB (cached for a month).
+            photo = await self._poster(branch_events[0].movie)
+            try:
+                await self.sender.send(int(sub["telegram_id"]), text, keyboard, photo_url=photo)
+            except UserBlocked:
+                await self.db.deactivate_subscription_for_telegram(int(sub["telegram_id"]))
+                logger.info("Deactivated blocked subscriber %s", sub["telegram_id"])
+                break
+            except Exception:
+                logger.exception("Broadcast failed for %s", sub["telegram_id"])
                 continue
-            by_branch: dict[str, list[DiscoveryEvent]] = {}
-            for event in matching:
-                by_branch.setdefault(event.branch.id, []).append(event)
-            for branch_events in by_branch.values():
-                if count >= self.settings.discovery_daily_cap:
-                    break
-                titles = await self._localized_titles(branch_events, sub.get("lang"))
-                with i18n.use(sub.get("lang")):
-                    text, keyboard = await self._build_message(
-                        int(sub["telegram_id"]), branch_events, titles=titles
-                    )
-                # The overview strips cinema-scraped artwork, so every alert
-                # resolves official artwork from TMDB (cached for a month).
-                photo = await self._poster(branch_events[0].movie)
-                try:
-                    await self.sender.send(int(sub["telegram_id"]), text, keyboard, photo_url=photo)
-                except UserBlocked:
-                    await self.db.deactivate_subscription_for_telegram(int(sub["telegram_id"]))
-                    logger.info("Deactivated blocked subscriber %s", sub["telegram_id"])
-                    break
-                except Exception:
-                    logger.exception("Broadcast failed for %s", sub["telegram_id"])
-                    continue
-                await self.db.increment_discovery_count(int(sub["user_id"]), day)
-                count += 1
-                sent += 1
-                self.sent += 1
-                if self.stats is not None:
-                    self.stats.note_broadcast()
+            await self.db.increment_discovery_count(int(sub["user_id"]), day)
+            count += 1
+            sent += 1
+            self.sent += 1
+            if self.stats is not None:
+                self.stats.note_broadcast()
         return sent
 
     def _filter_events(

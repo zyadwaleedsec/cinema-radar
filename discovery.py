@@ -360,9 +360,9 @@ class DiscoveryJob:
             for branch in branches:
                 if wanted is not None and branch.id not in wanted:
                     continue
-                if not self._due(branch.id, now):
+                if not self._due(provider_name, branch.id, now):
                     continue
-                self._mark_run(branch.id, now)
+                self._mark_run(provider_name, branch.id, now)
                 try:
                     queued += await self._process_branch(branch, provider, now, upcoming)
                 except Exception as exc:
@@ -378,15 +378,16 @@ class DiscoveryJob:
                 await self._save_upcoming(upcoming, now, provider)
         return queued
 
-    def _due(self, branch_id: str, now: float) -> bool:
-        return now >= self._next_allowed.get(branch_id, 0.0)
+    def _due(self, provider_name: str, branch_id: str, now: float) -> bool:
+        return now >= self._next_allowed.get(f"{provider_name}:{branch_id}", 0.0)
 
-    def _mark_run(self, branch_id: str, now: float) -> None:
+    def _mark_run(self, provider_name: str, branch_id: str, now: float) -> None:
         jitter = 1.0 + self._rng.uniform(
             -self.settings.discovery_jitter, self.settings.discovery_jitter
         )
-        self._next_allowed[branch_id] = now + self.settings.discovery_interval * jitter
-        self.last_run[branch_id] = now
+        key = f"{provider_name}:{branch_id}"
+        self._next_allowed[key] = now + self.settings.discovery_interval * jitter
+        self.last_run[key] = now
 
     async def _upcoming_state(self, provider: Any, now: float) -> _UpcomingState | None:
         if not hasattr(provider, "get_coming_soon"):

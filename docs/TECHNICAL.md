@@ -73,7 +73,7 @@ cinema-radar/
 │   └── SPEC.md             # product specification
 ├── scripts/cli_test.py     # live VOX smoke test
 ├── scripts/update_imax_list.py  # regenerates the IMAX snapshot
-├── tests/                  # pytest suite (272 tests)
+├── tests/                  # pytest suite (275 tests)
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── ruff.toml               # ruff lint/format configuration
@@ -472,6 +472,7 @@ from `.env`. Secrets are only read from the environment.
 | `POLL_JITTER` | `0.20` | ±20% interval jitter |
 | `WATCH_CONFIRM_DELAY` | `3` | Seconds before confirmation read |
 | `WATCHER_TICK` | `1` | Seconds between scheduler ticks |
+| `WATCHER_SYNC_INTERVAL` | `120` | Seconds between watch reconciliation/expiry sweeps |
 | `WATCH_ALERT_COOLDOWN` | `600` | Per-watch duplicate cooldown |
 | `WATCH_RETENTION_DAYS` | `3` | Days a closed watch is kept before hard deletion |
 | `MORNING_END_HOUR` | `17` | Split hour: shows before it are "morning", at/after "evening" |
@@ -549,8 +550,11 @@ The script is a development/maintenance tool, not part of the running bot.
 
 Each watch stores `expires_at` (UTC). Single-showtime watches expire when that
 screening starts, whole-day movie watches when the latest showtime starts, and
-all-days watches at 23:59 on the last bookable day they follow. During
-`sync_targets` the watcher:
+all-days watches at 23:59 on the last bookable day they follow. The watcher
+still ticks every `WATCHER_TICK` second to fire due targets, but reconciliation
+(`sync_targets`) runs at most once per `WATCHER_SYNC_INTERVAL` because new
+watches are scheduled directly when they are created. During a reconciliation
+the watcher:
 
 1. backfills `expires_at` for older rows,
 2. closes due watches and sends **one grouped message per user**

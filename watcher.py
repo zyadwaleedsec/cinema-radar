@@ -333,7 +333,8 @@ class Watcher:
         self._on_admin_message = on_admin_message
         self._coalescer = RequestCoalescer()
         self._semaphore = asyncio.Semaphore(max(concurrency, 1))
-        self._dates_cache: dict[str, tuple[float, list[str]]] = {}
+        self._dates_cache: dict[tuple[str, str], tuple[float, list[str]]] = {}
+        self._last_sync: float | None = None
         self.last_run: float | None = None
         self.last_error: str | None = None
 
@@ -371,6 +372,7 @@ class Watcher:
                 self.scheduler.add(target, status=None, interval=0.0, now=self._clock())
         await self._expand_all_dates(today, active_keys)
         removed = self.scheduler.remove_missing(active_keys)
+        self._last_sync = self._clock()
         return len(rows) + removed
 
     async def _backfill_watch_expiries(self) -> None:
@@ -476,7 +478,7 @@ class Watcher:
 
     async def _branch_dates(self, provider_name: str, branch_id: str) -> list[str]:
         now = self._clock()
-        cached = self._dates_cache.get(branch_id)
+        cached = self._dates_cache.get((provider_name, branch_id))
         if cached is not None and now - cached[0] < self.settings.all_dates_refresh:
             return cached[1]
         try:
@@ -485,14 +487,27 @@ class Watcher:
         except Exception:
             logger.warning("Could not refresh dates for %s", branch_id)
             return cached[1] if cached is not None else []
-        self._dates_cache[branch_id] = (now, dates)
+        self._dates_cache[(provider_name, branch_id)] = (now, dates)
         return dates
+
+    async def _maybe_sync(self, now: float) -> None:
+        """Reconcile the scheduler at a low cadence instead of every tick.
+
+        ``run_once`` fires every ``WATCHER_TICK`` (one second by default).
+        Permanent maintenance queries and the full watch table scan do not need
+        that rate: new watches are scheduled directly when they are created.
+        """
+
+        interval = max(self.settings.watcher_sync_interval, 0.0)
+        if self._last_sync is not None and now - self._last_sync < interval:
+            return
+        await self.sync_targets()
 
     async def run_once(self, now: float | None = None) -> int:
         now = self._clock() if now is None else now
         self.http.affected_hint = len(self.scheduler)
         await self._send_due_reminders(now)
-        await self.sync_targets()
+        await self._maybe_sync(now)
         due = self.scheduler.pop_due(now)
         if not due:
             return 0

@@ -48,6 +48,24 @@ class FakeProviders:
         return self.provider
 
 
+class FakeDates:
+    def __init__(self, dates):
+        self.dates = dates
+        self.calls = 0
+
+    async def get_dates(self, branch_id):
+        self.calls += 1
+        return self.dates
+
+
+class FakeDatesProviders:
+    def __init__(self, providers):
+        self._providers = providers
+
+    def get(self, name):
+        return self._providers[name]
+
+
 class FakeNotifier:
     def __init__(self):
         self.sent = 0
@@ -100,3 +118,58 @@ async def test_1000_watchers_20_targets_make_20_requests(db, cache, test_setting
     assert provider.calls == 20
     assert notifier.sent == 0
     assert len(scheduler) == 20
+
+
+async def test_run_once_reconciles_at_the_configured_cadence(db, cache, test_settings, clock):
+    scheduler = Scheduler(test_settings, clock)
+    watcher = Watcher(
+        test_settings,
+        db,
+        cache,
+        scheduler,
+        FakeProviders(FakeProvider()),
+        FakeHttp(),
+        notifier=FakeNotifier(),
+        clock=clock,
+        sleep=clock.sleep,
+    )
+    calls = 0
+    sync = watcher.sync_targets
+
+    async def counting_sync():
+        nonlocal calls
+        calls += 1
+        return await sync()
+
+    watcher.sync_targets = counting_sync
+
+    await watcher.run_once(now=clock())
+    assert calls == 1
+
+    # A one-second tick must not re-scan the whole watch table.
+    clock.advance(test_settings.watcher_tick)
+    await watcher.run_once(now=clock())
+    assert calls == 1
+
+    clock.advance(test_settings.watcher_sync_interval)
+    await watcher.run_once(now=clock())
+    assert calls == 2
+
+
+async def test_branch_dates_cache_is_scoped_by_provider(db, cache, test_settings, clock):
+    vox = FakeDates(["2026-12-01"])
+    renaissance = FakeDates(["2026-12-02"])
+    watcher = Watcher(
+        test_settings,
+        db,
+        cache,
+        Scheduler(test_settings, clock),
+        FakeDatesProviders({"vox": vox, "renaissance": renaissance}),
+        FakeHttp(),
+        clock=clock,
+        sleep=clock.sleep,
+    )
+
+    assert await watcher._branch_dates("vox", "same-id") == ["2026-12-01"]
+    assert await watcher._branch_dates("renaissance", "same-id") == ["2026-12-02"]
+    assert vox.calls == 1 and renaissance.calls == 1

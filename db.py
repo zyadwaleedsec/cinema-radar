@@ -262,9 +262,17 @@ class Database:
         await self.execute(
             "CREATE INDEX IF NOT EXISTS idx_watches_expiry ON watches(active, expires_at)"
         )
+        await self.execute(
+            "CREATE INDEX IF NOT EXISTS idx_watches_snoozed "
+            "ON watches(snoozed_until) WHERE active = 1 AND snoozed_until IS NOT NULL"
+        )
         await self._ensure_column("discovery_actions", "user_id", "INTEGER")
         await self._ensure_column("discovery_actions", "provider", "TEXT NOT NULL DEFAULT 'vox'")
         await self._ensure_column("discovery_actions", "payload", "TEXT")
+        await self.execute(
+            "CREATE INDEX IF NOT EXISTS idx_discovery_actions_created "
+            "ON discovery_actions(created_at)"
+        )
         await self._ensure_column("donations", "approved_at", "TEXT")
         await self._ensure_column("donations", "approved_by", "INTEGER")
         await self._ensure_column("donations", "below_minimum", "INTEGER NOT NULL DEFAULT 0")
