@@ -99,7 +99,12 @@ class Settings:
     # ------------------------------------------------------------------ secrets
     bot_token: str = ""
     admin_id: int = 0
+    # Shared fallback for both manual donation methods.  A dedicated value per
+    # method lets the operator use a wallet number for Vodafone Cash and an
+    # InstaPay address (phone or IPA) for InstaPay.
     donation_phone: str = ""
+    donation_vodafone: str = ""
+    donation_instapay: str = ""
     channel_id: str | None = None
     bot_username: str = ""
 
@@ -197,8 +202,18 @@ class Settings:
     backoff_recovery_step: float = 0.15
 
     # ------------------------------------------------------------------ support
-    # One-off donation, approved manually by the admin.
+    # Voluntary manual donation, approved by the admin.  A user may donate more
+    # than once; each approved proof keeps the supporter limit.
     donation_min_amount: int = 50
+
+    def donation_account(self, method: str) -> str:
+        """Return the account to show for a manual donation method."""
+
+        if method == "instapay":
+            return self.donation_instapay or self.donation_phone
+        if method == "vodafone_cash":
+            return self.donation_vodafone or self.donation_phone
+        return ""
 
     # --------------------------------------------------------------- quiet hours
     quiet_start: int = 23
@@ -227,6 +242,8 @@ class Settings:
             bot_token=_env("BOT_TOKEN"),
             admin_id=_env_int("ADMIN_ID", 0),
             donation_phone=_env("DONATION_PHONE"),
+            donation_vodafone=_env("DONATION_VODAFONE") or _env("DONATION_PHONE"),
+            donation_instapay=_env("DONATION_INSTAPAY") or _env("DONATION_PHONE"),
             channel_id=channel,
             bot_username=_env("BOT_USERNAME").lstrip("@"),
             db_path=_env("DB_PATH", "cinemaradar.sqlite3"),

@@ -11,6 +11,19 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-11-07
+
+### Added
+
+- Manual support now accepts a **Vodafone Cash** and an **InstaPay** account,
+  configured separately with `DONATION_VODAFONE` / `DONATION_INSTAPAY` (both
+  fall back to `DONATION_PHONE`).
+- Users can donate **more than once**. Each proof is forwarded to the admin;
+  approving it keeps the 10-watch supporter limit, and the admin sees when a
+  donation comes from an existing supporter.
+- Proof can be a photo, an image sent as a document, or a transaction ID.
+  Documents are forwarded to the admin as documents instead of being dropped.
+
 ## [3.2.2] - 2026-11-07
 
 ### Fixed
@@ -588,7 +601,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.2...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.2...v3.3.0
 [3.2.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.1.0...v3.2.0

@@ -30,12 +30,24 @@ class SupportFlow(StatesGroup):
 
 
 @router.callback_query(F.data == "menu:support")
-async def support_menu(callback: CallbackQuery, state: FSMContext, settings: Settings) -> None:
+async def support_menu(
+    callback: CallbackQuery,
+    state: FSMContext,
+    settings: Settings,
+    user_row: dict | None = None,
+) -> None:
     await answer(callback)
     await state.clear()
+    is_supporter = bool(user_row and int(user_row.get("is_supporter") or 0))
+    current_limit = int((user_row or {}).get("watch_limit") or settings.free_watch_limit)
     await edit(
         callback,
-        strings.support_text(settings.supporter_watch_limit, settings.donation_min_amount),
+        strings.support_text(
+            settings.supporter_watch_limit,
+            settings.donation_min_amount,
+            is_supporter=is_supporter,
+            current_limit=current_limit,
+        ),
         support_keyboard(),
     )
 
@@ -44,14 +56,20 @@ async def support_menu(callback: CallbackQuery, state: FSMContext, settings: Set
 async def manual(callback: CallbackQuery, state: FSMContext, settings: Settings) -> None:
     await state.clear()
     method = split_cb(callback.data, 2)[1]
-    if not settings.donation_phone:
+    account = settings.donation_account(method)
+    if not account:
         await edit(callback, strings.support_not_configured(), back_home_keyboard())
         await answer(callback)
         return
     await edit(
         callback,
-        strings.support_manual_text(method, settings.donation_phone, settings.donation_min_amount),
-        manual_payment_keyboard(method, settings.donation_phone),
+        strings.support_manual_text(
+            method,
+            account,
+            settings.donation_min_amount,
+            settings.supporter_watch_limit,
+        ),
+        manual_payment_keyboard(method, account),
     )
     await answer(callback)
 
@@ -121,12 +139,22 @@ async def amount_typed(message: Message, state: FSMContext, settings: Settings) 
     )
 
 
-@router.message(SupportFlow.waiting_proof, F.photo | (F.text & ~F.text.startswith("/")))
+@router.message(
+    SupportFlow.waiting_proof, F.photo | F.document | (F.text & ~F.text.startswith("/"))
+)
 async def proof_received(message: Message, state: FSMContext, support, settings: Settings) -> None:
     data = await state.get_data()
     method = _method(data)
     amount = data.get("amount")
-    file_id = message.photo[-1].file_id if message.photo else None
+    file_id = None
+    file_type = None
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        file_type = "photo"
+    elif message.document:
+        # Screenshots are often sent uncompressed as a file; accept both.
+        file_id = message.document.file_id
+        file_type = "document"
     note = (message.caption or message.text or "").strip()
     if not file_id and not note:
         await send(message, strings.error_generic())
@@ -137,6 +165,7 @@ async def proof_received(message: Message, state: FSMContext, support, settings:
         note=note,
         file_id=file_id,
         amount=float(amount) if amount else None,
+        file_type=file_type,
     )
     await state.clear()
     await send(message, strings.support_proof_received(), main_menu_keyboard())

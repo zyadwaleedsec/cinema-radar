@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
+import i18n
 from support import SupportService
 
 
@@ -13,6 +16,42 @@ class FakeSender:
 
     async def send(self, *args, **kwargs):
         self.sent.append((args, kwargs))
+
+
+class FakeBot:
+    def __init__(self):
+        self.photos = []
+        self.documents = []
+
+    async def send_photo(self, **kwargs):
+        self.photos.append(kwargs)
+
+    async def send_document(self, **kwargs):
+        self.documents.append(kwargs)
+
+
+def test_each_method_can_have_its_own_account(test_settings):
+    settings = replace(
+        test_settings,
+        donation_phone="01000000000",
+        donation_vodafone="01011111111",
+        donation_instapay="donate@instapay",
+    )
+
+    assert settings.donation_account("vodafone_cash") == "01011111111"
+    assert settings.donation_account("instapay") == "donate@instapay"
+
+
+def test_shared_number_is_the_fallback(test_settings):
+    settings = replace(
+        test_settings,
+        donation_phone="01000000000",
+        donation_vodafone="",
+        donation_instapay="",
+    )
+
+    assert settings.donation_account("vodafone_cash") == "01000000000"
+    assert settings.donation_account("instapay") == "01000000000"
 
 
 @pytest.mark.asyncio
@@ -102,3 +141,42 @@ async def test_supporter_keeps_limit_after_new_donation(db, test_settings):
     assert user is not None
     assert user["is_supporter"] == 1
     assert user["watch_limit"] == test_settings.supporter_watch_limit
+
+
+@pytest.mark.asyncio
+async def test_repeat_donation_is_marked_for_the_admin(db, test_settings):
+    await db.get_or_create_user(558, watch_limit=test_settings.free_watch_limit)
+    await db.set_user_supporter(558, True, test_settings.supporter_watch_limit)
+    sender = FakeSender()
+    service = SupportService(db, test_settings, sender)
+    previous = i18n.admin_language()
+    i18n.set_admin_language("en")
+    try:
+        await service.create_manual(558, "instapay", "second time", amount=75)
+    finally:
+        i18n.set_admin_language(previous)
+
+    admin_text = sender.sent[-1][0][1]
+    assert "already a supporter" in admin_text
+
+
+@pytest.mark.asyncio
+async def test_document_proof_is_forwarded_as_a_document(db, test_settings):
+    await db.get_or_create_user(561, watch_limit=test_settings.free_watch_limit)
+    bot = FakeBot()
+    service = SupportService(db, test_settings, FakeSender(), bot)
+
+    donation_id = await service.create_manual(
+        561,
+        "instapay",
+        "screenshot",
+        file_id="doc-1",
+        amount=50,
+        file_type="document",
+    )
+
+    donation = await db.get_donation(donation_id)
+    assert donation is not None
+    assert donation["file_type"] == "document"
+    assert bot.documents and bot.documents[0]["document"] == "doc-1"
+    assert bot.photos == []

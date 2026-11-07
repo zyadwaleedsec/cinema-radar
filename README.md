@@ -49,7 +49,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-  Current release: **v3.0.0** - see [`CHANGELOG.md`](CHANGELOG.md).
+  Current release: **v3.3.0** - see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -59,11 +59,13 @@ else, and Settings (`/language`) changes it later.
 | --- | --- | --- |
 | Active watches | 2 | 10 |
 | Alert speed | same | same |
-| Price | 0 EGP | one-off donation of 50 EGP or more |
+| Price | 0 EGP | 50 EGP or more per donation |
 
-Support is voluntary and **one-off** (not a subscription). Donate via Vodafone
-Cash or InstaPay, send the screenshot inside the bot, and the admin approves it
-manually. No Telegram Stars and no recurring payments.
+Support is voluntary and **not a subscription**. You can donate once or more
+than once; every approved donation keeps your supporter limit. Donate via
+Vodafone Cash or InstaPay, send the screenshot (or transaction ID) inside the
+bot, and the admin approves it manually. No Telegram Stars and no recurring
+payments.
 
 ---
 
@@ -87,13 +89,16 @@ Open `.env` and set these values:
 | --- | --- |
 | `BOT_TOKEN` | the token from @BotFather (required) |
 | `ADMIN_ID` | your numeric Telegram id (from @userinfobot) |
-| `DONATION_PHONE` | optional; the Vodafone Cash / InstaPay number users see |
+| `DONATION_PHONE` | optional; shared Vodafone Cash / InstaPay number users see |
+| `DONATION_VODAFONE` | optional; Vodafone Cash number (falls back to `DONATION_PHONE`) |
+| `DONATION_INSTAPAY` | optional; InstaPay number or address (falls back to `DONATION_PHONE`) |
 | `PROVIDERS` | comma-separated cinemas, default `vox,renaissance,premiere` |
 | `PROVIDER` | fallback brand for single-cinema mode |
 | `TMDB_READ_TOKEN` | optional TMDB API read token; enables posters |
 
 Without `ADMIN_ID`, admin commands and admin alerts stay disabled; without
-`DONATION_PHONE`, the manual donation flow is hidden.
+`DONATION_PHONE` (or a method-specific override), the manual donation flow is
+hidden.
 
 Then run:
 

@@ -39,6 +39,7 @@ class SupportService:
         note: str,
         file_id: str | None = None,
         amount: float | None = None,
+        file_type: str | None = None,
     ) -> int:
         user = await self.db.get_or_create_user(
             telegram_id, watch_limit=self.settings.free_watch_limit
@@ -51,10 +52,19 @@ class SupportService:
             status="pending",
             note=note,
             file_id=file_id,
+            file_type=file_type,
             below_minimum=below_minimum,
         )
         await self._notify_admin_donation(
-            donation_id, telegram_id, method, amount, note, file_id, below_minimum
+            donation_id,
+            telegram_id,
+            method,
+            amount,
+            note,
+            file_id,
+            below_minimum,
+            file_type,
+            bool(int(user.get("is_supporter") or 0)),
         )
         return donation_id
 
@@ -67,6 +77,8 @@ class SupportService:
         note: str,
         file_id: str | None,
         below_minimum: bool = False,
+        file_type: str | None = None,
+        already_supporter: bool = False,
     ) -> None:
         from keyboards import donation_admin_keyboard
 
@@ -79,15 +91,17 @@ class SupportService:
                 note,
                 self.settings.donation_min_amount,
                 below_minimum,
+                already_supporter,
             )
         if not self.settings.admin_id:
             return
         keyboard = donation_admin_keyboard(donation_id)
         if file_id and self.bot is not None:
+            send = self.bot.send_document if file_type == "document" else self.bot.send_photo
             try:
-                await self.bot.send_photo(
+                await send(
                     chat_id=self.settings.admin_id,
-                    photo=file_id,
+                    **({"document": file_id} if file_type == "document" else {"photo": file_id}),
                     caption=text,
                     parse_mode="HTML",
                     reply_markup=keyboard,

@@ -1411,31 +1411,47 @@ def event_type_label(kind: str) -> str:
 
 
 # -------------------------------------------------------------------- support
-def support_text(limit: int = 10, min_amount: int = 50) -> str:
+def support_text(
+    limit: int = 10,
+    min_amount: int = 50,
+    is_supporter: bool = False,
+    current_limit: int = 2,
+) -> str:
+    if is_supporter:
+        status = (
+            "You already support the project 💛\n"
+            f"Your current limit is <b>{_count(current_limit, 'watch', 'watches')}</b>.\n"
+            "You can donate again whenever you like."
+        )
+    else:
+        status = (
+            "Cinema Radar is free for everyone,\nand every user gets <b>2 watches</b> for free."
+        )
     return _blocks(
         f"💛 <b>Support the project</b>\n{DIVIDER}",
-        "Cinema Radar is free for everyone,\nand every user gets <b>2 watches</b> for free.",
-        "Want more? You can support the project <b>once</b>\n"
-        f"with a minimum of <b>{min_amount} EGP</b>,\n"
-        f"and your limit becomes <b>{limit} watches</b> for good.\n"
-        "Not a monthly subscription.",
+        status,
+        "Want more? You can support the project <b>once or more</b>,\n"
+        f"with a minimum of <b>{min_amount} EGP</b> each time,\n"
+        f"and your limit becomes <b>{_count(limit, 'watch', 'watches')}</b> for good.\n"
+        "Not a monthly subscription, and repeating is optional.",
         "Pay with Vodafone Cash or InstaPay,\n"
-        "then send a screenshot of the transfer.\n"
+        "then send a screenshot of the transfer or the transaction ID.\n"
         "The admin reviews the proof and approves it.",
         "How would you like to support?",
     )
 
 
-def support_manual_text(method: str, phone: str, min_amount: int = 50) -> str:
+def support_manual_text(method: str, account: str, min_amount: int = 50, limit: int = 10) -> str:
     name = "Vodafone Cash" if method == "vodafone_cash" else "InstaPay"
+    target = "Vodafone Cash number" if method == "vodafone_cash" else "InstaPay account"
     return _blocks(
         f"💛 <b>Support via {name}</b>\n{DIVIDER}",
-        f"Send to this number:\n<code>{esc(phone)}</code>",
-        f"Minimum <b>{min_amount} EGP</b> — one time, not a subscription.",
+        f"Send to this {target}:\n<code>{esc(account)}</code>",
+        f"Minimum <b>{min_amount} EGP</b> — not a subscription.",
         "After paying, tap <b>I paid ✅</b>,\n"
         "then send the transfer screenshot or transaction ID.\n"
         "The admin reviews it,\n"
-        "and once approved your limit becomes <b>10 watches</b>.",
+        f"and once approved your limit becomes <b>{_count(limit, 'watch', 'watches')}</b>.",
         "⚠️ <i>Transfers are not activated automatically.</i>",
     )
 
@@ -1467,7 +1483,8 @@ def support_ask_proof(method: str) -> str:
     name = "Vodafone Cash" if method == "vodafone_cash" else "InstaPay"
     return _blocks(
         f"📸 <b>{name} transfer proof</b>",
-        "Send the transfer screenshot or the transaction ID.",
+        "Send the transfer screenshot or the transaction ID.\n"
+        "If the screenshot is a file, send it as-is.",
         "If you'd rather stop, tap <b>Cancel</b>.",
     )
 
@@ -1507,16 +1524,22 @@ def support_admin_new(
     note: str,
     min_amount: int = 50,
     below_minimum: bool = False,
+    already_supporter: bool = False,
 ) -> str:
     name = "Vodafone Cash" if method == "vodafone_cash" else "InstaPay"
     amount_text = f"{amount:g} EGP" if amount else "Not specified"
     warning = f"\n⚠️ <b>Below the minimum ({min_amount} EGP)</b>" if below_minimum else ""
+    repeat = (
+        "\nStatus: already a supporter — this donation won't change the limit"
+        if already_supporter
+        else ""
+    )
     return _blocks(
         f"<b>New support proof #{donation_id}</b>{warning}\n{DIVIDER}",
         f"User: <code>{user_id}</code>\n"
         f"Method: {name}\n"
         f"Amount: {esc(amount_text)}\n"
-        f"Note: {esc(note or '—')}",
+        f"Note: {esc(note or '—')}{repeat}",
         "Review the proof, then decide:",
     )
 

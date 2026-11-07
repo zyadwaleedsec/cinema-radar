@@ -1424,32 +1424,46 @@ def event_type_label(kind: str) -> str:
 
 
 # -------------------------------------------------------------------- support
-def support_text(limit: int = 10, min_amount: int = 50) -> str:
+def support_text(
+    limit: int = 10,
+    min_amount: int = 50,
+    is_supporter: bool = False,
+    current_limit: int = 2,
+) -> str:
+    if is_supporter:
+        status = (
+            "إنت داعم للمشروع بالفعل 💛\n"
+            f"حد مراقباتك الحالي <b>{_watches(current_limit)}</b>.\n"
+            "تقدر تدعم تاني وقت ما تحب."
+        )
+    else:
+        status = "سينما رادار مجاني للكل،\nوكل مستخدم عنده <b>مراقبتين</b> مجانًا."
     return _blocks(
         f"💛 <b>ادعم المشروع</b>\n{DIVIDER}",
-        "سينما رادار مجاني للكل،\nوكل مستخدم عنده <b>مراقبتين</b> مجانًا.",
+        status,
         "لو عايز تتابع أكتر،\n"
-        "تقدر تدعم المشروع <b>مرة واحدة</b>\n"
-        f"بحد أدنى <b>{min_amount} جنيه</b>،\n"
+        "تقدر تدعم المشروع <b>مرة واحدة أو أكتر</b>\n"
+        f"بحد أدنى <b>{min_amount} جنيه</b> لكل مرة،\n"
         f"ويبقى حدك <b>{_watches(limit)}</b> دايمًا.\n"
-        "مش اشتراك شهري.",
+        "مش اشتراك شهري، والتكرار اختياري.",
         "التحويل فودافون كاش أو إنستاباي،\n"
-        "وبعدها تبعت صورة الإثبات.\n"
+        "وبعدها تبعت صورة الإثبات أو رقم العملية.\n"
         "الأدمن بيراجع الإثبات ويوافق.",
         "اختار طريقة الدعم:",
     )
 
 
-def support_manual_text(method: str, phone: str, min_amount: int = 50) -> str:
+def support_manual_text(method: str, account: str, min_amount: int = 50, limit: int = 10) -> str:
     name = "فودافون كاش" if method == "vodafone_cash" else "إنستاباي"
+    target = "رقم فودافون كاش" if method == "vodafone_cash" else "حساب إنستاباي"
     return _blocks(
         f"💛 <b>دعم عن طريق {name}</b>\n{DIVIDER}",
-        f"حوّل على الرقم ده:\n<code>{esc(phone)}</code>",
-        f"الحد الأدنى <b>{min_amount} جنيه</b> — مرة واحدة، مش اشتراك.",
+        f"حوّل على {target} ده:\n<code>{esc(account)}</code>",
+        f"الحد الأدنى <b>{min_amount} جنيه</b> — مش اشتراك.",
         "بعد التحويل اضغط <b>حوّلت ✅</b>،\n"
         "وابعت صورة التحويل أو رقم العملية.\n"
         "الأدمن هيراجع الإثبات،\n"
-        "ولو اتقبل حدك هيبقى <b>10 مراقبات</b>.",
+        f"ولو اتقبل حدك هيبقى <b>{_watches(limit)}</b>.",
         "⚠️ <i>التحويل مش بيتفعل تلقائيًا.</i>",
     )
 
@@ -1481,7 +1495,7 @@ def support_ask_proof(method: str) -> str:
     name = "فودافون كاش" if method == "vodafone_cash" else "إنستاباي"
     return _blocks(
         f"📸 <b>إثبات تحويل {name}</b>",
-        "ابعت صورة التحويل أو رقم العملية.",
+        "ابعت صورة التحويل أو رقم العملية.\nلو الصورة عندك كمستند، ابعتها زي ما هي.",
         "لو مش عايز تكمل، اضغط <b>إلغاء</b>.",
     )
 
@@ -1521,16 +1535,18 @@ def support_admin_new(
     note: str,
     min_amount: int = 50,
     below_minimum: bool = False,
+    already_supporter: bool = False,
 ) -> str:
     name = "فودافون كاش" if method == "vodafone_cash" else "إنستاباي"
     amount_text = f"{amount:g} جنيه" if amount else "غير محدد"
     warning = f"\n⚠️ <b>أقل من الحد الأدنى ({min_amount} جنيه)</b>" if below_minimum else ""
+    repeat = "\nالحالة: داعم بالفعل — الدعم ده مش هيغيّر الحد" if already_supporter else ""
     return _blocks(
         f"<b>إثبات دعم جديد #{donation_id}</b>{warning}\n{DIVIDER}",
         f"المستخدم: <code>{user_id}</code>\n"
         f"الطريقة: {name}\n"
         f"المبلغ: {esc(amount_text)}\n"
-        f"الملاحظة: {esc(note or '—')}",
+        f"الملاحظة: {esc(note or '—')}{repeat}",
         "راجع الإثبات وبعدين قرر:",
     )
 

@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS donations (
     status TEXT NOT NULL,
     note TEXT,
     file_id TEXT,
+    file_type TEXT,
     approved_at TEXT,
     approved_by INTEGER,
     below_minimum INTEGER NOT NULL DEFAULT 0,
@@ -276,6 +277,7 @@ class Database:
         await self._ensure_column("donations", "approved_at", "TEXT")
         await self._ensure_column("donations", "approved_by", "INTEGER")
         await self._ensure_column("donations", "below_minimum", "INTEGER NOT NULL DEFAULT 0")
+        await self._ensure_column("donations", "file_type", "TEXT")
         await self.execute(
             "CREATE INDEX IF NOT EXISTS idx_watches_target "
             "ON watches(provider, branch_id, date, movie_id, active)"
@@ -1100,14 +1102,15 @@ class Database:
         status: str,
         note: str | None = None,
         file_id: str | None = None,
+        file_type: str | None = None,
         below_minimum: bool = False,
     ) -> int:
         cur = await self.execute(
             """
             INSERT INTO donations
                 (user_id, method, amount, status, note, file_id,
-                 below_minimum, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 file_type, below_minimum, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -1116,6 +1119,7 @@ class Database:
                 status,
                 note,
                 file_id,
+                file_type,
                 1 if below_minimum else 0,
                 utc_now_iso(),
             ),

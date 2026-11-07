@@ -52,7 +52,7 @@ cinema-radar/
 ├── metadata.py             # cached Arabic titles/overviews + Arabic search aliases
 ├── posters.py              # cached TMDB poster resolution (never scraped URLs)
 ├── consent.py              # explicit first-run consent version + pending choice
-├── support.py              # one-off manual donations and admin approval
+├── support.py              # repeatable manual donations and admin approval
 ├── stats.py                # internal metrics for the admin dashboard
 ├── feedback.py             # one feedback per user per hour
 ├── deeplinks.py            # parks ?start= payloads until a language is chosen
@@ -589,7 +589,9 @@ from `.env`. Secrets are only read from the environment.
 | --- | --- | --- |
 | `BOT_TOKEN` | — | Telegram bot token (required) |
 | `ADMIN_ID` | — | Admin numeric id (required for admin features) |
-| `DONATION_PHONE` | — | Manual donation number (never hard-coded) |
+| `DONATION_PHONE` | — | Shared manual donation account (never hard-coded) |
+| `DONATION_VODAFONE` | `DONATION_PHONE` | Vodafone Cash account shown to users |
+| `DONATION_INSTAPAY` | `DONATION_PHONE` | InstaPay number or address shown to users |
 | `CHANNEL_ID` | empty | Optional public channel for discovery posts |
 | `BOT_USERNAME` | empty | Bot @username for deep links; filled at startup |
 | `UI_RENDERER` | `auto` | `auto` = rich with classic fallback, `rich`, or `classic` |
@@ -639,7 +641,7 @@ from `.env`. Secrets are only read from the environment.
 | `PREBOOK_DATES_MAX_DAYS` | `120` | Horizon for bookable Coming Soon dates |
 | `FREE_WATCH_LIMIT` | `2` | Free active-watch limit |
 | `SUPPORTER_WATCH_LIMIT` | `10` | Limit after an approved donation |
-| `DONATION_MIN_AMOUNT` | `50` | Minimum one-off donation (EGP); lower amounts are flagged to the admin but can still be approved |
+| `DONATION_MIN_AMOUNT` | `50` | Minimum per donation (EGP); lower amounts are flagged to the admin but can still be approved. A user may donate again after being approved |
 | `USER_RATE_LIMIT_PER_MINUTE` | `20` | Anti-spam bot actions/user/minute |
 | `TELEGRAM_RATE_PER_SECOND` | `25` | Global Telegram send rate |
 | `TELEGRAM_PER_CHAT_PER_SECOND` | `1` | Per-chat send rate |
@@ -721,6 +723,26 @@ disappear after the retention window.
 
 ---
 
+## Manual support and donations
+
+The bot never handles card details and never activates a transfer
+automatically. A user opens **Support the project**, picks Vodafone Cash or
+InstaPay, sees the configured account (`DONATION_PHONE`, or the method-specific
+`DONATION_VODAFONE` / `DONATION_INSTAPAY`), transfers manually, and sends proof
+inside the bot. The proof can be a photo, an image sent as a document, or a
+transaction ID.
+
+`SupportService.create_manual()` stores the row as `pending` and forwards the
+proof to `ADMIN_ID` with **Approve** / **Reject** buttons (`dn:a:<id>` /
+`dn:r:<id>`). Approving sets `is_supporter = 1` and the watch limit to
+`SUPPORTER_WATCH_LIMIT`; rejecting changes nothing. Both decisions are
+idempotent. A repeat donation from an existing supporter is still forwarded and
+thanked, but does not change the limit again. Photos reach the admin as photos;
+documents reach the admin as documents. Telegram Stars are intentionally not
+supported.
+
+---
+
 ## Local setup
 
 Requirements: **Python 3.12** (3.11+ should work) and pip.
@@ -743,7 +765,8 @@ Edit `.env`:
 
 - `BOT_TOKEN` — from [@BotFather](https://t.me/BotFather)
 - `ADMIN_ID` — your numeric id (from [@userinfobot](https://t.me/userinfobot))
-- `DONATION_PHONE` — Vodafone Cash / InstaPay number shown to users
+- `DONATION_PHONE` - shared Vodafone Cash / InstaPay account shown to users
+- `DONATION_VODAFONE` / `DONATION_INSTAPAY` - optional per-method overrides
 - `CHANNEL_ID` — optional public channel
 - `BOT_USERNAME` — optional @username for deep links (filled from `bot.me()` at startup)
 - `UI_RENDERER` — `auto` (default), `rich` or `classic`
@@ -847,7 +870,7 @@ as soon as polling resumes.
    .\.venv\Scripts\pip install -r requirements.txt
    ```
 2. Copy `.env.example` to `.env` and fill `BOT_TOKEN`, `ADMIN_ID` and
-   `DONATION_PHONE`.
+   `DONATION_PHONE` (or `DONATION_VODAFONE` / `DONATION_INSTAPAY`).
 3. Run it once in the foreground to confirm it starts, then stop it with
    `Ctrl+C`:
    ```powershell

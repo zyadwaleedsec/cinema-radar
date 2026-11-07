@@ -12,12 +12,12 @@ more than one place: everything reads ``__version__`` from here.
 
 from __future__ import annotations
 
-__version__ = "3.2.2"
+__version__ = "3.3.0"
 
 #: Displayed in ``/help``, the settings screen and the admin panel.
 VERSION = __version__
 
 #: Human readable, used in logs and release notes.
-RELEASE_NAME = "Keep the chosen cinema"
+RELEASE_NAME = "Support as often as you like"
 
 __all__ = ["RELEASE_NAME", "VERSION", "__version__"]
