@@ -505,7 +505,6 @@ class Watcher:
 
     async def run_once(self, now: float | None = None) -> int:
         now = self._clock() if now is None else now
-        self.http.affected_hint = len(self.scheduler)
         await self._send_due_reminders(now)
         await self._maybe_sync(now)
         due = self.scheduler.pop_due(now)
@@ -559,6 +558,9 @@ class Watcher:
         provider = self.providers.get(target.provider)
         per_movie = bool(getattr(provider, "showtimes_per_movie", False))
         movie_id = target.movie_id if per_movie else None
+        # The admin incident shows how many watches sit on this target; the
+        # scheduler size is unrelated to what a single fetch failure affects.
+        self.http.affected_hint = len(watches)
         # A per-movie endpoint serves every branch with one response, so the
         # in-flight key must not include the branch (or a different movie).
         fetch_key = (

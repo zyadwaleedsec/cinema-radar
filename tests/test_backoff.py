@@ -164,6 +164,42 @@ async def test_successful_retry_does_not_alert_the_admin(db, cache, test_setting
     assert client.incident_open is False
 
 
+@pytest.mark.asyncio
+async def test_missing_branch_404_is_not_an_outage(db, cache, test_settings, clock):
+    alerts: list[str] = []
+
+    async def admin(text: str) -> None:
+        alerts.append(text)
+
+    session = FakeSession([Response(404) for _ in range(3)])
+    client = HttpClient(
+        test_settings,
+        cache,
+        session=session,
+        clock=clock,
+        sleep=clock.sleep,
+        on_admin_message=admin,
+    )
+
+    for _ in range(3):
+        with pytest.raises(UpstreamError) as caught:
+            await client.get(
+                "https://example.test/showtimes",
+                "missing",
+                ttl=1,
+                target_key="vox:downtown:2026-12-17",
+                allow_stale=False,
+            )
+        assert caught.value.reason == "http_404"
+
+    # A branch/date that does not exist yet is not a cinema-wide outage.
+    assert alerts == []
+    assert client.incident_open is False
+    assert client.circuit_state == "closed"
+    assert client.slowdown_factor == 1.0
+    assert client.failures_total == 0
+
+
 def test_transport_errors_are_classified_for_the_admin():
     class CurlTimeout(OSError):
         pass

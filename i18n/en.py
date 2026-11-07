@@ -1781,6 +1781,8 @@ def admin_unexpected_error(name: str) -> str:
 
 REASON_LABELS_EN = {
     "http_403": "({cinema}) rejected the request (403) — protection or block",
+    "http_404": "({cinema}) has no page for this branch or date (404)",
+    "http_410": "({cinema}) page is gone (410)",
     "http_429": "({cinema}) rate-limited the request (429)",
     "http_5xx": "({cinema}) server returned an error (5xx)",
     "timeout": "Timed out connecting to ({cinema})",

@@ -1818,6 +1818,8 @@ def admin_unexpected_error(name: str) -> str:
 
 REASON_LABELS_AR = {
     "http_403": "({cinema}) رافض الطلب (403) — حماية أو بلوك",
+    "http_404": "({cinema}) مش لاقي الصفحة (404) — الفرع أو اليوم مش متاح",
+    "http_410": "({cinema}) الصفحة اتشالت (410)",
     "http_429": "({cinema}) محدّد الطلبات (429) — rate limit",
     "http_5xx": "سيرفر ({cinema}) بيرجع خطأ (5xx)",
     "timeout": "انتهت مهلة الاتصال بـ ({cinema})",

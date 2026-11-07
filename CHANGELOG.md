@@ -11,6 +11,18 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-11-07
+
+### Fixed
+
+- A watch created from the add-watch flow now keeps the cinema the user picked.
+  Premiere and Renaissance choices used to be saved as VOX, so the watcher asked
+  VOX about foreign branch ids and the watch never worked.
+- A missing branch or date (HTTP 404/410) is no longer reported as a cinema
+  outage: it does not page the admin, open the circuit breaker, or slow down
+  every other target. The admin alert now counts the watches on the failing
+  target instead of the whole scheduler.
+
 ## [3.2.1] - 2026-11-07
 
 ### Fixed
@@ -576,7 +588,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.1...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.2...HEAD
+[3.2.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.0.0...v3.1.0

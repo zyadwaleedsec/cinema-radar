@@ -661,9 +661,19 @@ class HttpClient:
                         )
                     raise last_exc
 
-                # Other 4xx: not a capacity signal, but still a failed fetch.
+                # Other 4xx: a 404/410 normally means this branch/date has no
+                # listing yet, not that the whole cinema is down.  Counting it
+                # as an outage paged the admin and slowed every other target
+                # for a single missing branch/date.
                 reason = reason_for_status(status)
-                await self._record_failure(target_key, reason, url=url)
+                if status in {404, 410}:
+                    logger.info(
+                        "Upstream %s for %s (target missing, not an outage)",
+                        status,
+                        target_key or url,
+                    )
+                else:
+                    await self._record_failure(target_key, reason, url=url)
                 raise UpstreamError(
                     f"HTTP {status}",
                     status,

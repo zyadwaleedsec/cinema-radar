@@ -1465,10 +1465,16 @@ async def confirm_add(
     settings: Settings,
     scheduler: Scheduler,
     provider: Any,
+    providers: Any = None,
     imax: Any = None,
 ) -> None:
     await _ack(callback)
     data = await state.get_data()
+    # The injected provider is only the default cinema.  A user who picked
+    # Premiere or Renaissance must keep that choice all the way into the
+    # database, otherwise the watcher asks VOX about foreign branch ids.
+    selected = _selected_provider(providers, provider, data)
+    provider_name = getattr(selected, "name", None) or settings.provider
     branch = data.get("branch", {})
     movie = data.get("movie", {})
     date = data.get("date", "")
@@ -1480,9 +1486,9 @@ async def confirm_add(
     selected_format = data.get("format")
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     details = movie
-    if hasattr(provider, "get_movie_details"):
+    if hasattr(selected, "get_movie_details"):
         try:
-            details = (await provider.get_movie_details(Movie(**movie))).__dict__
+            details = (await selected.get_movie_details(Movie(**movie))).__dict__
         except Exception:
             details = movie
     stored_showtimes = [Showtime.from_dict(item) for item in data.get("showtimes", [])]
@@ -1491,7 +1497,7 @@ async def confirm_add(
     try:
         watch_id = await db.add_watch(
             user_id=int(user["id"]),
-            provider=settings.provider,
+            provider=provider_name,
             branch_id=branch.get("id", ""),
             branch_name=branch.get("name", ""),
             date="*" if all_dates else date,
@@ -1531,7 +1537,7 @@ async def confirm_add(
         return
 
     target = TargetKey(
-        provider=settings.provider,
+        provider=provider_name,
         branch_id=branch.get("id", ""),
         date=date,
         movie_id=movie.get("id", ""),

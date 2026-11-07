@@ -275,12 +275,14 @@ want a fully identified caller (TMDB) use `IDENTIFIED_USER_AGENT`
 If a request fails with an HTTP/2 stream reset, the client discards the session,
 pins HTTP/1.1 for the next one and retries once before counting a failure. If
 VOX blocks us anyway, the bot slows down, opens the circuit breaker, tells the
-admin (reason, place, last success, retry ETA and the number of affected
-watches), and sends one recovery message when VOX is back. A first failure is
-reported as a temporary problem; the outage wording and "alerting paused" note
-are only sent when the breaker actually trips. While an incident is open,
-alerts are paused: the watcher never diffs stale cache. Menus may still show the
-last known data with an age warning.
+admin (reason, place, last success, retry ETA and the number of watches on the
+failing target), and sends one recovery message when VOX is back. A first failure
+is reported as a temporary problem; the outage wording and "alerting paused"
+note are only sent when the breaker actually trips. An HTTP 404/410 for one
+branch/date means that listing does not exist yet: it is logged and retried, but
+it never pages the admin, opens the breaker, or slows unrelated targets. While an
+incident is open, alerts are paused: the watcher never diffs stale cache. Menus
+may still show the last known data with an age warning.
 
 ### Parser
 
@@ -511,10 +513,12 @@ firing a whole-day fan-out; every bot call path supplies the movie.
    SHA-256 body hash to skip unchanged pages.
 6. **Global token bucket** — 1 request/second by default, max 2 connections.
 7. **AIMD backoff** — on 429/403/5xx/timeout, double the affected target and
-   global slowdown; recover gradually on successes; honor `Retry-After`.
+   global slowdown; recover gradually on successes; honor `Retry-After`. A
+   404/410 is treated as "this branch/date has no listing" and is not counted.
 8. **Circuit breaker** — after 3 consecutive failures, pause all upstream
    requests for 2–4 minutes, then probe once. The admin gets one message when
-   the outage starts (with the reason and retry ETA) and one when it recovers.
+   the outage starts (with the reason, retry ETA and the watches on the failing
+   target) and one when it recovers.
 9. **Alert debounce** — a second read ~3 s later must confirm the change, plus a
    per-watch cooldown.
 10. **No evasion** — no proxies or IP rotation.
