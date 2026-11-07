@@ -11,6 +11,15 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.3.2] - 2026-11-07
+
+### Fixed
+
+- `/grant` and `/revoke` without a numeric id no longer fail with "A small
+  hiccup": the usage line escaped its `<telegram_id>` placeholder, so Telegram
+  rejected the message as invalid HTML. `/imax` had the same problem with its
+  placeholders.
+
 ## [3.3.1] - 2026-11-07
 
 ### Changed
@@ -608,7 +617,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.1...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.2...HEAD
+[3.3.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.2...v3.3.0
 [3.2.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.1...v3.2.2

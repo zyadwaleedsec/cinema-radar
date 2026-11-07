@@ -2067,12 +2067,12 @@ def setting_saved() -> str:
 
 
 def admin_usage(command: str) -> str:
-    return f"استخدم: /{command} <telegram_id>"
+    return f"استخدم: <code>/{esc(command)} &lt;telegram_id&gt;</code>"
 
 
 def imax_override_usage() -> str:
     return (
-        "استخدم: /imax <movie_id> <status>\n"
+        "استخدم: <code>/imax &lt;movie_id&gt; &lt;status&gt;</code>\n"
         "الحالات: FULL_70MM, PARTIAL_70MM, CERTIFIED_DIGITAL, PARTIAL_DIGITAL, UNKNOWN"
     )
 

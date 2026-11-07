@@ -49,7 +49,7 @@ English**. Almost every step is an inline button; you only type a movie name whe
 searching or a custom quiet-hours range. You choose the language before anything
 else, and Settings (`/language`) changes it later.
 
-  Current release: **v3.3.1** - see [`CHANGELOG.md`](CHANGELOG.md).
+  Current release: **v3.3.2** - see [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 

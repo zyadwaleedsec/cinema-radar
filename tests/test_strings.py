@@ -55,6 +55,19 @@ def test_feedback_admin_prefers_the_sender_name():
     assert "ID:" not in anonymous
 
 
+def test_admin_usage_escapes_placeholder_tags():
+    # Telegram's HTML parser treats "<telegram_id>" as an unknown tag and
+    # rejects the whole message, so usage lines must escape the angle brackets.
+    for lang in ("ar", "en"):
+        catalog = strings.catalog(lang)
+        usage = catalog.admin_usage("grant")
+        assert "<telegram_id>" not in usage
+        assert "&lt;telegram_id&gt;" in usage
+        imax = catalog.imax_override_usage()
+        assert "<movie_id>" not in imax
+        assert "<status>" not in imax
+
+
 def test_seat_requirement_appears_on_the_confirmation():
     text = strings.confirm_watch(
         "City Centre Almaza",
