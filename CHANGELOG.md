@@ -11,6 +11,14 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-11-07
+
+### Fixed
+
+- Messages sent while the bot is restarting (for example `/start` during a
+  deploy) are no longer discarded. Polling keeps pending updates and answers
+  them as soon as it resumes.
+
 ## [3.2.0] - 2026-11-07
 
 ### Added
@@ -568,7 +576,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.1...HEAD
+[3.2.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.0.0...v3.1.0
 [2.8.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.0...v2.8.1

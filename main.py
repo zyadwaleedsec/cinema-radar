@@ -360,7 +360,9 @@ async def run() -> None:
     logger.info("Cinema Radar v%s starting", __version__)
 
     try:
-        await dp.start_polling(bot, drop_pending_updates=True)
+        # Keep updates that arrived while the process was restarting.  Dropping
+        # them made a /start sent during a deploy disappear with no reply.
+        await dp.start_polling(bot)
     finally:
         with contextlib.suppress(Exception):
             await bot.session.close()

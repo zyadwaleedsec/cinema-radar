@@ -833,7 +833,9 @@ collapse into a single line.
 ## Deployment on a local laptop
 
 The bot uses long polling, so it needs no inbound ports, domain or public IP.
-Run exactly one long-polling process per bot token.
+Run exactly one long-polling process per bot token. Pending updates are not
+discarded on startup, so a `/start` sent while the process restarts is answered
+as soon as polling resumes.
 
 1. Install Python 3.12 and create a virtual environment:
    ```powershell
