@@ -11,6 +11,13 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-11-07
+
+### Changed
+
+- The admin's donation notification shows the donor's name, Telegram username
+  (when set), and numeric Telegram ID instead of only the numeric ID.
+
 ## [3.3.0] - 2026-11-07
 
 ### Added
@@ -601,7 +608,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.2...v3.3.0
 [3.2.2]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.0...v3.2.1

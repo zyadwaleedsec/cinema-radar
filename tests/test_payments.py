@@ -161,6 +161,31 @@ async def test_repeat_donation_is_marked_for_the_admin(db, test_settings):
 
 
 @pytest.mark.asyncio
+async def test_admin_sees_the_donor_name_and_telegram_id(db, test_settings):
+    await db.get_or_create_user(562, watch_limit=test_settings.free_watch_limit)
+    sender = FakeSender()
+    service = SupportService(db, test_settings, sender)
+    previous = i18n.admin_language()
+    i18n.set_admin_language("en")
+    try:
+        await service.create_manual(
+            562,
+            "vodafone_cash",
+            "proof",
+            amount=50,
+            user_name="Ahmed Ali",
+            username="ahmed",
+        )
+    finally:
+        i18n.set_admin_language(previous)
+
+    admin_text = sender.sent[-1][0][1]
+    assert "Name: Ahmed Ali" in admin_text
+    assert "Telegram: @ahmed" in admin_text
+    assert "Telegram ID: <code>562</code>" in admin_text
+
+
+@pytest.mark.asyncio
 async def test_document_proof_is_forwarded_as_a_document(db, test_settings):
     await db.get_or_create_user(561, watch_limit=test_settings.free_watch_limit)
     bot = FakeBot()

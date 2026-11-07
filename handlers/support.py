@@ -159,6 +159,8 @@ async def proof_received(message: Message, state: FSMContext, support, settings:
     if not file_id and not note:
         await send(message, strings.error_generic())
         return
+    sender = message.from_user
+    user_name = (sender.full_name or sender.first_name or "").strip() if sender else ""
     await support.create_manual(
         telegram_id=message.from_user.id,
         method=method,
@@ -166,6 +168,8 @@ async def proof_received(message: Message, state: FSMContext, support, settings:
         file_id=file_id,
         amount=float(amount) if amount else None,
         file_type=file_type,
+        user_name=user_name or None,
+        username=sender.username if sender else None,
     )
     await state.clear()
     await send(message, strings.support_proof_received(), main_menu_keyboard())

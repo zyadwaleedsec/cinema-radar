@@ -733,8 +733,9 @@ inside the bot. The proof can be a photo, an image sent as a document, or a
 transaction ID.
 
 `SupportService.create_manual()` stores the row as `pending` and forwards the
-proof to `ADMIN_ID` with **Approve** / **Reject** buttons (`dn:a:<id>` /
-`dn:r:<id>`). Approving sets `is_supporter = 1` and the watch limit to
+proof to `ADMIN_ID` with the donor's name, Telegram username (when set), numeric
+Telegram ID, and **Approve** / **Reject** buttons (`dn:a:<id>` / `dn:r:<id>`).
+Approving sets `is_supporter = 1` and the watch limit to
 `SUPPORTER_WATCH_LIMIT`; rejecting changes nothing. Both decisions are
 idempotent. A repeat donation from an existing supporter is still forwarded and
 thanked, but does not change the limit again. Photos reach the admin as photos;

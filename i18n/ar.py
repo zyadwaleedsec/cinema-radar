@@ -1536,14 +1536,19 @@ def support_admin_new(
     min_amount: int = 50,
     below_minimum: bool = False,
     already_supporter: bool = False,
+    user_name: str | None = None,
+    username: str | None = None,
 ) -> str:
     name = "فودافون كاش" if method == "vodafone_cash" else "إنستاباي"
     amount_text = f"{amount:g} جنيه" if amount else "غير محدد"
     warning = f"\n⚠️ <b>أقل من الحد الأدنى ({min_amount} جنيه)</b>" if below_minimum else ""
     repeat = "\nالحالة: داعم بالفعل — الدعم ده مش هيغيّر الحد" if already_supporter else ""
+    handle = f"@{esc(username)}" if username else "—"
     return _blocks(
         f"<b>إثبات دعم جديد #{donation_id}</b>{warning}\n{DIVIDER}",
-        f"المستخدم: <code>{user_id}</code>\n"
+        f"الاسم: {esc(user_name or '—')}\n"
+        f"تيليجرام: {handle}\n"
+        f"رقم تيليجرام: <code>{user_id}</code>\n"
         f"الطريقة: {name}\n"
         f"المبلغ: {esc(amount_text)}\n"
         f"الملاحظة: {esc(note or '—')}{repeat}",

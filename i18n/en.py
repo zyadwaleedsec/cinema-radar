@@ -1525,6 +1525,8 @@ def support_admin_new(
     min_amount: int = 50,
     below_minimum: bool = False,
     already_supporter: bool = False,
+    user_name: str | None = None,
+    username: str | None = None,
 ) -> str:
     name = "Vodafone Cash" if method == "vodafone_cash" else "InstaPay"
     amount_text = f"{amount:g} EGP" if amount else "Not specified"
@@ -1534,9 +1536,12 @@ def support_admin_new(
         if already_supporter
         else ""
     )
+    handle = f"@{esc(username)}" if username else "—"
     return _blocks(
         f"<b>New support proof #{donation_id}</b>{warning}\n{DIVIDER}",
-        f"User: <code>{user_id}</code>\n"
+        f"Name: {esc(user_name or '—')}\n"
+        f"Telegram: {handle}\n"
+        f"Telegram ID: <code>{user_id}</code>\n"
         f"Method: {name}\n"
         f"Amount: {esc(amount_text)}\n"
         f"Note: {esc(note or '—')}{repeat}",

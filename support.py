@@ -40,6 +40,8 @@ class SupportService:
         file_id: str | None = None,
         amount: float | None = None,
         file_type: str | None = None,
+        user_name: str | None = None,
+        username: str | None = None,
     ) -> int:
         user = await self.db.get_or_create_user(
             telegram_id, watch_limit=self.settings.free_watch_limit
@@ -65,6 +67,8 @@ class SupportService:
             below_minimum,
             file_type,
             bool(int(user.get("is_supporter") or 0)),
+            user_name,
+            username,
         )
         return donation_id
 
@@ -79,6 +83,8 @@ class SupportService:
         below_minimum: bool = False,
         file_type: str | None = None,
         already_supporter: bool = False,
+        user_name: str | None = None,
+        username: str | None = None,
     ) -> None:
         from keyboards import donation_admin_keyboard
 
@@ -92,6 +98,8 @@ class SupportService:
                 self.settings.donation_min_amount,
                 below_minimum,
                 already_supporter,
+                user_name,
+                username,
             )
         if not self.settings.admin_id:
             return
