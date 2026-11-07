@@ -17,32 +17,43 @@ from aiogram.types import CallbackQuery
 import strings
 from config import Settings
 from db import Database, DuplicateWatch, WatchLimitReached
+from handlers.settings import ALL_EVENT_TYPES
 from handlers.utils import answer, edit, send
-from keyboards import discovery_movie_keyboard
+from keyboards import (
+    back_home_keyboard,
+    discovery_movie_keyboard,
+    discovery_stopped_keyboard,
+    watch_created_keyboard,
+)
 from models import TargetKey
 from scheduler import Scheduler, expected_opening_for
-from timeutil import today_iso
+from timeutil import day_end_iso, today_iso
 
 router = Router(name="discovery")
 
 
-async def _owned_action(db: Database, callback: CallbackQuery, token: str) -> dict[str, Any] | None:
+async def _load_action(
+    db: Database, callback: CallbackQuery, token: str
+) -> tuple[dict[str, Any] | None, bool]:
     """Load an alert only when it belongs to the person tapping it.
 
-    Newer rows store the Telegram id; rows sent before 2.8.2 stored the internal
-    ``users.id``, so accept either until they age out of the seven-day window.
+    Returns ``(action, stale)``.  A missing row is stale rather than forbidden
+    so the user gets a precise "this alert has expired" message instead of a
+    generic error.  Newer rows store the Telegram id; rows sent before 2.8.2
+    stored the internal ``users.id``, so accept either until they age out of
+    the seven-day window.
     """
 
     action = await db.get_discovery_action(token)
     if not action:
-        return None
+        return None, True
     owner = int(action.get("user_id") or 0)
     if owner == callback.from_user.id:
-        return action
+        return action, False
     user = await db.get_user(callback.from_user.id)
     if user is not None and owner == int(user["id"]):
-        return action
-    return None
+        return action, False
+    return None, False
 
 
 def _choices(action: dict[str, Any]) -> list[dict[str, Any]]:
@@ -74,6 +85,7 @@ def _choices(action: dict[str, Any]) -> list[dict[str, Any]]:
             "line": action.get("movie_name") or "",
             "showtime": "",
             "hall_type": "",
+            "times": [],
         }
     ]
 
@@ -81,9 +93,13 @@ def _choices(action: dict[str, Any]) -> list[dict[str, Any]]:
 @router.callback_query(F.data.startswith("dw:"))
 async def watch_from_discovery(callback: CallbackQuery, db: Database) -> None:
     token = (callback.data or "").split(":", 1)[1]
-    action = await _owned_action(db, callback, token)
+    action, stale = await _load_action(db, callback, token)
     if not action:
-        await answer(callback, strings.error_generic(), alert=True)
+        await answer(
+            callback,
+            strings.discovery_alert_expired() if stale else strings.error_generic(),
+            alert=True,
+        )
         return
     choices = _choices(action)
     await send(
@@ -107,9 +123,13 @@ async def watch_movie_chosen(
         index = int(parts[2]) if len(parts) > 2 else -1
     except ValueError:
         index = -1
-    action = await _owned_action(db, callback, token)
+    action, stale = await _load_action(db, callback, token)
     if not action:
-        await answer(callback, strings.error_generic(), alert=True)
+        await answer(
+            callback,
+            strings.discovery_alert_expired() if stale else strings.error_generic(),
+            alert=True,
+        )
         return
     choices = _choices(action)
     if not 0 <= index < len(choices):
@@ -124,15 +144,13 @@ async def watch_movie_chosen(
     movie_name = str(choice.get("movie_name") or action.get("movie_name") or "")
     title = str(choice.get("title") or movie_name)
     date = str(choice.get("date") or action.get("date") or today_iso(settings.timezone))
-    showtime = str(choice.get("showtime") or "")
-    hall = str(choice.get("hall_type") or "")
     if not (branch_id and movie_id):
         await answer(callback, strings.error_expired(), alert=True)
         return
 
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     try:
-        await db.add_watch(
+        watch_id = await db.add_watch(
             user_id=int(user["id"]),
             provider=provider_name,
             branch_id=branch_id,
@@ -140,8 +158,12 @@ async def watch_movie_chosen(
             date=date,
             movie_id=movie_id,
             movie_name=movie_name,
-            showtime=showtime,
-            hall_type=hall,
+            # A discovery alert is about the movie, not one screening: follow
+            # every showtime and every hall on that day so a later return of
+            # seats or a new slot is not missed.
+            showtime="*",
+            hall_type="*",
+            scope="movie",
             watch_limit=int(user["watch_limit"]),
             booking_url=str(choice.get("booking_url") or "") or None,
             poster_url=str(choice.get("poster_url") or "") or None,
@@ -151,6 +173,7 @@ async def watch_movie_chosen(
             synopsis=str(choice.get("synopsis") or "") or None,
             trailer_url=str(choice.get("trailer_url") or "") or None,
             imax_status=str(choice.get("imax_status") or "") or None,
+            expires_at=day_end_iso(date, settings.timezone),
         )
     except WatchLimitReached:
         await answer(
@@ -179,15 +202,11 @@ async def watch_movie_chosen(
         expected_open_at=expected_opening_for(date),
     )
     await answer(callback, strings.setting_saved(), alert=False)
+    count = len(choice.get("times") or ()) or 1
     await edit(
         callback,
-        strings.watch_created(
-            branch_name,
-            date,
-            title,
-            showtime or "—",
-            hall or "—",
-        ),
+        strings.watch_created_movie(branch_name, date, title, count),
+        watch_created_keyboard(watch_id),
     )
 
 
@@ -195,4 +214,19 @@ async def watch_movie_chosen(
 async def stop_discovery(callback: CallbackQuery, db: Database, settings: Settings) -> None:
     user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
     await db.set_subscription_active(int(user["id"]), False)
+    # Be explicit about the scope and leave a one-tap undo, so stopping an
+    # alert never feels like an irreversible surprise.
+    await edit(callback, strings.discovery_stopped(), discovery_stopped_keyboard())
+    await answer(callback, strings.setting_saved(), alert=False)
+
+
+@router.callback_query(F.data == "ds:on")
+async def resume_discovery(callback: CallbackQuery, db: Database, settings: Settings) -> None:
+    user = await db.get_or_create_user(callback.from_user.id, watch_limit=settings.free_watch_limit)
+    sub = await db.get_subscription(int(user["id"]))
+    if sub is None:
+        await db.upsert_subscription(int(user["id"]), [], list(ALL_EVENT_TYPES), None, True)
+    else:
+        await db.set_subscription_active(int(user["id"]), True)
+    await edit(callback, strings.discovery_resumed(), back_home_keyboard())
     await answer(callback, strings.setting_saved(), alert=False)

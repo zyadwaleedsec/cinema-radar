@@ -57,13 +57,17 @@ async def _user_and_sub(
 
 
 def _subscription_values(sub: dict[str, Any] | None, **overrides: Any) -> dict[str, Any]:
-    """Reuse the existing subscription, applying only the changed fields."""
+    """Reuse the existing subscription, applying only the changed fields.
+
+    ``active`` is deliberately inherited: editing a filter must never opt a
+    user into alerts they had switched off.  Only ``set:disc`` turns it on.
+    """
 
     values = {
         "branch_ids": json_list(sub.get("branch_ids")) if sub else [],
         "event_types": (json_list(sub.get("event_types")) if sub else list(ALL_EVENT_TYPES)),
         "hall_type": sub.get("hall_type") if sub else None,
-        "active": True,
+        "active": bool(sub.get("active")) if sub else False,
     }
     values.update(overrides)
     return values
@@ -229,7 +233,9 @@ async def toggle_discovery(callback: CallbackQuery, db: Database, settings: Sett
     if sub and sub.get("active"):
         await db.set_subscription_active(int(user["id"]), False)
     else:
-        await db.upsert_subscription(int(user["id"]), **_subscription_values(sub))
+        # The only place that opts a user in.  Filters chosen while the feature
+        # was off are kept and take effect now.
+        await db.upsert_subscription(int(user["id"]), **_subscription_values(sub, active=True))
     user, sub = await _user_and_sub(db, callback.from_user.id, settings)
     await _render(callback, user, sub, settings)
     await answer(callback, strings.setting_saved())

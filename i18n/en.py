@@ -207,7 +207,8 @@ BTN_OPEN_BOOKING = "🎟️ Open booking"
 BTN_MOVIE_PAGE = "🎬 Movie page"
 BTN_CINEMA_PAGE = "🏢 Cinema page"
 BTN_WATCH_MOVIE = "🔔 Watch a movie from these updates"
-BTN_STOP_ALERTS = "🔕 Stop these alerts"
+BTN_STOP_ALERTS = "🔕 Stop all movie alerts"
+BTN_TURN_ON_ALERTS = "🔔 Turn alerts back on"
 BTN_REMOVE_WATCH = "❌ Remove watch"
 BTN_CONFIRM_REMOVE_WATCH = "Yes, remove it"
 BTN_SNOOZE = "⏰ Remind me in an hour"
@@ -233,7 +234,7 @@ BTN_INSTAPAY = "InstaPay"
 BTN_CANCELLATIONS = "🪑 Seats back"
 BTN_QUIET_HOURS = "🕰️ Quiet hours"
 BTN_QUIET_CUSTOM = "🕰️ Custom time"
-BTN_DISCOVERY_ALERTS = "🎬 New-movie alerts"
+BTN_DISCOVERY_ALERTS = "🎬 Movie and showtime alerts"
 BTN_BRANCHES_FILTER = "🎯 Alert branches"
 BTN_TYPES_FILTER = "📌 Alert types"
 BTN_HALL_FILTER = "🎭 Hall type"
@@ -391,7 +392,9 @@ def onboard_alerts() -> str:
         "🎟️ <b>Booking opened</b>\nThe moment a showtime goes on sale.",
         "🪑 <b>Seats came back</b>\nWhen a sold-out show frees up.",
         "📅 <b>New date</b>\nWhen a movie opens another day.",
-        "⚙️ Set each alert type in <b>Alert settings</b>.",
+        "🍿 <b>A new movie or showtime</b>\nWhen a movie arrives or fresh slots open,\n"
+        "if you turn on <b>Movie and showtime alerts</b>.",
+        "⚙️ Set each type and switch alerts on in <b>Settings</b>.",
     )
 
 
@@ -422,6 +425,9 @@ def help_text() -> str:
         "• Showtime\n\n"
         "Or watch every showtime that day, or every available date.\n"
         "You can also filter by format (IMAX, 4DX, VIP…).\n\n"
+        "<b>Nothing to watch yet?</b>\n"
+        "Turn on <b>🎬 Movie and showtime alerts</b> in Settings,\n"
+        "and you'll hear about every new movie, date or showtime the moment it drops.\n\n"
         "<b>2 · Wait for the alert</b>\n"
         "When booking opens or a seat comes back,\n"
         "you get a message with the booking link.\n\n"
@@ -1320,13 +1326,20 @@ def settings_text(
     branches = "All branches" if branch_count == 0 else _count(branch_count, "branch", "branches")
     hall = hall_type or "All halls"
     watch_quiet = "and watches are included ✅" if quiet_watches else "watches always alert 🔔"
+    hint = (
+        ""
+        if discovery_enabled
+        else "💡 <i>Turn on movie and showtime alerts to hear about every new movie, "
+        "date or showtime the moment it drops.</i>"
+    )
     return _blocks(
         f"⚙️ <b>Settings</b>\n{DIVIDER}",
         "<b>🔔 Notifications</b>\n"
         f"• Seats back: {'on ✅' if notify_cancellations else 'off ⛔'}\n"
         f"• Quiet hours: {format_time(f'{quiet_start}:00')} → {format_time(f'{quiet_end}:00')}\n"
         f"  <i>{watch_quiet}</i>\n"
-        f"• New movies and bookings: {'on ✅' if discovery_enabled else 'off ⛔'}",
+        f"• New movies and showtimes: {'on ✅' if discovery_enabled else 'off ⛔'}",
+        hint,
         "<b>🎯 New-alert filters</b>\n"
         f"• Branches: {esc(branches)}\n"
         f"• Types: {esc(types)}\n"
@@ -1662,13 +1675,16 @@ def discovery_digest(
     count: int,
     lines: list[str],
     provider: str | None = None,
+    hidden: int = 0,
 ) -> str:
     body = "\n".join(f"• {line}" for line in lines)
+    more = f"➕ {_count(hidden, 'more update', 'more updates')}" if hidden > 0 else ""
     return _blocks(
         f"🍿 <b>{_count(count, 'new update', 'new updates')} at "
         f"{cinema_name(provider)} · {esc(branch)}</b>",
         DIVIDER,
         body,
+        more,
         "👀 <i>Take a look and pick your favourite.</i>",
     )
 
@@ -1678,6 +1694,30 @@ def discovery_watch_prompt() -> str:
         "🔔 <b>Which movie do you want to watch?</b>",
         DIVIDER,
         "Pick a movie from the updates above:",
+    )
+
+
+def discovery_stopped() -> str:
+    return _blocks(
+        "🔕 <b>Movie and showtime alerts are off</b>",
+        "You won't get alerts about new movies, dates or showtimes.",
+        "Your regular watches are untouched.",
+        "You can turn them back on anytime with the button below or in <b>Settings</b>.",
+    )
+
+
+def discovery_resumed() -> str:
+    return _blocks(
+        "🔔 <b>Alerts are back on</b>",
+        "You'll hear about everything new from the branches you picked.",
+    )
+
+
+def discovery_alert_expired() -> str:
+    return _blocks(
+        "⌛ <b>This alert has expired</b>",
+        "Alerts stay tappable for seven days.",
+        "Open the latest alert or go to /settings.",
     )
 
 
@@ -1887,7 +1927,10 @@ def discovery_line_new_date(name: object, date_text: str) -> str:
 
 
 def discovery_line_new_showtimes(name: object, times: tuple[str, ...]) -> str:
-    formatted = ", ".join(format_time(value) for value in times)
+    shown = times[:6]
+    formatted = ", ".join(format_time(value) for value in shown)
+    if len(times) > len(shown):
+        formatted += ", and more"
     return f"🕐 New showtimes: {esc(name)} — {formatted}"
 
 

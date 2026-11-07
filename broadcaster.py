@@ -22,8 +22,21 @@ from models import DiscoveryEvent, format_key
 from notifier import TelegramSender, UserBlocked
 from timeutil import is_quiet_time, local_date, today_iso
 from utils import json_list
+from watcher import BOOKING_OPENED, NEW_DATE_OPENED, NEW_SHOWTIMES, alert_allowed
 
 logger = logging.getLogger(__name__)
+
+#: A digest bigger than this is cut off and the rest is summarised.  Telegram
+#: rejects captions over 1024 characters, and twelve bullet lines already fill
+#: most of that budget on a phone.
+MAX_DIGEST_LINES = 12
+
+#: Discovery event kind -> the watcher kind it would duplicate.
+_DEDUPE_KIND = {
+    "NEW_MOVIE": BOOKING_OPENED,
+    "NEW_DATE_OPENED": NEW_DATE_OPENED,
+    "NEW_SHOWTIMES": NEW_SHOWTIMES,
+}
 
 
 class Broadcaster:
@@ -94,20 +107,45 @@ class Broadcaster:
         await self._post_to_channel(events)
 
         subscriptions = await self.db.list_active_subscriptions()
+        watches = await self._watches_by_user(subscriptions)
         sent = 0
         for sub in subscriptions:
             try:
-                sent += await self._send_subscriber(sub, events, now)
+                sent += await self._send_subscriber(
+                    sub,
+                    events,
+                    now,
+                    watches=watches.get(int(sub["user_id"]), ()),
+                )
             except Exception:
                 # One broken row (bad preference, database hiccup, unexpected
                 # payload) must not stop the rest of the fan-out.
                 logger.exception("Discovery broadcast failed for %s", sub.get("telegram_id"))
         return sent
 
+    async def _watches_by_user(
+        self, subscriptions: list[dict[str, Any]]
+    ) -> dict[int, list[dict[str, Any]]]:
+        """Load every subscriber's active watches in one bulk query."""
+
+        if not subscriptions:
+            return {}
+        rows = await self.db.list_active_watches_for_users(
+            [int(sub["user_id"]) for sub in subscriptions]
+        )
+        grouped: dict[int, list[dict[str, Any]]] = {}
+        for row in rows:
+            grouped.setdefault(int(row["user_id"]), []).append(row)
+        return grouped
+
     async def _send_subscriber(
-        self, sub: dict[str, Any], events: list[DiscoveryEvent], now: float
+        self,
+        sub: dict[str, Any],
+        events: list[DiscoveryEvent],
+        now: float,
+        watches: Iterable[dict[str, Any]] = (),
     ) -> int:
-        matching = self._filter_events(sub, events)
+        matching = self._filter_events(sub, events, watches)
         if not matching:
             return 0
         if self._is_quiet(sub, matching, now):
@@ -149,11 +187,17 @@ class Broadcaster:
         return sent
 
     def _filter_events(
-        self, sub: dict[str, Any], events: list[DiscoveryEvent]
+        self,
+        sub: dict[str, Any],
+        events: list[DiscoveryEvent],
+        watches: Iterable[dict[str, Any]] = (),
     ) -> list[DiscoveryEvent]:
         branch_ids = set(json_list(sub.get("branch_ids")))
         event_types = json_list(sub.get("event_types"))
         hall = format_key(sub.get("hall_type")) if sub.get("hall_type") else "*"
+        # A watch the user already created covers the same branch/movie/date.
+        # Sending a discovery card too would be a near-identical duplicate.
+        covered = list(watches)
         result = []
         for event in events:
             candidates = {event.branch.id, f"{event.branch.provider}:{event.branch.id}"}
@@ -166,6 +210,8 @@ class Broadcaster:
                     continue
                 if format_key(event.showtime.hall_type) != hall:
                     continue
+            if any(_watch_covers(watch, event) for watch in covered):
+                continue
             result.append(event)
         return result
 
@@ -240,11 +286,15 @@ class Broadcaster:
         first = events[0]
         branch_name = first.branch.name
         first_title = titles.get(first.movie.name) or first.movie.name
+        visible = events[:MAX_DIGEST_LINES]
         if len(events) == 1:
             text = _event_text(first, first_title)
         else:
-            lines = [_event_line(e, titles.get(e.movie.name)) for e in events]
-            text = strings.discovery_digest(branch_name, len(events), lines, first.branch.provider)
+            hidden = len(events) - len(visible)
+            lines = [_event_line(e, titles.get(e.movie.name)) for e in visible]
+            text = strings.discovery_digest(
+                branch_name, len(events), lines, first.branch.provider, hidden
+            )
 
         token = secrets.token_urlsafe(16)
         await self.db.add_discovery_action(
@@ -257,7 +307,7 @@ class Broadcaster:
             first.movie.name,
             first.branch.provider,
             payload=json.dumps(
-                _watch_choices(events, titles), ensure_ascii=False, separators=(",", ":")
+                _watch_choices(visible, titles), ensure_ascii=False, separators=(",", ":")
             ),
         )
         # A single event links straight to the movie; a digest covers several
@@ -292,6 +342,30 @@ class Broadcaster:
                 logger.exception("Could not post to public channel")
 
 
+def _watch_covers(watch: dict[str, Any], event: DiscoveryEvent) -> bool:
+    """True when an active watch already alerts about this discovery event.
+
+    The watcher and discovery can report the same booking from two directions.
+    Suppressing the discovery copy keeps one clear message per user, but only
+    when the watch's alert mode would actually deliver it (a seats-only watch
+    must not hide new-movie news).
+    """
+
+    kind = _DEDUPE_KIND.get(event.kind)
+    if kind is None or not alert_allowed(watch.get("alert_mode"), kind):
+        return False
+    if str(watch.get("provider") or "") != event.branch.provider:
+        return False
+    if str(watch.get("branch_id") or "") != event.branch.id:
+        return False
+    if str(watch.get("movie_id") or "") != event.movie.id:
+        return False
+    if str(watch.get("scope") or "showtime") == "movie_all_dates":
+        return True
+    watch_date = str(watch.get("date") or "")
+    return watch_date == "*" or (bool(event.date) and watch_date == event.date)
+
+
 def _watch_choices(events: list[DiscoveryEvent], titles: dict[str, str]) -> list[dict[str, Any]]:
     """One row per movie in this digest, with everything a watch needs.
 
@@ -301,14 +375,22 @@ def _watch_choices(events: list[DiscoveryEvent], titles: dict[str, str]) -> list
     """
 
     choices: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str]] = set()
+    index: dict[tuple[str, str, str], int] = {}
     for event in events:
         key = (event.branch.provider, event.branch.id, event.movie.id)
-        if key in seen:
-            continue
-        seen.add(key)
         showtime = event.showtime
         movie = event.movie
+        times = list(event.times or ())
+        if not times and showtime is not None and showtime.time:
+            times.append(showtime.time)
+        position = index.get(key)
+        if position is not None:
+            # The same movie can appear in two updates for this branch.  Merge
+            # their times so the confirmation can quote a real count.
+            merged = choices[position]["times"]
+            merged.extend(value for value in times if value not in merged)
+            continue
+        index[key] = len(choices)
         choices.append(
             {
                 "provider": event.branch.provider,
@@ -321,6 +403,7 @@ def _watch_choices(events: list[DiscoveryEvent], titles: dict[str, str]) -> list
                 "line": _event_line(event, titles.get(movie.name)),
                 "showtime": showtime.time if showtime else "",
                 "hall_type": showtime.hall_type if showtime else "",
+                "times": times,
                 "booking_url": event.booking_url
                 or (showtime.booking_url if showtime else None)
                 or "",

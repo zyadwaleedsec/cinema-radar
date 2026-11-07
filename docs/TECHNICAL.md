@@ -530,15 +530,28 @@ change by re-reading the provider cache
 (`DISCOVERY_CONFIRM_NETWORK=false`), so it does not create a second upstream
 request. Coming Soon is refreshed at most once per `COMING_SOON_INTERVAL`
 (default one hour), and movie details are cached for a week. When one cycle
-produces several updates for the same branch they ship as a single digest that
-lists every line, one movie per chooser button. The digest stores each movie's
-branch, date, showtime, artwork and booking URL as JSON in
+produces several updates for the same branch they ship as a single digest with
+at most twelve lines; any remainder is summarised as "and N more updates"
+(`MAX_DIGEST_LINES`, chosen to stay well below the photo-caption limit). Each
+showtime line also caps at six visible times. The digest stores each movie's
+branch, date, every showtime seen, artwork and booking URL as JSON in
 `discovery_actions.payload`; tapping "watch a movie" therefore creates the
-watch locally instead of fetching showtimes again. Every alert also carries a
-public link button: a single-movie alert points at that movie's page on the
-cinema site, while a digest points at the branch page (Premiere falls back to
-its now-showing listing). The link is assembled from the slug/id we already
-hold and is never fetched by the bot.
+watch locally instead of fetching showtimes again.
+
+That quick watch covers the whole movie on the alert's day
+(`scope="movie"`, `showtime="*"`, `hall_type="*"`, expiring at 23:59 local), not
+one screening, so a later seat return or a new hall is still covered. Before
+sending, the broadcaster skips an event for any subscriber who already has an
+active watch for the same provider, branch, movie and date whose alert mode
+would deliver it: this removes the near-duplicate message the watcher and
+discovery used to send together, while a seats-only watch still lets new-movie
+news through. All subscriber watches are loaded in one bulk query per cycle.
+Every alert also carries a public link button: a single-movie alert points at
+that movie's page on the cinema site, while a digest points at the branch page
+(Premiere falls back to its now-showing listing). Renaissance URLs are
+rewritten to the reader's language, and the link is assembled from the slug/id
+we already hold and is never fetched by the bot. The stop button switches all
+movie alerts off, states the scope plainly and offers a one-tap undo.
 
 The cross-cinema window watch ("All cinemas") stores one `scope="movie"` row
 per branch that has the movie, all sharing a `group_id` so the watch limit
@@ -638,6 +651,12 @@ Per-user quiet hours can be changed from Settings; `NULL` means "use the global
 values from config". Watch alerts honour quiet hours by default (today/tomorrow
 screenings always bypass them) and each user can turn that off from the quiet
 hours screen.
+
+Discovery alerts are opt-in and their filters are stored on the same
+`subscriptions` row. Saving branch, type or hall filters copies the existing
+`active` value; only the dedicated toggle in Settings writes `active = 1`, so
+adjusting a filter can never quietly start sending alerts. Filters chosen while
+the feature is off are kept and take effect when the user turns it on.
 
 ---
 

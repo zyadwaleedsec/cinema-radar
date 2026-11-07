@@ -11,6 +11,37 @@ the project uses [Semantic Versioning](https://semver.org):
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-07
+
+### Added
+
+- Discovery alerts now have a one-tap undo: stopping movie alerts shows what was
+  switched off and offers **Turn alerts back on** right away.
+- Settings, `/help` and onboarding explain how to turn movie and showtime
+  alerts on, and Settings shows a hint while they are off.
+
+### Changed
+
+- The quick watch from a discovery alert now follows the whole movie on that
+  day (every showtime and hall) instead of one screening, so a later seat
+  return or a new slot is not missed.
+- Editing branch, type or hall filters no longer opts a user into discovery
+  alerts; only the explicit toggle does. Filters chosen while it was off are
+  remembered.
+- Discovery skips an event when an active watch already covers the same
+  branch, movie and date with a mode that would deliver it, removing the
+  near-duplicate message the watcher and discovery used to send together.
+- A digest shows at most 12 updates and a showtime line at most 6 times, with
+  the rest summarised, so a long batch cannot exceed Telegram's caption limit.
+- Renaissance movie and branch links now open in the reader's language.
+
+### Fixed
+
+- An expired discovery alert now says the alert is old instead of showing a
+  generic error.
+- The settings toggle is named **Movie and showtime alerts**, matching the
+  dates and showtimes it actually covers.
+
 ## [3.1.0] - 2026-11-06
 
 ### Added
@@ -537,7 +568,8 @@ the project uses [Semantic Versioning](https://semver.org):
   donation approved by the admin.
 - Low-volume VOX polling, circuit breaker and stale-data protection.
 
-[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v3.0.0...v3.1.0
 [2.8.1]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/zyadwaleedsec/cinema-radar/compare/v2.7.3...v2.8.0

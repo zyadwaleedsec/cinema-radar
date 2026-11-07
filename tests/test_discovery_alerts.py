@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
+
 import i18n
 import strings
-from broadcaster import Broadcaster, _event_text
+from broadcaster import MAX_DIGEST_LINES, Broadcaster, _event_text
 from links import cinema_page_url, movie_page_url
 from models import Branch, DiscoveryEvent, Movie
 
@@ -189,6 +191,10 @@ def test_movie_page_urls_follow_each_provider():
         == "https://rnscinemas.com/en/movie/dune"
     )
     assert (
+        movie_page_url(Movie("dune", "Dune", "dune", "renaissance"), "ar")
+        == "https://rnscinemas.com/ar/movie/dune"
+    )
+    assert (
         movie_page_url(Movie("7651.499", "Ramayana", "7651.499", "premiere"), "ar")
         == "https://www.premiere-cinemas.com/ar/movie-details/7651.499"
     )
@@ -199,6 +205,18 @@ def test_cinema_page_falls_back_to_the_provider_listing():
     assert cinema_page_url(branch, "ar") == ("https://www.premiere-cinemas.com/ar/now-showing")
     vox = Branch("madina", "Madinaty", "vox", "https://egy.voxcinemas.com/cinemas/madina")
     assert cinema_page_url(vox) == "https://egy.voxcinemas.com/cinemas/madina"
+
+
+def test_stored_renaissance_branch_urls_are_localized():
+    branch = Branch(
+        "city-stars",
+        "City Stars",
+        "renaissance",
+        "https://rnscinemas.com/en/cinemas/city-stars",
+    )
+
+    assert cinema_page_url(branch, "ar") == "https://rnscinemas.com/ar/cinemas/city-stars"
+    assert cinema_page_url(branch, "en") == "https://rnscinemas.com/en/cinemas/city-stars"
 
 
 async def test_single_event_alert_links_to_the_movie_page(db, test_settings):
@@ -241,3 +259,152 @@ async def test_digest_alert_links_to_the_cinema_page(db, test_settings):
 
     assert "https://egy.voxcinemas.com/cinemas/madina" in _urls(keyboard)
     assert "https://egy.voxcinemas.com/movies/dune" not in _urls(keyboard)
+
+
+async def _subscribe(db, test_settings, telegram_id: int, kinds: list[str]) -> dict:
+    user = await db.get_or_create_user(telegram_id, watch_limit=test_settings.free_watch_limit)
+    await db.set_user_language(telegram_id, "ar")
+    await db.upsert_subscription(int(user["id"]), [], kinds, None, True)
+    return user
+
+
+async def test_active_watch_suppresses_the_duplicate_discovery_card(db, test_settings):
+    user = await _subscribe(db, test_settings, 971, ["NEW_SHOWTIMES"])
+    await db.add_watch(
+        user_id=int(user["id"]),
+        provider="vox",
+        branch_id="madina",
+        branch_name="Madinaty",
+        date="2026-12-16",
+        movie_id="m1",
+        movie_name="Dune",
+        showtime="*",
+        hall_type="*",
+        watch_limit=10,
+        scope="movie",
+    )
+    broadcaster = Broadcaster(test_settings, db, _Sender())
+    event = DiscoveryEvent(
+        kind="NEW_SHOWTIMES",
+        branch=Branch("madina", "Madinaty", "vox"),
+        movie=Movie("m1", "Dune", "dune", "vox"),
+        date="2026-12-16",
+        times=("21:30",),
+    )
+
+    assert await broadcaster.process([event]) == 0
+
+
+async def test_a_seats_only_watch_does_not_hide_new_movie_news(db, test_settings):
+    user = await _subscribe(db, test_settings, 972, ["NEW_SHOWTIMES"])
+    await db.add_watch(
+        user_id=int(user["id"]),
+        provider="vox",
+        branch_id="madina",
+        branch_name="Madinaty",
+        date="2026-12-16",
+        movie_id="m1",
+        movie_name="Dune",
+        showtime="*",
+        hall_type="*",
+        watch_limit=10,
+        scope="movie",
+        alert_mode="seats",
+    )
+    broadcaster = Broadcaster(test_settings, db, _Sender())
+    event = DiscoveryEvent(
+        kind="NEW_SHOWTIMES",
+        branch=Branch("madina", "Madinaty", "vox"),
+        movie=Movie("m1", "Dune", "dune", "vox"),
+        date="2026-12-16",
+        times=("21:30",),
+    )
+
+    assert await broadcaster.process([event]) == 1
+
+
+async def test_a_watch_for_another_date_does_not_suppress_the_card(db, test_settings):
+    user = await _subscribe(db, test_settings, 973, ["NEW_SHOWTIMES"])
+    await db.add_watch(
+        user_id=int(user["id"]),
+        provider="vox",
+        branch_id="madina",
+        branch_name="Madinaty",
+        date="2026-12-17",
+        movie_id="m1",
+        movie_name="Dune",
+        showtime="*",
+        hall_type="*",
+        watch_limit=10,
+        scope="movie",
+    )
+    broadcaster = Broadcaster(test_settings, db, _Sender())
+    event = DiscoveryEvent(
+        kind="NEW_SHOWTIMES",
+        branch=Branch("madina", "Madinaty", "vox"),
+        movie=Movie("m1", "Dune", "dune", "vox"),
+        date="2026-12-16",
+        times=("21:30",),
+    )
+
+    assert await broadcaster.process([event]) == 1
+
+
+async def test_all_dates_watch_covers_any_discovery_date(db, test_settings):
+    user = await _subscribe(db, test_settings, 974, ["NEW_DATE_OPENED"])
+    await db.add_watch(
+        user_id=int(user["id"]),
+        provider="vox",
+        branch_id="madina",
+        branch_name="Madinaty",
+        date="*",
+        movie_id="m1",
+        movie_name="Dune",
+        showtime="*",
+        hall_type="*",
+        watch_limit=10,
+        scope="movie_all_dates",
+    )
+    broadcaster = Broadcaster(test_settings, db, _Sender())
+    event = DiscoveryEvent(
+        kind="NEW_DATE_OPENED",
+        branch=Branch("madina", "Madinaty", "vox"),
+        movie=Movie("m1", "Dune", "dune", "vox"),
+        date="2026-12-20",
+    )
+
+    assert await broadcaster.process([event]) == 0
+
+
+async def test_digest_caps_lines_and_summarises_the_rest(db, test_settings):
+    i18n.set_language("ar")
+    broadcaster = Broadcaster(test_settings, db, _Sender())
+    branch = Branch("madina", "Madinaty", "vox")
+    events = [
+        DiscoveryEvent(
+            kind="NEW_MOVIE",
+            branch=branch,
+            movie=Movie(f"m{index}", f"Movie {index}", f"m{index}", "vox"),
+            date="2026-12-16",
+        )
+        for index in range(15)
+    ]
+
+    text, keyboard = await broadcaster._build_message(12345, events)
+
+    assert len([line for line in text.splitlines() if "• " in line]) == MAX_DIGEST_LINES
+    assert "3 تحديثات جديدة" in text
+    token = next(cb for cb in _callbacks(keyboard) if cb.startswith("dw:")).split(":", 1)[1]
+    action = await db.get_discovery_action(token)
+    assert action is not None
+    assert len(json.loads(action["payload"])) == MAX_DIGEST_LINES
+
+
+def test_showtime_lines_cap_the_visible_times():
+    i18n.set_language("ar")
+    line = strings.discovery_line_new_showtimes(
+        "Dune", tuple(f"{hour:02d}:00" for hour in range(9, 18))
+    )
+
+    assert "وغيرها" in line
+    assert line.count("—") == 1

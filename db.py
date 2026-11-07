@@ -694,6 +694,29 @@ class Database:
             (user_id,),
         )
 
+    async def list_active_watches_for_users(self, user_ids: Sequence[int]) -> list[dict[str, Any]]:
+        """Active watches for several users in one round-trip.
+
+        Discovery fan-out needs every subscriber's watches to avoid sending a
+        message the watcher already covers.  One query per chunk is much
+        cheaper than loading each subscriber's rows separately.
+        """
+
+        ids = list(dict.fromkeys(int(value) for value in user_ids))
+        rows: list[dict[str, Any]] = []
+        # SQLite's default parameter limit is 999; leave headroom for other
+        # placeholders and keep the query shape predictable.
+        for start in range(0, len(ids), 500):
+            chunk = ids[start : start + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            rows.extend(
+                await self.fetchall(
+                    f"SELECT * FROM watches WHERE active = 1 AND user_id IN ({placeholders})",
+                    tuple(chunk),
+                )
+            )
+        return rows
+
     async def get_watch(self, watch_id: int) -> dict[str, Any] | None:
         return await self.fetchone("SELECT * FROM watches WHERE id = ?", (watch_id,))
 

@@ -117,6 +117,8 @@ def test_watch_choices_dedupe_and_keep_the_event_data():
     assert first["branch_name"] == "Madinaty"
     assert first["showtime"] == "21:30"
     assert first["hall_type"] == "MAX"
+    # Two updates for the same movie are merged into one chooser row.
+    assert first["times"] == ["21:30", "23:45"]
     assert first["booking_url"] == "https://example/booking"
     assert first["poster_url"] == "https://image/movie.jpg"
     assert first["duration_minutes"] == 155
@@ -250,13 +252,13 @@ async def test_choosing_a_movie_creates_the_watch_from_the_payload(db, test_sett
         payload=payload,
     )
     scheduler = _FakeScheduler()
-    edits: list[str] = []
+    edits: list[tuple[str, object]] = []
 
     async def fake_answer(callback, text="", alert=False):
         pass
 
     async def fake_edit(callback, text, keyboard=None, photo_url=None):
-        edits.append(text)
+        edits.append((text, keyboard))
 
     with (
         patch.object(discovery_handler, "answer", fake_answer),
@@ -271,9 +273,73 @@ async def test_choosing_a_movie_creates_the_watch_from_the_payload(db, test_sett
     watch = watches[0]
     assert watch["movie_id"] == "m1"
     assert watch["branch_name"] == "Madinaty"
-    assert watch["showtime"] == "21:30"
-    assert watch["hall_type"] == "MAX"
+    # The alert is about the movie, not one screening: the quick watch covers
+    # every showtime and hall on that day instead of a single slot.
+    assert watch["scope"] == "movie"
+    assert watch["showtime"] == "*"
+    assert watch["hall_type"] == "*"
+    assert watch["expires_at"] is not None
     assert watch["poster_url"] == "https://image/movie.jpg"
     assert watch["duration_minutes"] == 155
     assert scheduler.targets and scheduler.targets[0].movie_id == "m1"
-    assert edits and "الكثيب" in edits[0]
+    assert edits and "الكثيب" in edits[0][0]
+    callbacks = [
+        button.callback_data
+        for row in edits[0][1].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert f"w:cfg:{watch['id']}" in callbacks
+
+
+async def test_expired_alert_token_gets_a_clear_message(db):
+    i18n.set_language("ar")
+    answers: list[str] = []
+
+    async def fake_answer(callback, text="", alert=False):
+        answers.append(text)
+
+    with patch.object(discovery_handler, "answer", fake_answer):
+        await discovery_handler.watch_from_discovery(_FakeCallback(960, "dw:gone"), db)
+
+    assert answers and "التنبيه ده قديم" in answers[0]
+
+
+async def test_stopping_is_explicit_and_undo_restores_alerts(db, test_settings):
+    i18n.set_language("ar")
+    user = await db.get_or_create_user(953)
+    await db.upsert_subscription(int(user["id"]), [], ["NEW_MOVIE"], None, True)
+    edits: list[tuple[str, object]] = []
+
+    async def fake_answer(callback, text="", alert=False):
+        pass
+
+    async def fake_edit(callback, text, keyboard=None, photo_url=None):
+        edits.append((text, keyboard))
+
+    with (
+        patch.object(discovery_handler, "answer", fake_answer),
+        patch.object(discovery_handler, "edit", fake_edit),
+    ):
+        await discovery_handler.stop_discovery(_FakeCallback(953, "ds:stop"), db, test_settings)
+
+    sub = await db.get_subscription(int(user["id"]))
+    assert sub is not None and sub["active"] == 0
+    assert "وقّفنا تنبيهات الأفلام والمواعيد" in edits[0][0]
+    assert "مراقباتك العادية شغالة" in edits[0][0]
+    callbacks = [
+        button.callback_data
+        for row in edits[0][1].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "ds:on" in callbacks
+
+    with (
+        patch.object(discovery_handler, "answer", fake_answer),
+        patch.object(discovery_handler, "edit", fake_edit),
+    ):
+        await discovery_handler.resume_discovery(_FakeCallback(953, "ds:on"), db, test_settings)
+
+    sub = await db.get_subscription(int(user["id"]))
+    assert sub is not None and sub["active"] == 1

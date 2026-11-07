@@ -203,7 +203,8 @@ BTN_OPEN_BOOKING = "🎟️ افتح الحجز"
 BTN_MOVIE_PAGE = "🎬 صفحة الفيلم"
 BTN_CINEMA_PAGE = "🏢 صفحة السينما"
 BTN_WATCH_MOVIE = "🔔 راقب فيلم من التحديثات"
-BTN_STOP_ALERTS = "🔕 وقّف التنبيهات دي"
+BTN_STOP_ALERTS = "🔕 وقّف كل تنبيهات الأفلام"
+BTN_TURN_ON_ALERTS = "🔔 رجّع التنبيهات"
 BTN_REMOVE_WATCH = "❌ شيل المراقبة"
 BTN_CONFIRM_REMOVE_WATCH = "أيوه، شيلها"
 BTN_SNOOZE = "⏰ فكّرني بعد ساعة"
@@ -229,7 +230,7 @@ BTN_INSTAPAY = "إنستاباي"
 BTN_CANCELLATIONS = "🪑 رجوع الكراسي"
 BTN_QUIET_HOURS = "🕰️ ساعات الهدوء"
 BTN_QUIET_CUSTOM = "🕰️ وقت مخصص"
-BTN_DISCOVERY_ALERTS = "🎬 تنبيهات الأفلام الجديدة"
+BTN_DISCOVERY_ALERTS = "🎬 تنبيهات الأفلام والمواعيد"
 BTN_BRANCHES_FILTER = "🎯 فروع التنبيهات"
 BTN_TYPES_FILTER = "📌 أنواع التنبيهات"
 BTN_HALL_FILTER = "🎭 نوع القاعة"
@@ -387,7 +388,9 @@ def onboard_alerts() -> str:
         "🎟️ <b>الحجز فتح</b>\nأول ما الحفلة تنزل.",
         "🪑 <b>كراسي رجعت</b>\nلما كرسي يتفضى.",
         "📅 <b>يوم جديد</b>\nلما فيلم ينزل في يوم جديد.",
-        "⚙️ تظبط كل نوع من <b>إعدادات التنبيه</b>.",
+        "🍿 <b>فيلم أو حفلة جديدة</b>\nلما ينزل فيلم جديد أو تفتح مواعيد جديدة،\n"
+        "لو فعّلت <b>تنبيهات الأفلام والمواعيد</b>.",
+        "⚙️ تظبط كل نوع وتفعّل التنبيهات من <b>الإعدادات</b>.",
     )
 
 
@@ -418,6 +421,9 @@ def help_text() -> str:
         "• الحفلة\n\n"
         "أو راقب كل حفلات اليوم، أو كل الأيام المتاحة.\n"
         "وتقدر تحدد فورمات معيّن زي IMAX أو 4DX أو VIP.\n\n"
+        "<b>مش لاقي اللي تراقبه؟</b>\n"
+        "فعّل <b>🎬 تنبيهات الأفلام والمواعيد</b> من الإعدادات،\n"
+        "وهتوصلك أول ما فيلم جديد ينزل أو يوم أو حفلة جديدة تفتح.\n\n"
         "<b>2 · استنى التنبيه</b>\n"
         "أول ما الحجز يفتح أو كرسي يرجع،\n"
         "هتوصلك رسالة فيها لينك الحجز.\n\n"
@@ -1334,13 +1340,19 @@ def settings_text(
     branches = "كل الفروع" if branch_count == 0 else _branches(branch_count)
     hall = hall_type or "كل القاعات"
     watch_quiet = "وبتشمل المراقبات ✅" if quiet_watches else "والمراقبات شغالة دايماً 🔔"
+    hint = (
+        ""
+        if discovery_enabled
+        else "💡 <i>فعّل تنبيهات الأفلام والمواعيد عشان يوصلك أي فيلم أو يوم أو حفلة جديدة أول ما تنزل.</i>"
+    )
     return _blocks(
         f"⚙️ <b>الإعدادات</b>\n{DIVIDER}",
         "<b>🔔 الإشعارات</b>\n"
         f"• رجوع الكراسي: {'مفعل ✅' if notify_cancellations else 'مقفول ⛔'}\n"
         f"• ساعات الهدوء: {format_time(f'{quiet_start}:00')} → {format_time(f'{quiet_end}:00')}\n"
         f"  <i>{watch_quiet}</i>\n"
-        f"• أفلام وحجوزات جديدة: {'مفعلة ✅' if discovery_enabled else 'مقفولة ⛔'}",
+        f"• الأفلام والمواعيد الجديدة: {'مفعلة ✅' if discovery_enabled else 'مقفولة ⛔'}",
+        hint,
         "<b>🎯 فلاتر التنبيهات الجديدة</b>\n"
         f"• الفروع: {esc(branches)}\n"
         f"• الأنواع: {esc(types)}\n"
@@ -1701,12 +1713,15 @@ def discovery_digest(
     count: int,
     lines: list[str],
     provider: str | None = None,
+    hidden: int = 0,
 ) -> str:
     body = "\n".join(_rtl(f"• {line}") for line in lines)
+    more = _rtl(f"➕ و{_updates(hidden)} كمان") if hidden > 0 else ""
     return _blocks(
         _rtl(f"🍿 <b>عندك {_updates(count)} في {cinema_name(provider)} · {_ltr(branch)}</b>"),
         _rtl(DIVIDER),
         body,
+        more,
         _rtl("👀 <i>بص عليهم واختار اللي يعجبك.</i>"),
     )
 
@@ -1716,6 +1731,30 @@ def discovery_watch_prompt() -> str:
         _rtl("🔔 <b>تحب تراقب أنهي فيلم؟</b>"),
         _rtl(DIVIDER),
         _rtl("اختار الفيلم اللي عايز تراقبه من التحديثات اللي فوق:"),
+    )
+
+
+def discovery_stopped() -> str:
+    return _blocks(
+        _rtl("🔕 <b>وقّفنا تنبيهات الأفلام والمواعيد</b>"),
+        _rtl("مش هيوصلك أي تنبيه عن فيلم جديد أو يوم أو حفلة جديدة."),
+        _rtl("مراقباتك العادية شغالة زي ما هي."),
+        _rtl("تقدر ترجّعها في أي وقت من الزرار تحت أو من <b>الإعدادات</b>."),
+    )
+
+
+def discovery_resumed() -> str:
+    return _blocks(
+        _rtl("🔔 <b>رجّعنا التنبيهات</b>"),
+        _rtl("هيوصلك تاني كل جديد من الفروع اللي اخترتها."),
+    )
+
+
+def discovery_alert_expired() -> str:
+    return _blocks(
+        _rtl("⌛ <b>التنبيه ده قديم</b>"),
+        _rtl("التنبيهات بتتقفل بعد 7 أيام."),
+        _rtl("افتح آخر تنبيه أو اضغط /settings."),
     )
 
 
@@ -1945,7 +1984,10 @@ def discovery_line_new_date(name: object, date_text: str) -> str:
 
 
 def discovery_line_new_showtimes(name: object, times: tuple[str, ...]) -> str:
-    formatted = "، ".join(format_time(value) for value in times)
+    shown = times[:6]
+    formatted = "، ".join(format_time(value) for value in shown)
+    if len(times) > len(shown):
+        formatted += " وغيرها"
     return f"🕐 حفلات جديدة: {esc(name)} — {formatted}"
 
 

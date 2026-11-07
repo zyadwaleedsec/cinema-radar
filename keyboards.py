@@ -704,6 +704,20 @@ def discovery_movie_keyboard(token: str, choices: list[dict[str, Any]]) -> Any:
     return _markup(rows)
 
 
+def discovery_stopped_keyboard() -> Any:
+    """Confirmation after stopping movie alerts, with a one-tap undo."""
+
+    return _markup(
+        [
+            [_btn(strings.BTN_TURN_ON_ALERTS, "ds:on", style="success")],
+            [
+                _btn(strings.BTN_SETTINGS, "menu:settings"),
+                _btn(strings.BTN_HOME, "menu:home"),
+            ],
+        ]
+    )
+
+
 def delete_me_keyboard() -> Any:
     return _markup(
         [
